@@ -23,9 +23,9 @@ RUN --network=none --mount=target=. \
     [[ "$GOARCH" == "arm" ]] && [[ "$TARGETVARIANT" == "v7" ]] && export GOARM=7; \
     echo $GOARCH $GOOS $GOARM$GOAMD64; \
     go build -ldflags "-s -w \
-    -X buildinfo.Version=${VERSION} \
-    -X buildinfo.Commit=${REVISION} \
-    -X buildinfo.Date=${BUILDTIME}" \
+    -X mangarr/internal/buildinfo.Version=${VERSION} \
+    -X mangarr/internal/buildinfo.Commit=${REVISION} \
+    -X mangarr/internal/buildinfo.Date=${BUILDTIME}" \
     -o /out/bin/mangarr main.go
 
 # build runner

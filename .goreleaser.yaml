@@ -32,6 +32,11 @@ builds:
         goarch: arm64
     main: main.go
     binary: mangarr
+    ldflags:
+      - -s -w
+      - -X mangarr/internal/buildinfo.Version={{.Version}}
+      - -X mangarr/internal/buildinfo.Commit={{.Commit}}
+      - -X mangarr/internal/buildinfo.Date={{.Date}}
 
 archives:
   - id: mangarr
