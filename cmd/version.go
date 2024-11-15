@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const ghURL = "https://api.github.com/repos/nuxencs/seasonpackarr/releases/latest"
+const githubURL = "https://api.github.com/repos/nuxencs/mangarr/releases/latest"
 
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
@@ -27,7 +27,7 @@ var versionCmd = &cobra.Command{
 		fmt.Println("Build date:", buildinfo.Date)
 		fmt.Println()
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, ghURL, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubURL, nil)
 		if err != nil {
 			fmt.Println("Failed to create request:", err)
 			os.Exit(1)
@@ -65,7 +65,7 @@ var versionCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		if rel.TagName != buildinfo.Version && buildinfo.Version != "dsev" {
+		if rel.TagName != buildinfo.Version && buildinfo.Version != "dev" {
 			fmt.Println("Update available:", buildinfo.Version, "->", rel.TagName)
 			fmt.Println("Published at:", rel.PublishedAt.Format(time.RFC3339))
 		}
