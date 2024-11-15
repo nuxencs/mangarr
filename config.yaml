@@ -1,0 +1,136 @@
+# config.yaml
+
+# Download Location
+# Needs to be filled out correctly, e.g. "/data/downloads/manga"
+#
+# Default: ""
+#
+downloadLocation: ""
+
+# Naming Template
+# This can be used to change how the downloaded chapter will be named
+# The default will result something like this: Manga Ch. 001 - Chapter Title
+#
+# Default: {manga:<.>} Ch. {num:3}{title: - <.>}
+#
+namingTemplate: "{manga:<.>} Ch. {num:3}{title: - <.>}"
+
+# Check interval in minutes
+#
+# Default: 15
+#
+checkInterval: 15
+
+# Monitored Manga
+# Here you can define which manga you want to monitor
+#
+monitoredManga:
+  # Custom name you can give the entry to easily distinguish between them
+  #
+  One Piece:
+    # Source from where the manga should be downloaded
+    #
+    source: "tcbscans"
+
+    # Name of the manga on TCB Scans
+    #
+    manga: "One Piece"
+
+  # Custom name you can give the entry to easily distinguish between them
+  #
+  Isekai Ojisan:
+    # Source from where the manga should be downloaded
+    #
+    source: "mangadex"
+
+    # ID of the manga on MangaDex
+    #
+    manga: "d8f1d7da-8bb1-407b-8be3-10ac2894d3c6"
+
+    # ID of the scanlation group on MangaDex
+    #
+    group: "310361d7-52dd-4848-9b36-2eb4fcc95e83"
+
+    # Language of the manga on MangaDex
+    #
+    language: "en"
+
+  # Custom name you can give the entry to easily distinguish between them
+  #
+  Kagurabachi:
+    # Source from where the manga should be downloaded
+    #
+    source: "mangaplus"
+
+    # ID of the manga on MangaPlus
+    #
+    manga: "100274"
+
+  # Custom name you can give the entry to easily distinguish between them
+  #
+  Solo Leveling Ragnarok:
+    # Source from where the manga should be downloaded
+    #
+    source: "flamecomics"
+
+    # URL of the manga on Flame Comics
+    #
+    manga: "https://flamecomics.xyz/series/solo-leveling-ragnarok/"
+
+  # Custom name you can give the entry to easily distinguish between them
+  #
+  Solo Max-Level Newbie:
+    # Source from where the manga should be downloaded
+    #
+    source: "asurascans"
+
+    # URL of the manga on Asura Scans
+    #
+    manga: "https://asuracomic.net/series/solo-max-level-newbie-31f980f5"
+
+  # Custom name you can give the entry to easily distinguish between them
+  #
+  One Punch Man:
+    # Source from where the manga should be downloaded
+    #
+    source: "cubari"
+
+    # URL of the gist for the manga on Cubari
+    #
+    manga: "https://git.io/OPM"
+
+    # ID of the scanlation group on MangaDex
+    #
+    group: "/r/OnePunchMan"
+
+# mangarr logs file
+# If not defined, logs to stdout
+# Make sure to use forward slashes and include the filename with extension. e.g. "logs/mangarr.log", "C:/mangarr/logs/mangarr.log"
+#
+# Optional
+#
+#logPath: ""
+
+# Log level
+#
+# Default: "DEBUG"
+#
+# Options: "ERROR", "DEBUG", "INFO", "WARN", "TRACE"
+#
+logLevel: "DEBUG"
+
+# Log Max Size
+#
+# Default: 50
+#
+# Max log size in megabytes
+#
+#logMaxSize: 50
+
+# Log Max Backups
+#
+# Default: 3
+#
+# Max amount of old log files
+#
+#logMaxBackups = 3
