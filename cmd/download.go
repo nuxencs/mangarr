@@ -53,18 +53,18 @@ var downloadCmd = &cobra.Command{
 		}
 
 		if err := s.ValidateInput(); err != nil {
-			fmt.Printf("Invalid input: %v\n", err)
+			fmt.Println("Invalid input:", err)
 			return
 		}
 
 		selectedManga, err := s.GetManga(ctx)
 		if err != nil {
-			fmt.Printf("Failed to get manga from %q: %v\n", s, err)
+			fmt.Printf("Failed to get manga from %s: %v\n", s, err)
 			return
 		}
 
 		if err := s.GetChapters(ctx, selectedManga); err != nil {
-			fmt.Printf("Failed to get chapters for %q: %v\n", selectedManga.Title, err)
+			fmt.Printf("Failed to get chapters for %s: %v\n", selectedManga.Title, err)
 			return
 		}
 
@@ -72,7 +72,7 @@ var downloadCmd = &cobra.Command{
 
 		firstChapterNr, latestChapterNr, err := parse.GetMinAndMaxKeys(selectedManga.Chapters)
 		if err != nil {
-			fmt.Printf("Failed to parse chapter number for %q: %v\n", selectedManga.Title, err)
+			fmt.Printf("Failed to parse chapter number for %s: %v\n", selectedManga.Title, err)
 			return
 		}
 
@@ -84,13 +84,13 @@ var downloadCmd = &cobra.Command{
 		default:
 			selectedChapterNumbers, err = parse.ChapterSelection(chapterNumbers, selectedManga.Chapters)
 			if err != nil {
-				fmt.Printf("Failed to parse chapter selection for %q: %v\n", selectedManga.Title, err)
+				fmt.Printf("Failed to parse chapter selection for %s: %v\n", selectedManga.Title, err)
 				return
 			}
 		}
 
 		if len(selectedChapterNumbers) == 0 {
-			fmt.Printf("Failed to find matching chapters in range %s for %q\n", chapterNumbers, selectedManga.Title)
+			fmt.Printf("Failed to find matching chapters in range %s for %s\n", chapterNumbers, selectedManga.Title)
 			return
 		}
 
@@ -104,7 +104,7 @@ var downloadCmd = &cobra.Command{
 
 				selectedChapter, ok := selectedManga.Chapters[num]
 				if !ok {
-					fmt.Printf("Failed to find chapter with number: %g\n", num)
+					fmt.Println("Failed to find chapter with number", num)
 					return
 				}
 
@@ -120,7 +120,7 @@ var downloadCmd = &cobra.Command{
 				contentPath := filepath.Join(downloadDirectory, selectedManga.Title, chapterFolder+".cbz")
 
 				if _, err := os.Stat(contentPath); err == nil {
-					fmt.Printf("Chapter has already been downloaded, skipping %q\n", templatedName)
+					fmt.Println("Chapter has already been downloaded, skipping", templatedName)
 					return
 				}
 
@@ -130,7 +130,7 @@ var downloadCmd = &cobra.Command{
 					return
 				}
 
-				fmt.Printf("Finished downloading %q\n", templatedName)
+				fmt.Println("Finished downloading", templatedName)
 			}()
 		}
 

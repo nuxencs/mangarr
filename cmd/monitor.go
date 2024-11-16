@@ -107,7 +107,7 @@ var monitorCmd = &cobra.Command{
 
 							_, latestChapterNr, err := parse.GetMinAndMaxKeys(selectedManga.Chapters)
 							if err != nil {
-								mLog.Error().Err(err).Msg("error parsing chapter number")
+								mLog.Error().Err(err).Msg("error getting latest chapter number")
 								return
 							}
 
@@ -140,16 +140,16 @@ var monitorCmd = &cobra.Command{
 							contentPath := filepath.Join(cfg.Config.DownloadLocation, selectedManga.Title, chapterFolder+".cbz")
 
 							if _, err := os.Stat(contentPath); err == nil {
-								mLog.Debug().Msgf("chapter has already been downloaded, skipping %q", templatedName)
+								mLog.Debug().Msgf("chapter has already been downloaded, skipping %s", templatedName)
 								return
 							}
 
 							mLog.Info().Msgf("downloading %q", templatedName)
 							if err := download.Chapter(ctx, contentPath, selectedChapter); err != nil {
-								mLog.Error().Err(err).Msgf("error downloading chapter %q", templatedName)
+								mLog.Error().Err(err).Msgf("error downloading chapter %s", templatedName)
 								return
 							}
-							mLog.Info().Msgf("finished downloading %q", templatedName)
+							mLog.Info().Msgf("finished downloading %s", templatedName)
 						}()
 					}
 

@@ -3,6 +3,7 @@ package files
 import (
 	"archive/zip"
 	"bufio"
+	"fmt"
 	"image"
 	"io"
 	"os"
@@ -16,7 +17,7 @@ const binSize = 10
 
 func IsValidLocation(location string) error {
 	if _, err := os.Stat(location); err != nil {
-		return err
+		return fmt.Errorf("failed to stat location %s: %w", location, err)
 	}
 
 	return nil
@@ -24,14 +25,16 @@ func IsValidLocation(location string) error {
 
 // CreateCbzArchive creates a zip archive named cbzPath and adds all files from sourceDir to it
 func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
-	err := os.MkdirAll(filepath.Dir(cbzPath), os.ModePerm)
+	cbzDir := filepath.Dir(cbzPath)
+
+	err := os.MkdirAll(cbzDir, os.ModePerm)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create directory %s: %w", cbzDir, err)
 	}
 
 	cbzFile, err := os.Create(cbzPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create file %s: %w", cbzPath, err)
 	}
 	defer cbzFile.Close()
 
@@ -45,19 +48,23 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 	widthCount := make(map[int]int)
 
 	walkErr := filepath.Walk(sourceDir, func(imgPath string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return err
+		if err != nil {
+			return fmt.Errorf("failed to walk directory %s: %w", sourceDir, err)
+		}
+
+		if info.IsDir() {
+			return nil
 		}
 
 		imgFile, err := os.Open(imgPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open image %s: %w", imgPath, err)
 		}
 		defer imgFile.Close()
 
 		img, _, err := image.DecodeConfig(imgFile)
 		if err != nil {
-			return nil
+			return fmt.Errorf("failed to decode image %s: %w", imgPath, err)
 		}
 
 		bin := (img.Width / binSize) * binSize
@@ -66,7 +73,7 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 		return nil
 	})
 	if walkErr != nil {
-		return walkErr
+		return fmt.Errorf("failed to walk directory %s: %w", sourceDir, walkErr)
 	}
 
 	maxCount := 0
@@ -78,32 +85,45 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 	}
 
 	walkErr = filepath.Walk(sourceDir, func(imgPath string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return err
+		if err != nil {
+			return fmt.Errorf("failed to walk directory %s: %w", sourceDir, err)
+		}
+
+		// skip directories
+		if info.IsDir() {
+			return nil
 		}
 
 		imgFile, err := os.Open(imgPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open image %s: %w", imgPath, err)
 		}
 		defer imgFile.Close()
 
 		img, _, err := image.DecodeConfig(imgFile)
 		if err != nil {
-			return nil
+			return fmt.Errorf("failed to decode image %s: %w", imgPath, err)
 		}
 
-		// only remove uncommon image widths for manhwa
+		// skip uncommon image widths for manhwa
 		if isManhwa {
 			if img.Width < mostCommonWidth-binSize || img.Width > mostCommonWidth+binSize {
 				return nil
 			}
 		}
 
-		return addFileToZip(zipWriter, imgPath, info.Name())
-	})
+		err = addFileToZip(zipWriter, imgPath, info.Name())
+		if err != nil {
+			return fmt.Errorf("failed to add file to cbz archive %s: %w", imgPath, err)
+		}
 
-	return walkErr
+		return nil
+	})
+	if walkErr != nil {
+		return fmt.Errorf("failed to walk directory %s: %w", sourceDir, walkErr)
+	}
+
+	return nil
 }
 
 // CreatePDF creates a pdf file named pdfPath and adds all files from sourceDir to it
@@ -147,17 +167,21 @@ func CreatePDF(sourceDir, pdfPath string) error {
 func addFileToZip(zipWriter *zip.Writer, filePath, fileName string) error {
 	fileToZip, err := os.Open(filePath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 	defer fileToZip.Close()
 
 	writer, err := zipWriter.Create(fileName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create zip file: %w", err)
 	}
 
 	readerBuf := bufio.NewReader(fileToZip)
 
 	_, err = io.Copy(writer, readerBuf)
+	if err != nil {
+		return fmt.Errorf("failed to copy buffer to cbz file: %w", err)
+	}
+
 	return err
 }

@@ -17,13 +17,9 @@ func ChapterSelection(input string, availableChapters map[float32]domain.Chapter
 
 	for _, part := range parts {
 		if strings.Contains(part, "-") {
-			rangeParts := strings.Split(part, "-")
-			if len(rangeParts) != 2 {
-				return nil, fmt.Errorf("invalid range format: %s", part)
-			}
-			start, end, err := getRange(rangeParts)
+			start, end, err := getRange(part)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get range from part %s: %w", part, err)
 			}
 
 			for chapter := range availableChapters {
@@ -34,8 +30,9 @@ func ChapterSelection(input string, availableChapters map[float32]domain.Chapter
 		} else {
 			chapter, err := strconv.ParseFloat(strings.TrimSpace(part), 32)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse chapter number from part %s: %w", part, err)
 			}
+
 			uniqueChapters[float32(chapter)] = true
 		}
 	}
@@ -49,18 +46,24 @@ func ChapterSelection(input string, availableChapters map[float32]domain.Chapter
 }
 
 // getRange parses the user input for chapter ranges
-func getRange(rangeParts []string) (float32, float32, error) {
+func getRange(part string) (float32, float32, error) {
+	rangeParts := strings.Split(part, "-")
+	if len(rangeParts) != 2 {
+		return 0, 0, fmt.Errorf("invalid range format: %s", part)
+	}
+
 	start, err := strconv.ParseFloat(strings.TrimSpace(rangeParts[0]), 32)
 	if err != nil {
-		return 0, 0, fmt.Errorf("invalid start of range: %s", rangeParts[0])
+		return 0, 0, fmt.Errorf("failed to parse start of range %s: %w", rangeParts[0], err)
 	}
+
 	end, err := strconv.ParseFloat(strings.TrimSpace(rangeParts[1]), 32)
 	if err != nil {
-		return 0, 0, fmt.Errorf("invalid end of range: %s", rangeParts[1])
+		return 0, 0, fmt.Errorf("failed to parse end of range %s: %w", rangeParts[1], err)
 	}
 
 	if start > end {
-		return 0, 0, fmt.Errorf("start of range should not be greater than end: %s-%s", rangeParts[0], rangeParts[1])
+		return 0, 0, fmt.Errorf("start of range should not be greater than end")
 	}
 
 	return float32(start), float32(end), nil

@@ -25,7 +25,6 @@ var versionCmd = &cobra.Command{
 		fmt.Println("Version:", buildinfo.Version)
 		fmt.Println("Commit:", buildinfo.Commit)
 		fmt.Println("Build date:", buildinfo.Date)
-		fmt.Println()
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubURL, nil)
 		if err != nil {
@@ -66,6 +65,7 @@ var versionCmd = &cobra.Command{
 		}
 
 		if rel.TagName != buildinfo.Version && buildinfo.Version != "dev" {
+			fmt.Println()
 			fmt.Println("Update available:", buildinfo.Version, "->", rel.TagName)
 			fmt.Println("Published at:", rel.PublishedAt.Format(time.RFC3339))
 		}

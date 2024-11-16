@@ -23,6 +23,7 @@ import (
 // Chapter downloads and processes manga chapter images to create a CBZ archive.
 func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter) error {
 	var wg sync.WaitGroup
+	errc := make(chan error, len(chapter.ImageInfo))
 
 	// if chapter.IsManhwa {
 	// 	 outputPath = contentPath + ".pdf"
@@ -32,34 +33,46 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter) er
 
 	temp, err := os.MkdirTemp("", "mangarr-*")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create temp directory %s: %w", temp, err)
 	}
 	defer os.RemoveAll(temp)
 
 	for i, imageInfo := range chapter.ImageInfo {
 		wg.Add(1)
 
-		i, imageInfo := i, imageInfo
-
 		go func() {
 			defer wg.Done()
 
 			filenameNoExt := filepath.Join(temp, fmt.Sprintf("%03d", i+1))
 
+			var err error
 			if len(imageInfo.EncryptionKey) != 0 {
 				if err = decryptImage(ctx, imageInfo.ImageURL, imageInfo.EncryptionKey, filenameNoExt); err != nil {
-					fmt.Printf("error decrypting and downloading file: %q", err)
+					errc <- fmt.Errorf("failed to decrypt and download image %s: %w", imageInfo.ImageURL, err)
 					return
 				}
 			} else {
 				if err = singleFile(ctx, imageInfo.ImageURL, filenameNoExt); err != nil {
-					fmt.Printf("error downloading file: %q", err)
+					errc <- fmt.Errorf("failed to download image %s: %w", imageInfo.ImageURL, err)
 					return
 				}
 			}
 		}()
 	}
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(errc)
+	}()
+
+	var errors []error
+	for err := range errc {
+		errors = append(errors, err)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to process %d images: %w", len(errors), errors[0])
+	}
 
 	// if chapter.IsManhwa {
 	// 	 err = files.CreatePDF(temp, outputPath)
@@ -74,7 +87,7 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter) er
 	// }
 
 	if err := files.CreateCbzArchive(temp, contentPath, chapter.IsManhwa); err != nil {
-		return err
+		return fmt.Errorf("failed to create cbz archive: %w", err)
 	}
 
 	return nil
@@ -95,24 +108,19 @@ func singleFile(ctx context.Context, url, filenameNoExt string) error {
 	}
 
 	retryErr := retry.Do(func() error {
-		resp, err := client.Do(req)
+		resp, err := sharedhttp.ExecRequest(client, req)
 		if err != nil {
-			return fmt.Errorf("failed to get image: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if err := sharedhttp.CheckStatusCode(resp.StatusCode); err != nil {
-			return err
+			return fmt.Errorf("failed to execute request: %w", err)
 		}
 
-		filename, err := appendImageExtension(resp, filenameNoExt)
+		filename, err := appendImageExtension(&resp, filenameNoExt)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to append image extension: %w", err)
 		}
 
 		out, err := os.Create(filename)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create file %s: %w", filename, err)
 		}
 		defer out.Close()
 
@@ -122,7 +130,7 @@ func singleFile(ctx context.Context, url, filenameNoExt string) error {
 
 		_, err = io.Copy(writeBuf, readBuf)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to copy buffer to file %s: %w", filename, err)
 		}
 
 		return nil
@@ -131,8 +139,11 @@ func singleFile(ctx context.Context, url, filenameNoExt string) error {
 		retry.Attempts(3),
 		retry.MaxJitter(time.Second*1),
 	)
+	if retryErr != nil {
+		return fmt.Errorf("failed to execute request: %w", retryErr)
+	}
 
-	return retryErr
+	return nil
 }
 
 // decryptImage fetches an image from the URL and decrypts it with the given encryption key.
@@ -150,24 +161,19 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 	}
 
 	retryErr := retry.Do(func() error {
-		resp, err := client.Do(req)
+		resp, err := sharedhttp.ExecRequest(client, req)
 		if err != nil {
-			return fmt.Errorf("failed to get image: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if err := sharedhttp.CheckStatusCode(resp.StatusCode); err != nil {
-			return err
+			return fmt.Errorf("failed to execute request: %w", err)
 		}
 
 		data, err := io.ReadAll(bufio.NewReader(resp.Body))
 		if err != nil {
-			return fmt.Errorf("failed to read image data: %w", err)
+			return fmt.Errorf("failed to read response body: %w", err)
 		}
 
 		key, err := hex.DecodeString(encryptionHex)
 		if err != nil {
-			return fmt.Errorf("failed to decode encryption key: %w", err)
+			return fmt.Errorf("failed to decode image using encryption key: %w", err)
 		}
 
 		// perform XOR decryption
@@ -176,14 +182,14 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 			data[i] ^= key[i%keyLen]
 		}
 
-		filename, err := appendImageExtension(resp, filenameNoExt)
+		filename, err := appendImageExtension(&resp, filenameNoExt)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to append image extension: %w", err)
 		}
 
 		out, err := os.Create(filename)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create file %s: %w", filename, err)
 		}
 		defer out.Close()
 
@@ -193,7 +199,7 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 
 		_, err = io.Copy(writeBuf, byteBuf)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to copy buffer to file %s: %w", filename, err)
 		}
 
 		return nil
@@ -202,8 +208,11 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 		retry.Attempts(3),
 		retry.MaxJitter(time.Second*1),
 	)
+	if retryErr != nil {
+		return fmt.Errorf("failed to execute request: %w", retryErr)
+	}
 
-	return retryErr
+	return nil
 }
 
 func appendImageExtension(resp *http.Response, filename string) (string, error) {
