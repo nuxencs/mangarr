@@ -55,11 +55,11 @@ func (c *cubari) String() string {
 
 func (c *cubari) ValidateInput() error {
 	if _, err := url.Parse(c.MangaURL); err != nil {
-		return err
+		return fmt.Errorf("failed to parse URL %s: %w", c.MangaURL, err)
 	}
 
 	if len(c.GroupID) == 0 {
-		return fmt.Errorf("cubari group id is required")
+		return fmt.Errorf("cubari group is required")
 	}
 
 	return nil
@@ -78,14 +78,14 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*c.Client, req)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
 		}
 
 		buf := bufio.NewReader(resp.Body)
 
 		err = json.NewDecoder(buf).Decode(&cubariResp)
 		if err != nil {
-			return retry.Unrecoverable(err)
+			return retry.Unrecoverable(fmt.Errorf("failed to decode response: %w", err))
 		}
 
 		return nil
@@ -94,10 +94,13 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 		retry.Attempts(3),
 		retry.MaxJitter(time.Second*1),
 	)
+	if retryErr != nil {
+		return domain.Manga{}, fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+	}
 
 	title := cubariResp.Title
 	if len(title) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga for provided url: %s", c.MangaURL)
+		return domain.Manga{}, fmt.Errorf("failed to get manga for URL %s", req.URL)
 	}
 
 	manga := domain.Manga{
@@ -108,7 +111,7 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 	for num, chapter := range cubariResp.Chapters {
 		chapterNum64, err := strconv.ParseFloat(num, 32)
 		if err != nil {
-			return domain.Manga{}, err
+			return domain.Manga{}, fmt.Errorf("failed to parse chapter number from %s: %w", num, err)
 		}
 
 		chapterNum := float32(chapterNum64)
@@ -133,7 +136,7 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 		return domain.Manga{}, fmt.Errorf("failed to get chapters for manga: %s", manga.Title)
 	}
 
-	return manga, retryErr
+	return manga, nil
 }
 
 func (c *cubari) GetChapters(_ context.Context, _ domain.Manga) error {

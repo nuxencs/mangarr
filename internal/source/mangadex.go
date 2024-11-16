@@ -88,11 +88,11 @@ func (m *mangadex) String() string {
 
 func (m *mangadex) ValidateInput() error {
 	if _, err := uuid.Parse(m.MangaID); err != nil {
-		return fmt.Errorf("invalid mangaplus manga id: %w", err)
+		return fmt.Errorf("failed to parse Manga PLUS manga id: %w", err)
 	}
 
 	if _, err := uuid.Parse(m.GroupID); err != nil {
-		return fmt.Errorf("invalid mangaplus group id: %w", err)
+		return fmt.Errorf("failed to parse Manga PLUS group id: %w", err)
 	}
 
 	if len(m.Language) == 0 {
@@ -107,7 +107,7 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 
 	path, err := url.JoinPath(mangadexURL, "manga", m.MangaID)
 	if err != nil {
-		return domain.Manga{}, err
+		return domain.Manga{}, fmt.Errorf("failed to build URL: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
@@ -120,14 +120,14 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
 		}
 
 		buf := bufio.NewReader(resp.Body)
 
 		err = json.NewDecoder(buf).Decode(&mangaResp)
 		if err != nil {
-			return retry.Unrecoverable(err)
+			return retry.Unrecoverable(fmt.Errorf("failed to decode response: %w", err))
 		}
 
 		return nil
@@ -136,23 +136,36 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 		retry.Attempts(3),
 		retry.MaxJitter(time.Second*1),
 	)
+	if retryErr != nil {
+		return domain.Manga{}, fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+	}
 
 	title := mangaResp.Data.Attributes.Title.En
 	if len(title) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga for id: %s", m.MangaID)
+		return domain.Manga{}, fmt.Errorf("failed to get manga for ID %s", m.MangaID)
 	}
 
 	return domain.Manga{
 		Title:    sanitize.Filename(title),
 		Chapters: make(map[float32]domain.Chapter),
-	}, retryErr
+	}, nil
 }
 
 func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
-	var errFunc error
+	var retryErr error
 	var chapterResp mangadexChapters
 	var chapterCount int
 	var offset int
+
+	path, err := url.JoinPath(mangadexURL, "manga", m.MangaID, "feed")
+	if err != nil {
+		return fmt.Errorf("failed to build URL: %w", err)
+	}
+
+	u, err := url.Parse(path)
+	if err != nil {
+		return fmt.Errorf("failed to parse URL %s: %w", path, err)
+	}
 
 	for {
 		params := url.Values{
@@ -161,16 +174,6 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 			"order[chapter]":       []string{"desc"},
 			"limit":                []string{fmt.Sprintf("%d", mangadexLimit)},
 			"offset":               []string{fmt.Sprintf("%d", offset)},
-		}
-
-		path, err := url.JoinPath(mangadexURL, "manga", m.MangaID, "feed")
-		if err != nil {
-			return err
-		}
-
-		u, err := url.Parse(path)
-		if err != nil {
-			return err
 		}
 
 		u.RawQuery = params.Encode()
@@ -182,17 +185,17 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 
 		req.Header.Set("User-Agent", "mangarr")
 
-		errFunc = retry.Do(func() error {
+		retryErr = retry.Do(func() error {
 			resp, err := sharedhttp.ExecRequest(*m.Client, req)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
 			}
 
 			buf := bufio.NewReader(resp.Body)
 
 			err = json.NewDecoder(buf).Decode(&chapterResp)
 			if err != nil {
-				return retry.Unrecoverable(err)
+				return retry.Unrecoverable(fmt.Errorf("failed to decode response: %w", err))
 			}
 
 			return nil
@@ -201,13 +204,16 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 			retry.Attempts(3),
 			retry.MaxJitter(time.Second*1),
 		)
+		if retryErr != nil {
+			return fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+		}
 
 		for _, data := range chapterResp.Data {
 			for _, rel := range data.Relationships {
 				if rel.Type == "scanlation_group" && rel.ID == m.GroupID {
 					chapterNum64, err := strconv.ParseFloat(data.Attributes.Chapter, 32)
 					if err != nil {
-						return err
+						return fmt.Errorf("failed to parse chapter number from %s: %w", data.Attributes.Chapter, err)
 					}
 					chapterNum := float32(chapterNum64)
 
@@ -226,13 +232,13 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 		}
 
 		if len(manga.Chapters) == 0 {
-			return fmt.Errorf("failed to get chapters for id: %s", m.MangaID)
+			return fmt.Errorf("failed to get chapters for for manga ID %s", m.MangaID)
 		}
 
 		chapterCount += len(chapterResp.Data)
 
 		if chapterCount == chapterResp.Total {
-			return errFunc
+			return nil
 		}
 
 		offset += mangadexLimit
@@ -245,7 +251,7 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 
 	path, err := url.JoinPath(mangadexURL, "at-home/server", chapter.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build URL: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
@@ -255,17 +261,17 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 
 	req.Header.Set("User-Agent", "mangarr")
 
-	errFunc := retry.Do(func() error {
+	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
 		}
 
 		buf := bufio.NewReader(resp.Body)
 
 		err = json.NewDecoder(buf).Decode(&chapterResp)
 		if err != nil {
-			return retry.Unrecoverable(err)
+			return retry.Unrecoverable(fmt.Errorf("failed to decode response: %w", err))
 		}
 
 		return nil
@@ -274,21 +280,23 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 		retry.Attempts(3),
 		retry.MaxJitter(time.Second*1),
 	)
+	if retryErr != nil {
+		return fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+	}
 
 	for _, imageURL := range chapterResp.Chapter.Data {
 		imagePath, err := url.JoinPath(chapterResp.BaseURL, "data", chapterResp.Chapter.Hash, imageURL)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to build URL: %w", err)
 		}
 
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imagePath})
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image urls for chapter id: %s", chapter.ID)
+		return fmt.Errorf("failed to get image URLs for chapter ID %s", chapter.ID)
 	}
 
 	chapter.ImageInfo = imageInfos
-
-	return errFunc
+	return nil
 }

@@ -47,7 +47,7 @@ func (t *tcbscans) String() string {
 
 func (t *tcbscans) ValidateInput() error {
 	if len(t.MangaTitle) == 0 {
-		return fmt.Errorf("tcbscans manga title is required")
+		return fmt.Errorf("tcb scans manga title is required")
 	}
 
 	return nil
@@ -56,7 +56,12 @@ func (t *tcbscans) ValidateInput() error {
 // GetManga gets the selected manga from TCB Scans
 func (t *tcbscans) GetManga(_ context.Context) (domain.Manga, error) {
 	mangas := make(map[string]domain.Manga)
+	var errors []error
 	c := t.Collector.Clone()
+
+	c.OnError(func(r *colly.Response, err error) {
+		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
+	})
 
 	c.OnHTML("div.bg-card.border.border-border.rounded.p-3.mb-3", func(e *colly.HTMLElement) {
 		mangaURL := e.ChildAttr("a", "href")
@@ -71,17 +76,21 @@ func (t *tcbscans) GetManga(_ context.Context) (domain.Manga, error) {
 
 	path, err := url.JoinPath(tcbscansURL, "projects")
 	if err != nil {
-		return domain.Manga{}, err
+		return domain.Manga{}, fmt.Errorf("failed to build URL: %w", err)
 	}
 
 	err = c.Visit(path)
 	if err != nil {
-		return domain.Manga{}, err
+		return domain.Manga{}, fmt.Errorf("failed to visit URL %s: %w", path, err)
+	}
+
+	if len(errors) > 0 {
+		return domain.Manga{}, fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
 	}
 
 	selectedManga, ok := mangas[t.MangaTitle]
 	if !ok {
-		return domain.Manga{}, fmt.Errorf("failed to get manga for provided name: %s", t.MangaTitle)
+		return domain.Manga{}, fmt.Errorf("failed to get manga for name %s", t.MangaTitle)
 	}
 
 	return selectedManga, nil
@@ -89,7 +98,12 @@ func (t *tcbscans) GetManga(_ context.Context) (domain.Manga, error) {
 
 // GetChapters gets all chapters for a manga
 func (t *tcbscans) GetChapters(_ context.Context, manga domain.Manga) error {
+	var errors []error
 	c := t.Collector.Clone()
+
+	c.OnError(func(r *colly.Response, err error) {
+		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
+	})
 
 	c.OnHTML("a.block.border.border-border.bg-card.mb-3.p-3.rounded", func(e *colly.HTMLElement) {
 		chapterURL := e.Attr("href")
@@ -97,6 +111,7 @@ func (t *tcbscans) GetChapters(_ context.Context, manga domain.Manga) error {
 		name := strings.TrimSpace(e.ChildText("div.text-lg.font-bold"))
 		number, err := t.getChapterNumber(name)
 		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to parse chapter number from URL %s: %w", e.Request.URL, err))
 			return
 		}
 
@@ -111,16 +126,20 @@ func (t *tcbscans) GetChapters(_ context.Context, manga domain.Manga) error {
 
 	path, err := url.JoinPath(tcbscansURL, manga.URL)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build URL: %w", err)
 	}
 
 	err = c.Visit(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to visit URL %s: %w", path, err)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
 	}
 
 	if len(manga.Chapters) == 0 {
-		return fmt.Errorf("failed to get chapters for manga: %s", manga.Title)
+		return fmt.Errorf("failed to get chapters for manga %s", manga.Title)
 	}
 
 	return nil
@@ -128,9 +147,13 @@ func (t *tcbscans) GetChapters(_ context.Context, manga domain.Manga) error {
 
 // GetImageURLs gets all image urls for a chapter
 func (t *tcbscans) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
+	var imageInfos []domain.ImageInfo
+	var errors []error
 	c := t.Collector.Clone()
 
-	var imageInfos []domain.ImageInfo
+	c.OnError(func(r *colly.Response, err error) {
+		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
+	})
 
 	c.OnHTML("img.fixed-ratio-content", func(e *colly.HTMLElement) {
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: e.Attr("src")})
@@ -138,16 +161,20 @@ func (t *tcbscans) GetImageURLs(_ context.Context, chapter *domain.Chapter) erro
 
 	path, err := url.JoinPath(tcbscansURL, chapter.URL)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to build URL: %w", err)
 	}
 
 	err = c.Visit(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to visit URL %s: %w", path, err)
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image urls for chapter number: %g", chapter.Number)
+		return fmt.Errorf("failed to get image URLs for chapter %g", chapter.Number)
 	}
 
 	chapter.ImageInfo = imageInfos
@@ -156,18 +183,18 @@ func (t *tcbscans) GetImageURLs(_ context.Context, chapter *domain.Chapter) erro
 
 // getChapterNumber gets the chapter number from the scraped chapter name
 func (t *tcbscans) getChapterNumber(name string) (float32, error) {
-	var number float64
-	var err error
 
 	// FindSubmatch returns an array where the first element is the full match, and the rest are submatches.
 	matches := chapterNumberPattern.FindStringSubmatch(name)
-	if len(matches) > 1 {
-		number, err = strconv.ParseFloat(matches[1], 32)
-		if err != nil {
-			return 0, err
-		}
-		return float32(number), nil
+
+	if len(matches) <= 1 {
+		return 0, fmt.Errorf("failed to find matches in %s", name)
 	}
 
-	return 0, err
+	number, err := strconv.ParseFloat(matches[1], 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse chapter number from %s: %w", name, err)
+	}
+
+	return float32(number), nil
 }

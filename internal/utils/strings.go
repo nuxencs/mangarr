@@ -26,5 +26,6 @@ func PadFloat(num float32, width int) string {
 	if len(parts) > 1 {
 		return intPart + "." + parts[1]
 	}
+
 	return intPart
 }

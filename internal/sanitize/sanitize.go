@@ -15,5 +15,6 @@ func Filename(title string) string {
 
 	// Remove illegal chars
 	title = r.ReplaceAllString(title, "")
+
 	return title
 }
