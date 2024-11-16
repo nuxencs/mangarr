@@ -43,20 +43,22 @@ type mangadexManga struct {
 }
 
 type mangadexChapters struct {
-	Data []struct {
-		ID         string `json:"id"`
-		Type       string `json:"type"`
-		Attributes struct {
-			Volume  *string `json:"volume"`
-			Chapter string  `json:"chapter"`
-			Title   *string `json:"title"`
-		} `json:"attributes"`
-		Relationships []struct {
-			ID   string `json:"id"`
-			Type string `json:"type"`
-		} `json:"relationships"`
-	} `json:"data"`
-	Total int `json:"total"`
+	Data  []mangadexChaptersData `json:"data"`
+	Total int                    `json:"total"`
+}
+
+type mangadexChaptersData struct {
+	ID         string `json:"id"`
+	Type       string `json:"type"`
+	Attributes struct {
+		Volume  *string `json:"volume"`
+		Chapter string  `json:"chapter"`
+		Title   *string `json:"title"`
+	} `json:"attributes"`
+	Relationships []struct {
+		ID   string `json:"id"`
+		Type string `json:"type"`
+	} `json:"relationships"`
 }
 
 type mangadexChapter struct {
@@ -91,9 +93,9 @@ func (m *mangadex) ValidateInput() error {
 		return fmt.Errorf("failed to parse Manga PLUS manga id: %w", err)
 	}
 
-	if _, err := uuid.Parse(m.GroupID); err != nil {
-		return fmt.Errorf("failed to parse Manga PLUS group id: %w", err)
-	}
+	// if _, err := uuid.Parse(m.GroupID); err != nil {
+	// 	 return fmt.Errorf("failed to parse Manga PLUS group id: %w", err)
+	// }
 
 	if len(m.Language) == 0 {
 		m.Language = "en"
@@ -209,30 +211,25 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 		}
 
 		for _, data := range chapterResp.Data {
-			for _, rel := range data.Relationships {
-				if rel.Type == "scanlation_group" && rel.ID == m.GroupID {
-					chapterNum64, err := strconv.ParseFloat(data.Attributes.Chapter, 32)
-					if err != nil {
-						return fmt.Errorf("failed to parse chapter number from %s: %w", data.Attributes.Chapter, err)
-					}
-					chapterNum := float32(chapterNum64)
-
-					var title string
-					if data.Attributes.Title != nil {
-						title = *data.Attributes.Title
-					}
-
-					manga.Chapters[chapterNum] = domain.Chapter{
-						ID:     data.ID,
-						Number: chapterNum,
-						Title:  sanitize.Filename(title),
+			if len(m.GroupID) == 0 {
+				err := m.processChapter(data, &manga)
+				if err != nil {
+					return fmt.Errorf("failed to process chapter: %w", err)
+				}
+			} else {
+				for _, rel := range data.Relationships {
+					if rel.Type == "scanlation_group" && rel.ID == m.GroupID {
+						err := m.processChapter(data, &manga)
+						if err != nil {
+							return fmt.Errorf("failed to process chapter: %w", err)
+						}
 					}
 				}
 			}
 		}
 
 		if len(manga.Chapters) == 0 {
-			return fmt.Errorf("failed to get chapters for for manga ID %s", m.MangaID)
+			return fmt.Errorf("failed to get chapters for manga ID %s", m.MangaID)
 		}
 
 		chapterCount += len(chapterResp.Data)
@@ -298,5 +295,32 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 	}
 
 	chapter.ImageInfo = imageInfos
+	return nil
+}
+
+func (m *mangadex) processChapter(data mangadexChaptersData, manga *domain.Manga) error {
+	chapter := data.Attributes.Chapter
+
+	if chapter == "" {
+		chapter = "0"
+	}
+
+	chapterNum64, err := strconv.ParseFloat(chapter, 32)
+	if err != nil {
+		return fmt.Errorf("failed to parse chapter number from %s: %w", chapter, err)
+	}
+	chapterNum := float32(chapterNum64)
+
+	var title string
+	if data.Attributes.Title != nil {
+		title = *data.Attributes.Title
+	}
+
+	manga.Chapters[chapterNum] = domain.Chapter{
+		ID:     data.ID,
+		Number: chapterNum,
+		Title:  sanitize.Filename(title),
+	}
+
 	return nil
 }
