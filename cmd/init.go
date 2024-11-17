@@ -1,5 +1,7 @@
 package cmd
 
+const maxConcurrentChapterProcesses = 10
+
 var (
 	configPath        string
 	naming            string

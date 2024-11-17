@@ -11,6 +11,7 @@ import (
 	"mangarr/internal/files"
 	"mangarr/internal/parse"
 	"mangarr/internal/sanitize"
+	"mangarr/internal/semaphore"
 	"mangarr/internal/source"
 	"mangarr/internal/templater"
 
@@ -94,13 +95,16 @@ var downloadCmd = &cobra.Command{
 			return
 		}
 
+		// semaphore to limit concurrency to 10
+		sem := semaphore.NewWeighted(maxConcurrentChapterProcesses)
 		wg := sync.WaitGroup{}
 
 		for _, num := range selectedChapterNumbers {
 			wg.Add(1)
 
 			go func() {
-				defer wg.Done()
+				sem.Acquire()
+				defer func() { sem.Release(); wg.Done() }()
 
 				selectedChapter, ok := selectedManga.Chapters[num]
 				if !ok {
