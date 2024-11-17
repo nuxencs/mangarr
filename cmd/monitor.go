@@ -17,6 +17,7 @@ import (
 	"mangarr/internal/logger"
 	"mangarr/internal/parse"
 	"mangarr/internal/sanitize"
+	"mangarr/internal/semaphore"
 	"mangarr/internal/source"
 	"mangarr/internal/templater"
 
@@ -73,8 +74,10 @@ var monitorCmd = &cobra.Command{
 		ticker := time.NewTicker(time.Duration(cfg.Config.CheckInterval)*time.Minute - 40*time.Second)
 		defer ticker.Stop()
 
-		wg := sync.WaitGroup{}
+		// semaphore to limit concurrency to 10
+		sem := semaphore.NewWeighted(maxConcurrentSourceProcesses)
 		quit := make(chan bool, 1)
+		wg := sync.WaitGroup{}
 
 		go func() {
 			for {
@@ -86,7 +89,8 @@ var monitorCmd = &cobra.Command{
 						wg.Add(1)
 
 						go func() {
-							defer wg.Done()
+							sem.Acquire()
+							defer func() { sem.Release(); wg.Done() }()
 
 							if err := s.ValidateInput(); err != nil {
 								log.Error().Err(err).Msgf("error validating input")

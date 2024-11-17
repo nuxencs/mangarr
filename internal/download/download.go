@@ -15,16 +15,16 @@ import (
 
 	"mangarr/internal/domain"
 	"mangarr/internal/files"
+	"mangarr/internal/semaphore"
 	"mangarr/internal/sharedhttp"
 
 	"github.com/avast/retry-go"
 )
 
+const maxConcurrentImageDownloads = 10
+
 // Chapter downloads and processes manga chapter images to create a CBZ archive.
 func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter) error {
-	var wg sync.WaitGroup
-	errc := make(chan error, len(chapter.ImageInfo))
-
 	// if chapter.IsManhwa {
 	// 	 outputPath = contentPath + ".pdf"
 	// } else {
@@ -37,11 +37,17 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter) er
 	}
 	defer os.RemoveAll(temp)
 
+	// semaphore to limit concurrency to maxConcurrentImageDownloads
+	sem := semaphore.NewWeighted(maxConcurrentImageDownloads)
+	errc := make(chan error, len(chapter.ImageInfo))
+	var wg sync.WaitGroup
+
 	for i, imageInfo := range chapter.ImageInfo {
 		wg.Add(1)
 
 		go func() {
-			defer wg.Done()
+			sem.Acquire()
+			defer func() { sem.Release(); wg.Done() }()
 
 			filenameNoExt := filepath.Join(temp, fmt.Sprintf("%03d", i+1))
 
