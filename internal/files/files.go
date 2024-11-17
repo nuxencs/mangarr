@@ -105,9 +105,9 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 			return fmt.Errorf("failed to decode image %s: %w", imgPath, err)
 		}
 
-		// skip uncommon image widths for manhwa
+		// for manhwa skip uncommon image widths and images that are wider than high
 		if isManhwa {
-			if img.Width < mostCommonWidth-binSize || img.Width > mostCommonWidth+binSize {
+			if img.Width < mostCommonWidth-binSize || img.Width > mostCommonWidth+binSize || img.Width > img.Height {
 				return nil
 			}
 		}
