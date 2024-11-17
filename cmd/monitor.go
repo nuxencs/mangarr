@@ -75,7 +75,7 @@ var monitorCmd = &cobra.Command{
 		defer ticker.Stop()
 
 		// semaphore to limit concurrency to 10
-		sem := semaphore.NewWeighted(maxConcurrentChapterProcesses)
+		sem := semaphore.NewWeighted(maxConcurrentSourceProcesses)
 		quit := make(chan bool, 1)
 		wg := sync.WaitGroup{}
 
