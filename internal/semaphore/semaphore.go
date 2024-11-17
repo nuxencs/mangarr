@@ -17,12 +17,12 @@ func NewWeighted(weight int) Semaphore {
 	}
 }
 
-// Acquire acquires the semaphore with a weight of n, blocking until resources are available.
+// Acquire acquires the semaphore with a weight of 1, blocking until resources are available.
 func (s *semaphore) Acquire() {
 	s.ch <- struct{}{}
 }
 
-// Release releases the semaphore with a weight of n.
+// Release releases the semaphore with a weight of 1.
 func (s *semaphore) Release() {
 	<-s.ch
 }
