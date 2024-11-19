@@ -19,9 +19,6 @@ mangarr download -d ./downloads -s "mangaplus" -m "100037" -C "6,17"
 # Download the latest chapter of Solo Leveling: Ragnarok from Flame Comics
 mangarr download -d ./downloads -s "flamecomics" -m "https://flamecomics.xyz/series/solo-leveling-ragnarok/"
 
-# Download the latest chapter of Solo Max-Level Newbie from Asura Scans
-mangarr download -d ./downloads -s "asurascans" -m "https://asuracomic.net/series/solo-max-level-newbie-31f980f5"
-
 # Download chapter 1-3 of One Punch Man from Cubari
 mangarr download -d ./downloads -s "cubari" -m "https://git.io/OPM" -g "/r/OnePunchMan" -C "1-3"
 

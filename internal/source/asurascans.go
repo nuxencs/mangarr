@@ -53,9 +53,12 @@ func (a *asurascans) ValidateInput() error {
 }
 
 func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
-	var manga domain.Manga
 	var errors []error
-	manga.Chapters = make(map[float32]domain.Chapter)
+
+	manga := domain.Manga{
+		Chapters: make(map[float32]domain.Chapter),
+		IsManhwa: true,
+	}
 
 	c := a.Collector.Clone()
 
@@ -68,19 +71,21 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	})
 
 	c.OnHTML(".pl-4.pr-2.pb-4 a", func(e *colly.HTMLElement) {
-		chapterNum, chapterTitle, err := a.splitChapterInfo(e.Text)
+		chapterTitle := e.ChildText("span")
+
+		chapterNum, err := a.splitChapterInfo(e.Text, chapterTitle)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("failed to parse chapter info %q from URL %s: %w", e.Text, e.Request.URL, err))
 			return
 		}
 
 		chapterURL := e.Attr("href")
+		chapterTitle = sanitize.Filename(chapterTitle)
 
 		manga.Chapters[chapterNum] = domain.Chapter{
-			URL:      chapterURL,
-			Number:   chapterNum,
-			Title:    chapterTitle,
-			IsManhwa: true,
+			URL:    chapterURL,
+			Number: chapterNum,
+			Title:  chapterTitle,
 		}
 	})
 
@@ -144,17 +149,26 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	return nil
 }
 
-func (a *asurascans) splitChapterInfo(input string) (float32, string, error) {
-	parts := strings.SplitN(input, " ", 3)
-	chapterNumberStr := parts[1]
+func (a *asurascans) splitChapterInfo(chapterLine string, chapterTitle string) (float32, error) {
+	cutChapterLine := chapterLine
 
-	chapterNumber, err := strconv.ParseFloat(chapterNumberStr, 32)
-	if err != nil {
-		return 0, "", fmt.Errorf("failed to parse chapter number from %s: %w", chapterNumberStr, err)
+	if len(chapterTitle) != 0 {
+		// not checking for found, because if chapterTitle is not found in chapterLine, cutChapterLine will be set
+		// to chapterLine which already is in the format "Chapter Number"
+		cutChapterLine, _, _ = strings.Cut(chapterLine, chapterTitle)
 	}
 
-	chapterTitle := strings.TrimSpace(strings.Join(parts[2:], " "))
+	_, cutChapterLine, ok := strings.Cut(cutChapterLine, "Chapter ")
+	if !ok {
+		return 0, fmt.Errorf("failed to split chapter string %q", cutChapterLine)
+	}
+
+	chapterNumber, err := strconv.ParseFloat(cutChapterLine, 32)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse chapter number from %s: %w", cutChapterLine, err)
+	}
+
 	chapterTitle = sanitize.Filename(chapterTitle)
 
-	return float32(chapterNumber), chapterTitle, nil
+	return float32(chapterNumber), nil
 }

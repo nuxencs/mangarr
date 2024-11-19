@@ -59,8 +59,8 @@ var monitorCmd = &cobra.Command{
 				sources = append(sources, source.NewMangaPlus(monitoredManga.Manga))
 			case "flamecomics":
 				sources = append(sources, source.NewFlamecomics(monitoredManga.Manga))
-			case "asurascans":
-				sources = append(sources, source.NewAsurascans(monitoredManga.Manga))
+			//case "asurascans":
+			//	sources = append(sources, source.NewAsurascans(monitoredManga.Manga))
 			case "cubari":
 				sources = append(sources, source.NewCubari(monitoredManga.Manga, monitoredManga.Group))
 			default:
@@ -149,7 +149,7 @@ var monitorCmd = &cobra.Command{
 							}
 
 							mLog.Info().Msgf("downloading %q", templatedName)
-							if err := download.Chapter(ctx, contentPath, selectedChapter); err != nil {
+							if err := download.Chapter(ctx, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
 								mLog.Error().Err(err).Msgf("error downloading chapter %s", templatedName)
 								return
 							}

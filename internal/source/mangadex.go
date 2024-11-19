@@ -19,8 +19,12 @@ import (
 )
 
 const (
-	mangadexURL   = "https://api.mangadex.org"
-	mangadexLimit = 500
+	mangadexURL         = "https://api.mangadex.org"
+	mangadexResultLimit = 500
+
+	// tag ID for the "Long Strip" format to identify Manhwa
+	// https://mangadex.org/titles?include=3e2b8dae-350e-4ab8-a8ce-016e844b9f0d
+	mangadexLongStripTagID = "3e2b8dae-350e-4ab8-a8ce-016e844b9f0d"
 )
 
 type mangadex struct {
@@ -33,11 +37,13 @@ type mangadex struct {
 type mangadexManga struct {
 	Data struct {
 		ID         string `json:"id"`
-		Type       string `json:"type"`
 		Attributes struct {
 			Title struct {
 				En string `json:"en"`
 			} `json:"title"`
+			Tags []struct {
+				ID string `json:"id"`
+			} `json:"tags"`
 		} `json:"attributes"`
 	} `json:"data"`
 }
@@ -49,7 +55,6 @@ type mangadexChapters struct {
 
 type mangadexChaptersData struct {
 	ID         string `json:"id"`
-	Type       string `json:"type"`
 	Attributes struct {
 		Volume  *string `json:"volume"`
 		Chapter string  `json:"chapter"`
@@ -64,9 +69,8 @@ type mangadexChaptersData struct {
 type mangadexChapter struct {
 	BaseURL string `json:"baseUrl"`
 	Chapter struct {
-		Hash      string   `json:"hash"`
-		Data      []string `json:"data"`
-		DataSaver []string `json:"dataSaver"`
+		Hash string   `json:"hash"`
+		Data []string `json:"data"`
 	} `json:"chapter"`
 }
 
@@ -106,6 +110,7 @@ func (m *mangadex) ValidateInput() error {
 
 func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 	var mangaResp mangadexManga
+	var isManhwa bool
 
 	path, err := url.JoinPath(mangadexURL, "manga", m.MangaID)
 	if err != nil {
@@ -147,9 +152,17 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 		return domain.Manga{}, fmt.Errorf("failed to get manga for ID %s", m.MangaID)
 	}
 
+	for _, tag := range mangaResp.Data.Attributes.Tags {
+		if tag.ID == mangadexLongStripTagID {
+			isManhwa = true
+			break
+		}
+	}
+
 	return domain.Manga{
 		Title:    sanitize.Filename(title),
 		Chapters: make(map[float32]domain.Chapter),
+		IsManhwa: isManhwa,
 	}, nil
 }
 
@@ -174,7 +187,7 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 			"translatedLanguage[]": []string{m.Language},
 			"order[volume]":        []string{"desc"},
 			"order[chapter]":       []string{"desc"},
-			"limit":                []string{fmt.Sprintf("%d", mangadexLimit)},
+			"limit":                []string{fmt.Sprintf("%d", mangadexResultLimit)},
 			"offset":               []string{fmt.Sprintf("%d", offset)},
 		}
 
@@ -238,7 +251,7 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 			return nil
 		}
 
-		offset += mangadexLimit
+		offset += mangadexResultLimit
 	}
 }
 

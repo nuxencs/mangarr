@@ -44,8 +44,8 @@ var downloadCmd = &cobra.Command{
 			s = source.NewMangaPlus(manga)
 		case "flamecomics":
 			s = source.NewFlamecomics(manga)
-		case "asurascans":
-			s = source.NewAsurascans(manga)
+		//case "asurascans":
+		//	s = source.NewAsurascans(manga)
 		case "cubari":
 			s = source.NewCubari(manga, group)
 		default:
@@ -129,7 +129,7 @@ var downloadCmd = &cobra.Command{
 				}
 
 				fmt.Printf("Downloading %q...\n", templatedName)
-				if err := download.Chapter(ctx, contentPath, selectedChapter); err != nil {
+				if err := download.Chapter(ctx, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
 					fmt.Printf("Failed to download chapter %q: %v\n", templatedName, err)
 					return
 				}

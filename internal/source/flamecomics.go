@@ -51,9 +51,12 @@ func (f *flamecomics) ValidateInput() error {
 }
 
 func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
-	var manga domain.Manga
 	var errors []error
-	manga.Chapters = make(map[float32]domain.Chapter)
+
+	manga := domain.Manga{
+		Chapters: make(map[float32]domain.Chapter),
+		IsManhwa: true,
+	}
 
 	c := f.Collector.Clone()
 
@@ -76,9 +79,8 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 		chapterNum := float32(chapterNum64)
 
 		manga.Chapters[chapterNum] = domain.Chapter{
-			URL:      chapterURL,
-			Number:   chapterNum,
-			IsManhwa: true,
+			URL:    chapterURL,
+			Number: chapterNum,
 		}
 	})
 

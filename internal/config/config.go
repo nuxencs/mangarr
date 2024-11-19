@@ -99,17 +99,6 @@ monitoredManga:
 
   # Custom name you can give the entry to easily distinguish between them
   #
-  Solo Max-Level Newbie:
-    # Source from where the manga should be downloaded
-    #
-    source: "asurascans"
-
-    # URL of the manga on Asura Scans
-    #
-    manga: "https://asuracomic.net/series/solo-max-level-newbie-31f980f5"
-
-  # Custom name you can give the entry to easily distinguish between them
-  #
   One Punch Man:
     # Source from where the manga should be downloaded
     #

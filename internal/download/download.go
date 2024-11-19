@@ -24,7 +24,7 @@ import (
 const maxConcurrentImageDownloads = 10
 
 // Chapter downloads and processes manga chapter images to create a CBZ archive.
-func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter) error {
+func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter, isManhwa bool) error {
 	// if chapter.IsManhwa {
 	// 	 outputPath = contentPath + ".pdf"
 	// } else {
@@ -92,7 +92,7 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter) er
 	// 	 }
 	// }
 
-	if err := files.CreateCbzArchive(temp, contentPath, chapter.IsManhwa); err != nil {
+	if err := files.CreateCbzArchive(temp, contentPath, isManhwa); err != nil {
 		return fmt.Errorf("failed to create cbz archive: %w", err)
 	}
 
