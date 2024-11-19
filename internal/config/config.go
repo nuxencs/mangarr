@@ -291,9 +291,17 @@ func (c *AppConfig) load(configPath string) {
 func (c *AppConfig) DynamicReload(log logger.Logger) {
 	viper.WatchConfig()
 
-	viper.OnConfigChange(func(_ fsnotify.Event) {
+	viper.OnConfigChange(func(e fsnotify.Event) {
 		c.m.Lock()
 		defer c.m.Unlock()
+
+		// only reload config on write to config file
+		if !e.Op.Has(fsnotify.Write) {
+			return
+		}
+
+		namingTemplate := viper.GetString("namingTemplate")
+		c.Config.NamingTemplate = namingTemplate
 
 		logLevel := viper.GetString("logLevel")
 		c.Config.LogLevel = logLevel
