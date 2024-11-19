@@ -99,17 +99,6 @@ monitoredManga:
 
   # Custom name you can give the entry to easily distinguish between them
   #
-  Solo Max-Level Newbie:
-    # Source from where the manga should be downloaded
-    #
-    source: "asurascans"
-
-    # URL of the manga on Asura Scans
-    #
-    manga: "https://asuracomic.net/series/solo-max-level-newbie-31f980f5"
-
-  # Custom name you can give the entry to easily distinguish between them
-  #
   One Punch Man:
     # Source from where the manga should be downloaded
     #
@@ -302,9 +291,17 @@ func (c *AppConfig) load(configPath string) {
 func (c *AppConfig) DynamicReload(log logger.Logger) {
 	viper.WatchConfig()
 
-	viper.OnConfigChange(func(_ fsnotify.Event) {
+	viper.OnConfigChange(func(e fsnotify.Event) {
 		c.m.Lock()
 		defer c.m.Unlock()
+
+		// only reload config on write to config file
+		if !e.Op.Has(fsnotify.Write) {
+			return
+		}
+
+		namingTemplate := viper.GetString("namingTemplate")
+		c.Config.NamingTemplate = namingTemplate
 
 		logLevel := viper.GetString("logLevel")
 		c.Config.LogLevel = logLevel

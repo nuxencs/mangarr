@@ -14,6 +14,7 @@ type Manga struct {
 	URL      string
 	Title    string
 	Chapters map[float32]Chapter
+	IsManhwa bool
 }
 
 type Chapter struct {
@@ -21,13 +22,10 @@ type Chapter struct {
 	URL       string
 	Number    float32
 	Title     string
-	IsManhwa  bool
 	ImageInfo []ImageInfo
 }
 
 type ImageInfo struct {
 	ImageURL      string
 	EncryptionKey string
-	Width         float64
-	Height        float64
 }
