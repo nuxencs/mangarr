@@ -1,11 +1,13 @@
 package domain
 
+import "time"
+
 type Config struct {
 	Version          string
 	ConfigPath       string
 	DownloadLocation string                     `yaml:"downloadLocation"`
 	NamingTemplate   string                     `yaml:"namingTemplate"`
-	CheckInterval    int                        `yaml:"checkInterval"`
+	CheckInterval    time.Duration              `yaml:"checkInterval"`
 	MonitoredManga   map[string]*MonitoredManga `yaml:"monitoredManga"`
 	LogPath          string                     `yaml:"logPath"`
 	LogLevel         string                     `yaml:"LogLevel"`
