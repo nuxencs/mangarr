@@ -71,7 +71,7 @@ var monitorCmd = &cobra.Command{
 
 		log.Info().Msg("starting to monitor configured manga")
 
-		ticker := time.NewTicker(time.Duration(cfg.Config.CheckInterval) * time.Minute)
+		ticker := time.NewTicker(cfg.Config.CheckInterval * time.Minute)
 		defer ticker.Stop()
 
 		// semaphore to limit concurrency to 10

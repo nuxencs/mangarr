@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"mangarr/internal/domain"
 	"mangarr/internal/logger"
@@ -236,7 +237,7 @@ func (c *AppConfig) loadFromEnv() {
 					c.Config.NamingTemplate = envPair[1]
 				case prefix + "CHECK_INTERVAL":
 					if i, _ := strconv.ParseInt(envPair[1], 10, 32); i > 0 {
-						c.Config.CheckInterval = int(i)
+						c.Config.CheckInterval = time.Duration(i)
 					}
 				case prefix + "LOG_LEVEL":
 					c.Config.LogLevel = envPair[1]
