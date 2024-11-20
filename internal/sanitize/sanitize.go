@@ -22,9 +22,6 @@ var (
 
 // Filename removes problematic characters and replaces specified characters in filename candidates
 func Filename(title string) string {
-	// Trim spaces & dots
-	title = strings.Trim(title, " .")
-
 	// Process characters
 	result := new(strings.Builder)
 	for _, char := range title {
@@ -41,5 +38,7 @@ func Filename(title string) string {
 		}
 	}
 
-	return result.String()
+	sanitizedTitle := strings.Trim(result.String(), " .")
+
+	return sanitizedTitle
 }
