@@ -2,6 +2,7 @@ package sanitize
 
 import (
 	"strings"
+	"unicode"
 )
 
 var (
@@ -22,23 +23,31 @@ var (
 
 // Filename removes problematic characters and replaces specified characters in filename candidates
 func Filename(title string) string {
-	// Process characters
-	result := new(strings.Builder)
-	for _, char := range title {
-		if _, isIllegal := illegalCharacters[char]; isIllegal {
-			// Skip illegal characters
-			continue
-		}
-		if replacementCharacter, hasReplacement := replacementCharacters[char]; hasReplacement {
-			// Use replacementCharacter if found
-			result.WriteRune(replacementCharacter)
-		} else {
-			// Keep the character as is
-			result.WriteRune(char)
-		}
+	if len(title) == 0 {
+		return ""
 	}
 
-	sanitizedTitle := strings.Trim(result.String(), " .")
+	builder := new(strings.Builder)
+	builder.Grow(len(title))
+
+	for _, r := range title {
+		// Skip illegal characters
+		if _, illegal := illegalCharacters[r]; illegal {
+			continue
+		}
+
+		// Use replacement if found
+		if replacement, hasReplacement := replacementCharacters[r]; hasReplacement {
+			builder.WriteRune(replacement)
+		}
+
+		// Keep the character as is
+		builder.WriteRune(r)
+	}
+
+	sanitizedTitle := strings.TrimFunc(builder.String(), func(r rune) bool {
+		return unicode.IsSpace(r) || r == '.'
+	})
 
 	return sanitizedTitle
 }
