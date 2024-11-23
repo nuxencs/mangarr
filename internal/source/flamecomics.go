@@ -1,9 +1,13 @@
 package source
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -14,6 +18,66 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 )
+
+const flamecomicsCDNURL = "https://cdn.flamecomics.xyz"
+
+type flamecomicsResponse struct {
+	Props struct {
+		PageProps struct {
+			Series struct {
+				SeriesId    int         `json:"series_id"`
+				Title       string      `json:"title"`
+				AltTitles   string      `json:"altTitles"`
+				Description string      `json:"description"`
+				Language    string      `json:"language"`
+				Type        string      `json:"type"`
+				Tags        string      `json:"tags"`
+				Country     string      `json:"country"`
+				Author      string      `json:"author"`
+				Artist      string      `json:"artist"`
+				Publisher   string      `json:"publisher"`
+				Year        int         `json:"year"`
+				Status      string      `json:"status"`
+				Schedule    string      `json:"schedule"`
+				Views       int         `json:"views"`
+				Likes       interface{} `json:"likes"`
+				Cover       string      `json:"cover"`
+				Draft       int         `json:"draft"`
+				LastEdit    string      `json:"last_edit"`
+				Time        int         `json:"time"`
+			} `json:"series"`
+			Chapters []flamescansChapter `json:"chapters"`
+		} `json:"pageProps"`
+	} `json:"props"`
+	Query struct {
+		Id string `json:"id"`
+	} `json:"query"`
+}
+
+type flamescansChapter struct {
+	ChapterID     int                        `json:"chapter_id"`
+	SeriesID      int                        `json:"series_id"`
+	Chapter       string                     `json:"chapter"`
+	Title         string                     `json:"title"`
+	Images        map[string]flamescansImage `json:"images"`
+	Language      string                     `json:"language"`
+	Views         int                        `json:"views"`
+	Likes         int                        `json:"likes"`
+	Hidden        int                        `json:"hidden"`
+	ReleaseDate   int64                      `json:"release_date"`
+	Token         string                     `json:"token"`
+	UnixTimestamp int64                      `json:"unix_timestamp"`
+}
+
+type flamescansImage struct {
+	Size     int64  `json:"size"`
+	Name     string `json:"name"`
+	Modified string `json:"modified"`
+	Width    int    `json:"width"`
+	Height   int    `json:"height"`
+}
+
+var jsonRegex = regexp.MustCompile(`type="application/json">((?s).*?)</script>`)
 
 type flamecomics struct {
 	MangaURL  string
@@ -51,6 +115,7 @@ func (f *flamecomics) ValidateInput() error {
 }
 
 func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
+	var responseData flamecomicsResponse
 	var errors []error
 
 	manga := domain.Manga{
@@ -64,23 +129,19 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
 	})
 
-	c.OnHTML(".entry-title", func(e *colly.HTMLElement) {
-		manga.Title = sanitize.Filename(e.Text)
-	})
-
-	c.OnHTML(".eplister li", func(e *colly.HTMLElement) {
-		chapterNum64, err := strconv.ParseFloat(e.Attr("data-num"), 32)
-		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to parse chapter info %q from URL %s: %w", e.Text, e.Request.URL, err))
+	c.OnResponse(func(r *colly.Response) {
+		match := jsonRegex.FindSubmatch(r.Body)
+		if len(match) < 2 {
+			errors = append(errors, fmt.Errorf("failed to find chapter data in response from URL %s", r.Request.URL))
 			return
 		}
 
-		chapterURL := e.ChildAttr("a", "href")
-		chapterNum := float32(chapterNum64)
+		buf := bytes.NewReader(match[1])
 
-		manga.Chapters[chapterNum] = domain.Chapter{
-			URL:    chapterURL,
-			Number: chapterNum,
+		err := json.NewDecoder(buf).Decode(&responseData)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to decode chapter data from json: %w", err))
+			return
 		}
 	})
 
@@ -91,6 +152,48 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 
 	if len(errors) > 0 {
 		return domain.Manga{}, fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
+	}
+
+	manga.Title = sanitize.Filename(responseData.Props.PageProps.Series.Title)
+
+	for _, responseChapter := range responseData.Props.PageProps.Chapters {
+		chapterNumF64, err := strconv.ParseFloat(responseChapter.Chapter, 32)
+		if err != nil {
+			return domain.Manga{}, fmt.Errorf("failed to parse chapter number %s: %w", responseChapter.Chapter, err)
+		}
+
+		chapterNum := float32(chapterNumF64)
+
+		keys := make([]string, 0, len(responseChapter.Images))
+		for k := range responseChapter.Images {
+			keys = append(keys, k)
+		}
+		sort.Slice(keys, func(i, j int) bool {
+			iNum, _ := strconv.ParseFloat(keys[i], 32)
+			jNum, _ := strconv.ParseFloat(keys[j], 32)
+			return iNum < jNum
+		})
+
+		imageURLs := make([]domain.ImageInfo, 0, len(responseChapter.Images))
+		for _, key := range keys {
+			i := responseChapter.Images[key]
+
+			imageURLs = append(imageURLs, domain.ImageInfo{
+				ImageURL: fmt.Sprintf("%s/series/%d/%s/%s",
+					flamecomicsCDNURL,
+					responseData.Props.PageProps.Series.SeriesId,
+					responseChapter.Token,
+					i.Name,
+				),
+			})
+		}
+
+		manga.Chapters[chapterNum] = domain.Chapter{
+			ID:        responseChapter.Token,
+			Number:    chapterNum,
+			Title:     responseChapter.Title,
+			ImageInfo: imageURLs,
+		}
 	}
 
 	if len(manga.Title) == 0 {
@@ -108,38 +211,6 @@ func (f *flamecomics) GetChapters(_ context.Context, _ domain.Manga) error {
 	return nil
 }
 
-func (f *flamecomics) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
-	var imageInfos []domain.ImageInfo
-	var errors []error
-
-	c := f.Collector.Clone()
-
-	c.OnError(func(r *colly.Response, err error) {
-		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
-	})
-
-	c.OnHTML("#readerarea img", func(e *colly.HTMLElement) {
-		imgURL := e.Attr("src")
-
-		// skip images that are not hosted on https://flamecomics
-		if strings.HasPrefix(imgURL, "https://flamecomics") {
-			imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imgURL})
-		}
-	})
-
-	err := c.Visit(chapter.URL)
-	if err != nil {
-		return fmt.Errorf("failed to visit URL %s: %w", chapter.URL, err)
-	}
-
-	if len(errors) > 0 {
-		return fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
-	}
-
-	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image URLs for chapter %g", chapter.Number)
-	}
-
-	chapter.ImageInfo = imageInfos
+func (f *flamecomics) GetImageURLs(_ context.Context, _ *domain.Chapter) error {
 	return nil
 }
