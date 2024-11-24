@@ -189,7 +189,14 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobu
 func (m *mangaplus) addChapters(chapters map[float32]domain.Chapter, chapterLists ...[]*protobuf.Chapter) error {
 	for _, chapterList := range chapterLists {
 		for _, chapter := range chapterList {
-			name := strings.Trim(chapter.GetName(), "#")
+			chapterName := chapter.GetName()
+
+			// logic used to skip extra chapters named "ex"
+			if !strings.ContainsAny(chapterName, "0123456789") {
+				continue
+			}
+
+			name := strings.Trim(chapterName, "#")
 
 			number, err := strconv.ParseFloat(name, 32)
 			if err != nil {
