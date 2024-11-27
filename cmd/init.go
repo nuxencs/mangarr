@@ -8,6 +8,7 @@ var (
 	naming            string
 	downloadDirectory string
 	mangaSource       string
+	overwrite         string
 
 	manga    string
 	group    string
@@ -50,6 +51,13 @@ func initDownloadFlags() {
 		"{manga:<.>} Ch. {num:3}{title: - <.>}",
 		"specifies the naming template you want to use for naming chapters",
 	)
+	downloadCmd.Flags().StringVarP(
+		&overwrite,
+		"overwrite",
+		"o",
+		"overwrites the parsed manga name",
+		"",
+	)
 
 	downloadCmd.Flags().StringVarP(
 		&manga,
@@ -58,7 +66,6 @@ func initDownloadFlags() {
 		"",
 		"specifies the manga you want to download",
 	)
-
 	downloadCmd.Flags().StringVarP(
 		&group,
 		"group",

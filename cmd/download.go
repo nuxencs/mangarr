@@ -95,7 +95,7 @@ var downloadCmd = &cobra.Command{
 			return
 		}
 
-		// semaphore to limit concurrency to 10
+		// semaphore to limit concurrency to maxConcurrentChapterProcesses which is set to 1ß
 		sem := semaphore.NewWeighted(maxConcurrentChapterProcesses)
 		wg := sync.WaitGroup{}
 
@@ -115,6 +115,12 @@ var downloadCmd = &cobra.Command{
 				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
 					fmt.Printf("Failed to get image URLs for chapter %g: %v\n", selectedChapter.Number, err)
 					return
+				}
+
+				overwrittenTitle := sanitize.Filename(overwrite)
+
+				if len(overwrittenTitle) != 0 {
+					selectedManga.Title = overwrittenTitle
 				}
 
 				t := templater.New(selectedManga, selectedChapter)
