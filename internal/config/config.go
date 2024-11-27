@@ -76,7 +76,7 @@ monitoredManga:
     #
     language: "en"
 
-    # Overwrite can be used to overwrite the Manga name
+    # Overwrite can be used to overwrite the parsed manga name
     #
     overwrite: "Uncle from Another World"
 
