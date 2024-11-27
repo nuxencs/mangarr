@@ -16,8 +16,9 @@ type Config struct {
 }
 
 type MonitoredManga struct {
-	Source   string `yaml:"source"`
-	Manga    string `yaml:"manga"`
-	Group    string `yaml:"group"`
-	Language string `yaml:"language"`
+	Source    string `yaml:"source"`
+	Manga     string `yaml:"manga"`
+	Group     string `yaml:"group"`
+	Language  string `yaml:"language"`
+	Overwrite string `yaml:"overwrite"`
 }

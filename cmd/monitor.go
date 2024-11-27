@@ -11,7 +11,6 @@ import (
 
 	"mangarr/internal/buildinfo"
 	"mangarr/internal/config"
-	"mangarr/internal/domain"
 	"mangarr/internal/download"
 	"mangarr/internal/files"
 	"mangarr/internal/logger"
@@ -47,34 +46,12 @@ var monitorCmd = &cobra.Command{
 			log.Fatal().Err(err).Msgf("invalid download location")
 		}
 
-		var sources []domain.Source
-
-		for mangaName, monitoredManga := range cfg.Config.MonitoredManga {
-			switch monitoredManga.Source {
-			case "tcbscans":
-				sources = append(sources, source.NewTCBScans(monitoredManga.Manga))
-			case "mangadex":
-				sources = append(sources, source.NewMangadex(monitoredManga.Manga, monitoredManga.Group, monitoredManga.Language))
-			case "mangaplus":
-				sources = append(sources, source.NewMangaPlus(monitoredManga.Manga))
-			case "flamecomics":
-				sources = append(sources, source.NewFlamecomics(monitoredManga.Manga))
-			//case "asurascans":
-			//	sources = append(sources, source.NewAsurascans(monitoredManga.Manga))
-			case "cubari":
-				sources = append(sources, source.NewCubari(monitoredManga.Manga, monitoredManga.Group))
-			default:
-				log.Error().Msgf("unknown monitored manga source for %s: %s", mangaName, monitoredManga.Source)
-				continue
-			}
-		}
-
 		log.Info().Msg("starting to monitor configured manga")
 
 		ticker := time.NewTicker(cfg.Config.CheckInterval * time.Minute)
 		defer ticker.Stop()
 
-		// semaphore to limit concurrency to 10
+		// semaphore to limit concurrency to maxConcurrentSourceProcesses which is set to 10
 		sem := semaphore.NewWeighted(maxConcurrentSourceProcesses)
 		quit := make(chan bool, 1)
 		wg := sync.WaitGroup{}
@@ -85,26 +62,32 @@ var monitorCmd = &cobra.Command{
 				case <-quit:
 					return
 				case <-ticker.C:
-					for _, s := range sources {
+					for _, monitoredManga := range cfg.Config.MonitoredManga {
 						wg.Add(1)
 
 						go func() {
 							sem.Acquire()
 							defer func() { sem.Release(); wg.Done() }()
 
-							if err := s.ValidateInput(); err != nil {
+							mangaSource, err := source.Select(*monitoredManga)
+							if err != nil {
+								log.Error().Err(err).Msgf("error selecting manga source")
+								return
+							}
+
+							if err := mangaSource.ValidateInput(); err != nil {
 								log.Error().Err(err).Msgf("error validating input")
 								return
 							}
 
-							selectedManga, err := s.GetManga(ctx)
+							selectedManga, err := mangaSource.GetManga(ctx)
 							if err != nil {
-								log.Error().Err(err).Msgf("error getting manga from %s", s)
+								log.Error().Err(err).Msgf("error getting manga from %s", monitoredManga.Source)
 								return
 							}
-							mLog := log.With().Str("manga", selectedManga.Title).Str("source", s.String()).Logger()
+							mLog := log.With().Str("manga", selectedManga.Title).Str("source", mangaSource.String()).Logger()
 
-							if err := s.GetChapters(ctx, selectedManga); err != nil {
+							if err := mangaSource.GetChapters(ctx, selectedManga); err != nil {
 								mLog.Error().Err(err).Msg("error getting manga chapters")
 								return
 							}
@@ -132,9 +115,15 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
+							if err := mangaSource.GetImageURLs(ctx, &selectedChapter); err != nil {
 								mLog.Error().Err(err).Msgf("error getting image urls for chapter %g", selectedChapter.Number)
 								return
+							}
+
+							overwrittenTitle := sanitize.Filename(monitoredManga.Overwrite)
+
+							if len(overwrittenTitle) != 0 {
+								selectedManga.Title = overwrittenTitle
 							}
 
 							t := templater.New(selectedManga, selectedChapter)

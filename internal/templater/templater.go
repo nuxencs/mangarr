@@ -38,8 +38,8 @@ func (t *Templater) handleMangaTitle(options string) string {
 		return ""
 	}
 
-	cleanString := strings.ReplaceAll(options, ":", "")
-	return strings.ReplaceAll(cleanString, "<.>", t.Manga.Title)
+	clean := strings.ReplaceAll(options, ":", "")
+	return strings.ReplaceAll(clean, "<.>", t.Manga.Title)
 }
 
 func (t *Templater) handleChapterTitle(options string) string {
@@ -47,8 +47,8 @@ func (t *Templater) handleChapterTitle(options string) string {
 		return ""
 	}
 
-	cleanString := strings.ReplaceAll(options, ":", "")
-	return strings.ReplaceAll(cleanString, "<.>", t.Chapter.Title)
+	clean := strings.ReplaceAll(options, ":", "")
+	return strings.ReplaceAll(clean, "<.>", t.Chapter.Title)
 }
 
 func (t *Templater) ExecTemplate(template string) string {

@@ -76,6 +76,10 @@ monitoredManga:
     #
     language: "en"
 
+    # Overwrite can be used to overwrite the parsed manga name
+    #
+    overwrite: "Uncle from Another World"
+
   # Custom name you can give the entry to easily distinguish between them
   #
   Kagurabachi:

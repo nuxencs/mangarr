@@ -37,7 +37,7 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter, is
 	}
 	defer os.RemoveAll(temp)
 
-	// semaphore to limit concurrency to maxConcurrentImageDownloads
+	// semaphore to limit concurrency to maxConcurrentImageDownloads which is set to 10
 	sem := semaphore.NewWeighted(maxConcurrentImageDownloads)
 	errc := make(chan error, len(chapter.ImageInfo))
 	var wg sync.WaitGroup
