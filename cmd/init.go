@@ -55,8 +55,8 @@ func initDownloadFlags() {
 		&overwrite,
 		"overwrite",
 		"o",
-		"overwrites the parsed manga name",
 		"",
+		"overwrites the parsed manga name",
 	)
 
 	downloadCmd.Flags().StringVarP(
