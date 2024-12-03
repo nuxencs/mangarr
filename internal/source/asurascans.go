@@ -11,6 +11,7 @@ import (
 	"mangarr/internal/sanitize"
 
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 )
 
 const asurascansURL = "https://asuracomic.net/series/"
@@ -50,7 +51,9 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		IsManhwa: true,
 	}
 
-	b := rod.New().MustConnect()
+	path, _ := launcher.LookPath()
+	u := launcher.New().Bin(path).MustLaunch()
+	b := rod.New().ControlURL(u).MustConnect()
 	defer b.MustClose()
 
 	page := b.MustPage(a.MangaURL).MustWaitStable()
@@ -117,7 +120,9 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	var imageInfos []domain.ImageInfo
 	var errors []error
 
-	b := rod.New().MustConnect()
+	path, _ := launcher.LookPath()
+	u := launcher.New().Bin(path).MustLaunch()
+	b := rod.New().ControlURL(u).MustConnect()
 	defer b.MustClose()
 
 	page := b.MustPage(asurascansURL + chapter.URL).MustWaitStable()
