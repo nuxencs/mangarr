@@ -6,33 +6,23 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
+	"github.com/go-rod/rod"
 )
 
 const asurascansURL = "https://asuracomic.net/series/"
 
 type asurascans struct {
-	MangaURL  string
-	Collector colly.Collector
+	MangaURL string
+	Browser  *rod.Browser
 }
 
 func NewAsurascans(mangaURL string) domain.Source {
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-	)
-	extensions.RandomUserAgent(collector)
-
-	collector.SetRequestTimeout(120 * time.Second)
-
 	return &asurascans{
-		MangaURL:  mangaURL,
-		Collector: *collector,
+		MangaURL: mangaURL,
 	}
 }
 
@@ -60,38 +50,48 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		IsManhwa: true,
 	}
 
-	c := a.Collector.Clone()
+	b := rod.New().MustConnect()
+	defer b.MustClose()
 
-	c.OnError(func(r *colly.Response, err error) {
-		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
-	})
+	page := b.MustPage(a.MangaURL).MustWaitStable()
+	manga.Title = sanitize.Filename(page.MustElement("span.text-xl.font-bold").MustText())
 
-	c.OnHTML("span.text-xl.font-bold", func(e *colly.HTMLElement) {
-		manga.Title = sanitize.Filename(e.Text)
-	})
+	chapterElements, err := page.Elements(".pl-4.py-2")
+	if err != nil {
+		return domain.Manga{}, fmt.Errorf("failed to find chapter elements: %w", err)
+	}
 
-	c.OnHTML(".pl-4.pr-2.pb-4 a", func(e *colly.HTMLElement) {
-		chapterTitle := e.ChildText("span")
-
-		chapterNum, err := a.splitChapterInfo(e.Text, chapterTitle)
+	for _, e := range chapterElements {
+		chapterElement, err := e.Element(".flex")
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to parse chapter info %q from URL %s: %w", e.Text, e.Request.URL, err))
-			return
+			errors = append(errors, fmt.Errorf("failed to get chapter element from URL %s: %w", a.MangaURL, err))
+			continue
 		}
 
-		chapterURL := e.Attr("href")
-		chapterTitle = sanitize.Filename(chapterTitle)
+		link, err := chapterElement.Attribute("href")
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to get chapter element from URL %s: %w", a.MangaURL, err))
+			continue
+		}
+		chapterURL := *link
+
+		chapterLine, err := chapterElement.Text()
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to get chapter line from URL %s: %w", a.MangaURL, err))
+			continue
+		}
+
+		chapterNum, chapterTitle, err := a.splitChapterInfo(chapterLine)
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to split chapter info %s: %w", chapterLine, err))
+			continue
+		}
 
 		manga.Chapters[chapterNum] = domain.Chapter{
 			URL:    chapterURL,
 			Number: chapterNum,
 			Title:  chapterTitle,
 		}
-	})
-
-	err := c.Visit(a.MangaURL)
-	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to visit URL %s: %w", a.MangaURL, err)
 	}
 
 	if len(errors) > 0 {
@@ -117,24 +117,25 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	var imageInfos []domain.ImageInfo
 	var errors []error
 
-	c := a.Collector.Clone()
+	b := rod.New().MustConnect()
+	defer b.MustClose()
 
-	c.OnError(func(r *colly.Response, err error) {
-		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
-	})
+	page := b.MustPage(asurascansURL + chapter.URL).MustWaitStable()
+	imageElements, err := page.Elements(".w-full.mx-auto img")
+	if err != nil {
+		return fmt.Errorf("failed to find image element: %w", err)
+	}
 
-	c.OnHTML(".w-full.mx-auto img", func(e *colly.HTMLElement) {
-		imgURL := e.Attr("src")
+	for _, e := range imageElements {
+		imgURL, err := e.Attribute("src")
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to get image URL: %w", err))
+		}
 
 		// skip images that are not hosted on https://gg.asuracomic.net
-		if strings.HasPrefix(imgURL, "https://gg.asuracomic.net") {
-			imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imgURL})
+		if strings.HasPrefix(*imgURL, "https://gg.asuracomic.net") {
+			imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: *imgURL})
 		}
-	})
-
-	err := c.Visit(asurascansURL + chapter.URL)
-	if err != nil {
-		return fmt.Errorf("failed to visit URL %s: %w", chapter.URL, err)
 	}
 
 	if len(errors) > 0 {
@@ -149,26 +150,31 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	return nil
 }
 
-func (a *asurascans) splitChapterInfo(chapterLine string, chapterTitle string) (float32, error) {
-	cutChapterLine := chapterLine
-
-	if len(chapterTitle) != 0 {
-		// not checking for found, because if chapterTitle is not found in chapterLine, cutChapterLine will be set
-		// to chapterLine which already is in the format "Chapter Number"
-		cutChapterLine, _, _ = strings.Cut(chapterLine, chapterTitle)
+func (a *asurascans) splitChapterInfo(chapterLine string) (float32, string, error) {
+	if len(chapterLine) == 0 {
+		return 0, "", fmt.Errorf("chapter line is empty")
 	}
 
-	_, cutChapterLine, ok := strings.Cut(cutChapterLine, "Chapter ")
+	// splits a chapter line into split[0] = chapter part and split[1] = chapter title
+	split := strings.Split(chapterLine, "\n")
+	if len(split) > 2 {
+		return 0, "", fmt.Errorf("chapter line is not in the correct format")
+	}
+
+	_, cutChapterLine, ok := strings.Cut(split[0], "Chapter ")
 	if !ok {
-		return 0, fmt.Errorf("failed to split chapter string %q", cutChapterLine)
+		return 0, "", fmt.Errorf("failed to split chapter string %q", cutChapterLine)
 	}
 
 	chapterNumber, err := strconv.ParseFloat(cutChapterLine, 32)
 	if err != nil {
-		return 0, fmt.Errorf("failed to parse chapter number from %s: %w", cutChapterLine, err)
+		return 0, "", fmt.Errorf("failed to parse chapter number from %s: %w", cutChapterLine, err)
 	}
 
-	chapterTitle = sanitize.Filename(chapterTitle)
+	var chapterTitle string
+	if len(split) == 2 {
+		chapterTitle = sanitize.Filename(split[1])
+	}
 
-	return float32(chapterNumber), nil
+	return float32(chapterNumber), chapterTitle, nil
 }
