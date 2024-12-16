@@ -71,10 +71,15 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 			continue
 		}
 
-		link, err := chapterElement.Attribute("href")
+		linkElement, err := e.Element("a")
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to get chapter element from URL %s: %w", a.MangaURL, err))
+			errors = append(errors, fmt.Errorf("failed to get link element from URL %s: %w", a.MangaURL, err))
 			continue
+		}
+
+		link, err := linkElement.Attribute("href")
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to get link from URL %s: %w", a.MangaURL, err))
 		}
 		chapterURL := *link
 
