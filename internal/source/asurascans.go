@@ -56,7 +56,7 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	b := rod.New().ControlURL(u).MustConnect()
 	defer b.MustClose()
 
-	page := b.MustPage(a.MangaURL).MustWaitStable()
+	page := b.MustPage(a.MangaURL).MustWaitDOMStable()
 	manga.Title = sanitize.Filename(page.MustElement("span.text-xl.font-bold").MustText())
 
 	chapterElements, err := page.Elements(".pl-4.py-2")
@@ -130,7 +130,7 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	b := rod.New().ControlURL(u).MustConnect()
 	defer b.MustClose()
 
-	page := b.MustPage(asurascansURL + chapter.URL).MustWaitStable()
+	page := b.MustPage(asurascansURL + chapter.URL).MustWaitDOMStable()
 	imageElements, err := page.Elements(".w-full.mx-auto img")
 	if err != nil {
 		return fmt.Errorf("failed to find image element: %w", err)
