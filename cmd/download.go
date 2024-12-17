@@ -44,8 +44,8 @@ var downloadCmd = &cobra.Command{
 			s = source.NewMangaPlus(manga)
 		case "flamecomics":
 			s = source.NewFlamecomics(manga)
-		//case "asurascans":
-		//	s = source.NewAsurascans(manga)
+		case "asurascans":
+			s = source.NewAsurascans(manga)
 		case "cubari":
 			s = source.NewCubari(manga, group)
 		default:

@@ -16,8 +16,8 @@ func Select(monitoredManga domain.MonitoredManga) (domain.Source, error) {
 		return NewMangaPlus(monitoredManga.Manga), nil
 	case "flamecomics":
 		return NewFlamecomics(monitoredManga.Manga), nil
-	//case "asurascans":
-	//	return source.NewAsurascans(monitoredManga.Manga), nil
+	case "asurascans":
+		return NewAsurascans(monitoredManga.Manga), nil
 	case "cubari":
 		return NewCubari(monitoredManga.Manga, monitoredManga.Group), nil
 	}
