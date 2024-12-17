@@ -94,7 +94,7 @@ func (m *mangadex) String() string {
 
 func (m *mangadex) ValidateInput() error {
 	if _, err := uuid.Parse(m.MangaID); err != nil {
-		return fmt.Errorf("failed to parse Manga PLUS manga id: %w", err)
+		return fmt.Errorf("failed to parse MangaDex manga id: %w", err)
 	}
 
 	// if _, err := uuid.Parse(m.GroupID); err != nil {

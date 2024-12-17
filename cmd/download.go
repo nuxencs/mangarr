@@ -48,6 +48,8 @@ var downloadCmd = &cobra.Command{
 			s = source.NewAsurascans(manga)
 		case "cubari":
 			s = source.NewCubari(manga, group)
+		case "comick":
+			s = source.NewComick(manga, group, language)
 		default:
 			fmt.Println("Invalid source:", mangaSource)
 			return

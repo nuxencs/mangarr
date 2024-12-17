@@ -20,6 +20,8 @@ func Select(monitoredManga domain.MonitoredManga) (domain.Source, error) {
 		return NewAsurascans(monitoredManga.Manga), nil
 	case "cubari":
 		return NewCubari(monitoredManga.Manga, monitoredManga.Group), nil
+	case "comick":
+		return NewComick(monitoredManga.Manga, monitoredManga.Group, monitoredManga.Language), nil
 	}
 
 	return nil, fmt.Errorf("unknown monitored manga source %s", monitoredManga.Source)
