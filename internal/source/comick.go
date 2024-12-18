@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -31,7 +30,6 @@ type comick struct {
 	MangaURL string
 	GroupID  string
 	Language string
-	Client   *http.Client
 }
 
 type comickManga struct {
@@ -80,16 +78,10 @@ type comickImageData []struct {
 }
 
 func NewComick(mangaURL, group, language string) domain.Source {
-	client := http.Client{
-		Timeout:   60 * time.Second,
-		Transport: sharedhttp.Transport,
-	}
-
 	return &comick{
 		MangaURL: mangaURL,
 		GroupID:  group,
 		Language: language,
-		Client:   &client,
 	}
 }
 
@@ -188,21 +180,18 @@ func (c *comick) GetChapters(_ context.Context, manga domain.Manga) error {
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	processedChapters := make(map[string]bool)
+
 	for _, data := range chapterResp.Chapters {
-		if len(c.GroupID) == 0 {
-			err := c.processChapter(data, &manga)
-			if err != nil {
+		if c.shouldProcessChapter(data, c.GroupID) {
+			if processedChapters[data.Chap] {
+				continue
+			}
+
+			if err := c.processChapter(data, &manga); err != nil {
 				return fmt.Errorf("failed to process chapter: %w", err)
 			}
-		} else {
-			for _, group := range data.MdChaptersGroups {
-				if group.MdGroups.Title == c.GroupID {
-					err := c.processChapter(data, &manga)
-					if err != nil {
-						return fmt.Errorf("failed to process chapter: %w", err)
-					}
-				}
-			}
+			processedChapters[data.Chap] = true
 		}
 	}
 
@@ -232,6 +221,10 @@ func (c *comick) GetImageURLs(_ context.Context, chapter *domain.Chapter) error 
 		return fmt.Errorf("failed to decode response: %w", err)
 	}
 
+	if len(imageResp) == 0 {
+		return fmt.Errorf("chapter is delayed")
+	}
+
 	for _, image := range imageResp {
 		imagePath, err := url.JoinPath(comickImageHost, image.B2Key)
 		if err != nil {
@@ -242,7 +235,7 @@ func (c *comick) GetImageURLs(_ context.Context, chapter *domain.Chapter) error 
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image URLs for chapter ID %s", chapter.ID)
+		return fmt.Errorf("failed to get image URLs for chapter")
 	}
 
 	chapter.ImageInfo = imageInfos
@@ -273,8 +266,9 @@ func (c *comick) fetchJSON(path string) (string, error) {
 	browser := rod.New().ControlURL(launcherURL).MustConnect()
 	defer browser.MustClose()
 
-	page := browser.MustPage(path).MustWaitDOMStable()
-	resp, err := page.Element("pre")
+	page := browser.MustPage(path)
+	stable := page.Timeout(sharedhttp.Timeout).MustWaitDOMStable()
+	resp, err := stable.Element("pre")
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch chapters page: %w", err)
 	}
@@ -285,6 +279,27 @@ func (c *comick) fetchJSON(path string) (string, error) {
 	}
 
 	return jsonResp, nil
+}
+
+func (c *comick) shouldProcessChapter(data comickChapterData, groupID string) bool {
+	if len(groupID) == 0 {
+		return true
+	}
+
+	for _, group := range data.MdChaptersGroups {
+		if strings.EqualFold(group.MdGroups.Title, groupID) ||
+			strings.EqualFold(group.MdGroups.Slug, groupID) {
+			return true
+		}
+	}
+
+	for _, groupName := range data.GroupName {
+		if strings.EqualFold(groupName, groupID) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (c *comick) processChapter(data comickChapterData, manga *domain.Manga) error {

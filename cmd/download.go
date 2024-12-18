@@ -73,7 +73,7 @@ var downloadCmd = &cobra.Command{
 
 		var selectedChapterNumbers []float32
 
-		firstChapterNr, latestChapterNr, err := parse.GetMinAndMaxKeys(selectedManga.Chapters)
+		firstChapterNr, latestChapterNr, err := parse.MinMaxKeys(selectedManga.Chapters)
 		if err != nil {
 			fmt.Printf("Failed to parse chapter number for %s: %v\n", selectedManga.Title, err)
 			return

@@ -182,6 +182,8 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 		return fmt.Errorf("failed to parse URL %s: %w", path, err)
 	}
 
+	processedChapters := make(map[string]bool)
+
 	for {
 		params := url.Values{
 			"translatedLanguage[]": []string{m.Language},
@@ -224,20 +226,15 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 		}
 
 		for _, data := range chapterResp.Data {
-			if len(m.GroupID) == 0 {
-				err := m.processChapter(data, &manga)
-				if err != nil {
+			if m.shouldProcessChapter(data, m.GroupID) {
+				if processedChapters[data.Attributes.Chapter] {
+					continue
+				}
+
+				if err := m.processChapter(data, &manga); err != nil {
 					return fmt.Errorf("failed to process chapter: %w", err)
 				}
-			} else {
-				for _, rel := range data.Relationships {
-					if rel.Type == "scanlation_group" && rel.ID == m.GroupID {
-						err := m.processChapter(data, &manga)
-						if err != nil {
-							return fmt.Errorf("failed to process chapter: %w", err)
-						}
-					}
-				}
+				processedChapters[data.Attributes.Chapter] = true
 			}
 		}
 
@@ -309,6 +306,20 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 
 	chapter.ImageInfo = imageInfos
 	return nil
+}
+
+func (m *mangadex) shouldProcessChapter(data mangadexChaptersData, groupID string) bool {
+	if len(groupID) == 0 {
+		return true
+	}
+
+	for _, rel := range data.Relationships {
+		if rel.Type == "scanlation_group" && rel.ID == groupID {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (m *mangadex) processChapter(data mangadexChaptersData, manga *domain.Manga) error {

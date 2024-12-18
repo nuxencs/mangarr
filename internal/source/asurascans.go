@@ -9,6 +9,7 @@ import (
 
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
+	"mangarr/internal/sharedhttp"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
@@ -56,10 +57,11 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	b := rod.New().ControlURL(u).MustConnect()
 	defer b.MustClose()
 
-	page := b.MustPage(a.MangaURL).MustWaitDOMStable()
-	manga.Title = sanitize.Filename(page.MustElement("span.text-xl.font-bold").MustText())
+	page := b.MustPage(a.MangaURL)
+	stable := page.Timeout(sharedhttp.Timeout).MustWaitDOMStable()
+	manga.Title = sanitize.Filename(stable.MustElement("span.text-xl.font-bold").MustText())
 
-	chapterElements, err := page.Elements(".pl-4.py-2")
+	chapterElements, err := stable.Elements(".pl-4.py-2")
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("failed to find chapter elements: %w", err)
 	}
@@ -130,8 +132,9 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	b := rod.New().ControlURL(u).MustConnect()
 	defer b.MustClose()
 
-	page := b.MustPage(asurascansURL + chapter.URL).MustWaitDOMStable()
-	imageElements, err := page.Elements(".w-full.mx-auto img")
+	page := b.MustPage(asurascansURL + chapter.URL)
+	stable := page.Timeout(sharedhttp.Timeout).MustWaitDOMStable()
+	imageElements, err := stable.Elements(".w-full.mx-auto img")
 	if err != nil {
 		return fmt.Errorf("failed to find image element: %w", err)
 	}

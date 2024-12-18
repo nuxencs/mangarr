@@ -92,7 +92,7 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							_, latestChapterNr, err := parse.GetMinAndMaxKeys(selectedManga.Chapters)
+							_, latestChapterNr, err := parse.MinMaxKeys(selectedManga.Chapters)
 							if err != nil {
 								mLog.Error().Err(err).Msg("error getting latest chapter number")
 								return
