@@ -9,12 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
-	"mangarr/internal/sharedhttp"
 
 	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
 )
 
 const (
@@ -30,6 +29,7 @@ type comick struct {
 	MangaURL string
 	GroupID  string
 	Language string
+	Browser  *browser.Manager
 }
 
 type comickManga struct {
@@ -77,11 +77,12 @@ type comickImageData []struct {
 	Optimized int    `json:"optimized"`
 }
 
-func NewComick(mangaURL, group, language string) domain.Source {
+func NewComick(mangaURL, group, language string, bm *browser.Manager) domain.Source {
 	return &comick{
 		MangaURL: mangaURL,
 		GroupID:  group,
 		Language: language,
+		Browser:  bm,
 	}
 }
 
@@ -261,14 +262,16 @@ func (c *comick) extractSlug(urlString string) (string, error) {
 }
 
 func (c *comick) fetchJSON(path string) (string, error) {
-	launcherPath, _ := launcher.LookPath()
-	launcherURL := launcher.New().Bin(launcherPath).MustLaunch()
-	browser := rod.New().ControlURL(launcherURL).MustConnect()
-	defer browser.MustClose()
+	var page *rod.Page
+	err := rod.Try(func() {
+		page = c.Browser.Get().MustPage(path).Timeout(browser.Timeout).MustWaitDOMStable()
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
+	}
+	defer page.MustClose()
 
-	page := browser.MustPage(path)
-	stable := page.Timeout(sharedhttp.Timeout).MustWaitDOMStable()
-	resp, err := stable.Element("pre")
+	resp, err := page.Element("pre")
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch chapters page: %w", err)
 	}

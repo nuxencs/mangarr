@@ -7,24 +7,24 @@ import (
 	"strconv"
 	"strings"
 
+	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
-	"mangarr/internal/sharedhttp"
 
 	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
 )
 
 const asurascansURL = "https://asuracomic.net/series/"
 
 type asurascans struct {
 	MangaURL string
-	Browser  *rod.Browser
+	Browser  *browser.Manager
 }
 
-func NewAsurascans(mangaURL string) domain.Source {
+func NewAsurascans(mangaURL string, bm *browser.Manager) domain.Source {
 	return &asurascans{
 		MangaURL: mangaURL,
+		Browser:  bm,
 	}
 }
 
@@ -52,16 +52,23 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		IsManhwa: true,
 	}
 
-	path, _ := launcher.LookPath()
-	u := launcher.New().Bin(path).MustLaunch()
-	b := rod.New().ControlURL(u).MustConnect()
-	defer b.MustClose()
+	var page *rod.Page
+	err := rod.Try(func() {
+		page = a.Browser.Get().MustPage(a.MangaURL).Timeout(browser.Timeout).MustWaitDOMStable()
+	})
+	if err != nil {
+		return manga, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
+	}
+	defer page.MustClose()
 
-	page := b.MustPage(a.MangaURL)
-	stable := page.Timeout(sharedhttp.Timeout).MustWaitDOMStable()
-	manga.Title = sanitize.Filename(stable.MustElement("span.text-xl.font-bold").MustText())
+	titleElement, err := page.Element("span.text-xl.font-bold")
+	if err != nil {
+		return domain.Manga{}, fmt.Errorf("failed to find title element: %w", err)
+	}
 
-	chapterElements, err := stable.Elements(".pl-4.py-2")
+	manga.Title = sanitize.Filename(titleElement.MustText())
+
+	chapterElements, err := page.Elements(".pl-4.py-2")
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("failed to find chapter elements: %w", err)
 	}
@@ -127,14 +134,16 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	var imageInfos []domain.ImageInfo
 	var errors []error
 
-	path, _ := launcher.LookPath()
-	u := launcher.New().Bin(path).MustLaunch()
-	b := rod.New().ControlURL(u).MustConnect()
-	defer b.MustClose()
+	var page *rod.Page
+	err := rod.Try(func() {
+		page = a.Browser.Get().MustPage(asurascansURL + chapter.URL).Timeout(browser.Timeout).MustWaitDOMStable()
+	})
+	if err != nil {
+		return fmt.Errorf("failed to open image page: %w", browser.HandleError(err))
+	}
+	defer page.MustClose()
 
-	page := b.MustPage(asurascansURL + chapter.URL)
-	stable := page.Timeout(sharedhttp.Timeout).MustWaitDOMStable()
-	imageElements, err := stable.Elements(".w-full.mx-auto img")
+	imageElements, err := page.Elements(".w-full.mx-auto img")
 	if err != nil {
 		return fmt.Errorf("failed to find image element: %w", err)
 	}

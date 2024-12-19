@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"mangarr/internal/browser"
 	"mangarr/internal/buildinfo"
 	"mangarr/internal/config"
 	"mangarr/internal/download"
@@ -51,6 +52,9 @@ var monitorCmd = &cobra.Command{
 		ticker := time.NewTicker(cfg.Config.CheckInterval * time.Minute)
 		defer ticker.Stop()
 
+		bm := browser.NewManager()
+		defer bm.Close()
+
 		// semaphore to limit concurrency to maxConcurrentSourceProcesses which is set to 10
 		sem := semaphore.NewWeighted(maxConcurrentSourceProcesses)
 		quit := make(chan bool, 1)
@@ -62,6 +66,8 @@ var monitorCmd = &cobra.Command{
 				case <-quit:
 					return
 				case <-ticker.C:
+					pages, _ := bm.Get().Pages()
+					log.Trace().Msgf("%+v", pages)
 					for _, monitoredManga := range cfg.Config.MonitoredManga {
 						wg.Add(1)
 
@@ -69,7 +75,7 @@ var monitorCmd = &cobra.Command{
 							sem.Acquire()
 							defer func() { sem.Release(); wg.Done() }()
 
-							mangaSource, err := source.Select(*monitoredManga)
+							mangaSource, err := source.Select(*monitoredManga, bm)
 							if err != nil {
 								log.Error().Err(err).Msgf("error selecting manga source")
 								return

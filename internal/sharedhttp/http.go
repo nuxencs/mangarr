@@ -10,10 +10,6 @@ import (
 	"github.com/avast/retry-go"
 )
 
-const (
-	Timeout = 30 * time.Second
-)
-
 var Transport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	DialContext: (&net.Dialer{

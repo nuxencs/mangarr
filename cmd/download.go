@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/download"
 	"mangarr/internal/files"
@@ -35,6 +36,9 @@ var downloadCmd = &cobra.Command{
 
 		var s domain.Source
 
+		bm := browser.NewManager()
+		defer bm.Close()
+
 		switch mangaSource {
 		case "tcbscans":
 			s = source.NewTCBScans(manga)
@@ -45,11 +49,11 @@ var downloadCmd = &cobra.Command{
 		case "flamecomics":
 			s = source.NewFlamecomics(manga)
 		case "asurascans":
-			s = source.NewAsurascans(manga)
+			s = source.NewAsurascans(manga, bm)
 		case "cubari":
 			s = source.NewCubari(manga, group)
 		case "comick":
-			s = source.NewComick(manga, group, language)
+			s = source.NewComick(manga, group, language, bm)
 		default:
 			fmt.Println("Invalid source:", mangaSource)
 			return
