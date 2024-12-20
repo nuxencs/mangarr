@@ -12,6 +12,7 @@ import (
 	"mangarr/internal/sanitize"
 
 	"github.com/go-rod/rod"
+	"github.com/rs/zerolog/log"
 )
 
 const asurascansURL = "https://asuracomic.net/series/"
@@ -54,11 +55,13 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 
 	var page *rod.Page
 	err := rod.Try(func() {
+		log.Trace().Msg("trying to get asurascans manga")
 		page = a.Browser.Get().MustPage(a.MangaURL).Timeout(browser.Timeout).MustWaitDOMStable()
 	})
 	if err != nil {
 		return manga, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
 	}
+	log.Trace().Msg("got asurascans manga")
 	defer page.MustClose()
 
 	titleElement, err := page.Element("span.text-xl.font-bold")
@@ -136,11 +139,13 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 
 	var page *rod.Page
 	err := rod.Try(func() {
+		log.Trace().Msg("trying to get asurascans images")
 		page = a.Browser.Get().MustPage(asurascansURL + chapter.URL).Timeout(browser.Timeout).MustWaitDOMStable()
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open image page: %w", browser.HandleError(err))
 	}
+	log.Trace().Msg("got asurascans images")
 	defer page.MustClose()
 
 	imageElements, err := page.Elements(".w-full.mx-auto img")
