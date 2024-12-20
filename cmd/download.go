@@ -118,11 +118,6 @@ var downloadCmd = &cobra.Command{
 					return
 				}
 
-				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
-					fmt.Printf("Failed to get image URLs for chapter %g: %v\n", selectedChapter.Number, err)
-					return
-				}
-
 				overwrittenTitle := sanitize.Filename(overwrite)
 
 				if len(overwrittenTitle) != 0 {
@@ -137,6 +132,11 @@ var downloadCmd = &cobra.Command{
 
 				if _, err := os.Stat(contentPath); err == nil {
 					fmt.Println("Chapter has already been downloaded, skipping", templatedName)
+					return
+				}
+
+				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
+					fmt.Printf("Failed to get image URLs for chapter %g: %v\n", selectedChapter.Number, err)
 					return
 				}
 

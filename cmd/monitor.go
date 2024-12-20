@@ -53,7 +53,6 @@ var monitorCmd = &cobra.Command{
 		defer ticker.Stop()
 
 		bm := browser.NewManager()
-		defer bm.Close()
 
 		// semaphore to limit concurrency to maxConcurrentSourceProcesses which is set to 10
 		sem := semaphore.NewWeighted(maxConcurrentSourceProcesses)
@@ -66,8 +65,6 @@ var monitorCmd = &cobra.Command{
 				case <-quit:
 					return
 				case <-ticker.C:
-					pages, _ := bm.Get().Pages()
-					log.Trace().Msgf("%+v", pages)
 					for _, monitoredManga := range cfg.Config.MonitoredManga {
 						wg.Add(1)
 
@@ -121,11 +118,6 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							if err := mangaSource.GetImageURLs(ctx, &selectedChapter); err != nil {
-								mLog.Error().Err(err).Msgf("error getting image urls for chapter %g", selectedChapter.Number)
-								return
-							}
-
 							overwrittenTitle := sanitize.Filename(monitoredManga.Overwrite)
 
 							if len(overwrittenTitle) != 0 {
@@ -143,6 +135,11 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
+							if err := mangaSource.GetImageURLs(ctx, &selectedChapter); err != nil {
+								mLog.Error().Err(err).Msgf("error getting image urls for chapter %g", selectedChapter.Number)
+								return
+							}
+
 							mLog.Info().Msgf("downloading %q", templatedName)
 							if err := download.Chapter(ctx, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
 								mLog.Error().Err(err).Msgf("error downloading chapter %s", templatedName)
@@ -153,6 +150,7 @@ var monitorCmd = &cobra.Command{
 					}
 
 					wg.Wait()
+					bm.Close()
 				}
 			}
 		}()
