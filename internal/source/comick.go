@@ -263,20 +263,19 @@ func (c *comick) extractSlug(urlString string) (string, error) {
 
 func (c *comick) fetchJSON(path string) (string, error) {
 	var page *rod.Page
+	var respElement *rod.Element
 	err := rod.Try(func() {
-		page = c.Browser.Get().MustPage(path).Timeout(browser.Timeout).MustWaitDOMStable()
+		page = c.Browser.Get().MustPage().Timeout(browser.Timeout)
+		page.MustNavigate(path).MustWaitDOMStable()
+
+		respElement = page.MustElement("pre")
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
 	}
 	defer page.MustClose()
 
-	resp, err := page.Element("pre")
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch chapters page: %w", err)
-	}
-
-	jsonResp, err := resp.Text()
+	jsonResp, err := respElement.Text()
 	if err != nil {
 		return "", fmt.Errorf("failed to get json from html: %w", err)
 	}

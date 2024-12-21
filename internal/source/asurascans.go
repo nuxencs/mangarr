@@ -56,20 +56,19 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	var page *rod.Page
 	err := rod.Try(func() {
 		log.Trace().Msg("trying to get asurascans manga")
-		page = a.Browser.Get().MustPage(a.MangaURL).Timeout(browser.Timeout).MustWaitDOMStable()
+		page = a.Browser.Get().MustPage().Timeout(browser.Timeout)
+		page.MustNavigate(a.MangaURL).MustWaitDOMStable()
+		log.Trace().Msg("got asurascans manga")
+
+		log.Trace().Msg("trying to get asurascans manga title")
+		titleElement := page.MustElement("span.text-xl.font-bold")
+		manga.Title = sanitize.Filename(titleElement.MustText())
+		log.Trace().Msg("got asurascans manga title")
 	})
 	if err != nil {
-		return manga, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
+		return domain.Manga{}, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
 	}
-	log.Trace().Msg("got asurascans manga")
 	defer page.MustClose()
-
-	titleElement, err := page.Element("span.text-xl.font-bold")
-	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to find title element: %w", err)
-	}
-
-	manga.Title = sanitize.Filename(titleElement.MustText())
 
 	chapterElements, err := page.Elements(".pl-4.py-2")
 	if err != nil {
@@ -138,20 +137,21 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	var errors []error
 
 	var page *rod.Page
+	var imageElements rod.Elements
 	err := rod.Try(func() {
 		log.Trace().Msg("trying to get asurascans images")
-		page = a.Browser.Get().MustPage(asurascansURL + chapter.URL).Timeout(browser.Timeout).MustWaitDOMStable()
+		page = a.Browser.Get().MustPage().Timeout(browser.Timeout)
+		page.MustNavigate(asurascansURL + chapter.URL).MustWaitDOMStable()
+		log.Trace().Msg("got asurascans images")
+
+		log.Trace().Msg("trying to get asurascans image elements")
+		imageElements = page.MustElements(".w-full.mx-auto img")
+		log.Trace().Msg("got asurascans image elements")
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open image page: %w", browser.HandleError(err))
 	}
-	log.Trace().Msg("got asurascans images")
 	defer page.MustClose()
-
-	imageElements, err := page.Elements(".w-full.mx-auto img")
-	if err != nil {
-		return fmt.Errorf("failed to find image element: %w", err)
-	}
 
 	for _, e := range imageElements {
 		imgURL, err := e.Attribute("src")
