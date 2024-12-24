@@ -12,7 +12,6 @@ import (
 	"mangarr/internal/sanitize"
 
 	"github.com/go-rod/rod"
-	"github.com/rs/zerolog/log"
 )
 
 const asurascansURL = "https://asuracomic.net/series/"
@@ -53,17 +52,13 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		IsManhwa: true,
 	}
 
-	var page *rod.Page
-	err := rod.Try(func() {
-		log.Trace().Msg("trying to get asurascans manga")
-		page = a.Browser.Get().MustPage().Timeout(browser.Timeout)
-		page.MustNavigate(a.MangaURL).MustWaitDOMStable()
-		log.Trace().Msg("got asurascans manga")
+	page := a.Browser.Get().MustPage().Timeout(browser.Timeout)
 
-		log.Trace().Msg("trying to get asurascans manga title")
+	err := rod.Try(func() {
+		page.MustNavigate(a.MangaURL).MustWaitDOMStable()
+
 		titleElement := page.MustElement("span.text-xl.font-bold")
 		manga.Title = sanitize.Filename(titleElement.MustText())
-		log.Trace().Msg("got asurascans manga title")
 	})
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
@@ -136,17 +131,13 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	var imageInfos []domain.ImageInfo
 	var errors []error
 
-	var page *rod.Page
+	page := a.Browser.Get().MustPage().Timeout(browser.Timeout)
 	var imageElements rod.Elements
-	err := rod.Try(func() {
-		log.Trace().Msg("trying to get asurascans images")
-		page = a.Browser.Get().MustPage().Timeout(browser.Timeout)
-		page.MustNavigate(asurascansURL + chapter.URL).MustWaitDOMStable()
-		log.Trace().Msg("got asurascans images")
 
-		log.Trace().Msg("trying to get asurascans image elements")
+	err := rod.Try(func() {
+		page.MustNavigate(asurascansURL + chapter.URL).MustWaitDOMStable()
+
 		imageElements = page.MustElements(".w-full.mx-auto img")
-		log.Trace().Msg("got asurascans image elements")
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open image page: %w", browser.HandleError(err))

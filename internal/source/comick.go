@@ -262,10 +262,10 @@ func (c *comick) extractSlug(urlString string) (string, error) {
 }
 
 func (c *comick) fetchJSON(path string) (string, error) {
-	var page *rod.Page
+	page := c.Browser.Get().MustPage().Timeout(browser.Timeout)
 	var respElement *rod.Element
+
 	err := rod.Try(func() {
-		page = c.Browser.Get().MustPage().Timeout(browser.Timeout)
 		page.MustNavigate(path).MustWaitDOMStable()
 
 		respElement = page.MustElement("pre")

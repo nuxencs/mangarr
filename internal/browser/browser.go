@@ -36,7 +36,12 @@ func (bm *Manager) Get() *rod.Browser {
 	}
 
 	path, _ := launcher.LookPath()
-	u := launcher.New().Bin(path).MustLaunch()
+	u := launcher.
+		New().
+		Bin(path).
+		Set("disable-gpu").
+		Set("disable-software-rasterizer").
+		MustLaunch()
 
 	bm.browser = rod.New().
 		ControlURL(u).
