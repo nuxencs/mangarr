@@ -150,7 +150,6 @@ var monitorCmd = &cobra.Command{
 					}
 
 					wg.Wait()
-					bm.Close()
 				}
 			}
 		}()
@@ -162,5 +161,6 @@ var monitorCmd = &cobra.Command{
 		fmt.Printf("received signal: %s, stopping monitoring.\n", <-sigCh)
 		quit <- true
 		wg.Wait()
+		bm.Close()
 	},
 }
