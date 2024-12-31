@@ -52,20 +52,22 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		IsManhwa: true,
 	}
 
-	page := a.Browser.Get().MustPage().Timeout(browser.Timeout)
+	page := a.Browser.Get().MustPage()
+	defer page.MustClose()
+
+	pageWithTimeout := page.Timeout(browser.Timeout)
 
 	err := rod.Try(func() {
-		page.MustNavigate(a.MangaURL).MustWaitDOMStable()
+		pageWithTimeout.MustNavigate(a.MangaURL).MustWaitDOMStable()
 
-		titleElement := page.MustElement("span.text-xl.font-bold")
+		titleElement := pageWithTimeout.MustElement("span.text-xl.font-bold")
 		manga.Title = sanitize.Filename(titleElement.MustText())
 	})
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
 	}
-	defer page.MustClose()
 
-	chapterElements, err := page.Elements(".pl-4.py-2")
+	chapterElements, err := pageWithTimeout.Elements(".pl-4.py-2")
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("failed to find chapter elements: %w", err)
 	}
@@ -129,20 +131,22 @@ func (a *asurascans) GetChapters(_ context.Context, _ domain.Manga) error {
 
 func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
 	var imageInfos []domain.ImageInfo
+	var imageElements rod.Elements
 	var errors []error
 
-	page := a.Browser.Get().MustPage().Timeout(browser.Timeout)
-	var imageElements rod.Elements
+	page := a.Browser.Get().MustPage()
+	defer page.MustClose()
+
+	pageWithTimeout := page.Timeout(browser.Timeout)
 
 	err := rod.Try(func() {
-		page.MustNavigate(asurascansURL + chapter.URL).MustWaitDOMStable()
+		pageWithTimeout.MustNavigate(asurascansURL + chapter.URL).MustWaitDOMStable()
 
-		imageElements = page.MustElements(".w-full.mx-auto img")
+		imageElements = pageWithTimeout.MustElements(".w-full.mx-auto img")
 	})
 	if err != nil {
 		return fmt.Errorf("failed to open image page: %w", browser.HandleError(err))
 	}
-	defer page.MustClose()
 
 	for _, e := range imageElements {
 		imgURL, err := e.Attribute("src")
