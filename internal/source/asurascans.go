@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"mangarr/internal/browser"
 	"mangarr/internal/domain"
@@ -58,9 +59,10 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	pageWithTimeout := page.Timeout(browser.Timeout)
 
 	err := rod.Try(func() {
-		pageWithTimeout.MustNavigate(a.MangaURL).MustWaitDOMStable()
+		_ = pageWithTimeout.MustNavigate(a.MangaURL).WaitDOMStable(time.Second, 1)
 
-		titleElement := pageWithTimeout.MustElement("span.text-xl.font-bold")
+		titleContainer := pageWithTimeout.MustElement(".space-y-7")
+		titleElement := titleContainer.MustElement("span.text-xl.font-bold")
 		manga.Title = sanitize.Filename(titleElement.MustText())
 	})
 	if err != nil {
@@ -140,7 +142,7 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	pageWithTimeout := page.Timeout(browser.Timeout)
 
 	err := rod.Try(func() {
-		pageWithTimeout.MustNavigate(asurascansURL + chapter.URL).MustWaitDOMStable()
+		_ = pageWithTimeout.MustNavigate(asurascansURL+chapter.URL).WaitDOMStable(time.Second, 1)
 
 		imageElements = pageWithTimeout.MustElements(".w-full.mx-auto img")
 	})
