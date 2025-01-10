@@ -6,24 +6,26 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
+	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 
 	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/launcher"
 )
 
 const asurascansURL = "https://asuracomic.net/series/"
 
 type asurascans struct {
 	MangaURL string
-	Browser  *rod.Browser
+	Browser  *browser.Manager
 }
 
-func NewAsurascans(mangaURL string) domain.Source {
+func NewAsurascans(mangaURL string, bm *browser.Manager) domain.Source {
 	return &asurascans{
 		MangaURL: mangaURL,
+		Browser:  bm,
 	}
 }
 
@@ -51,20 +53,38 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		IsManhwa: true,
 	}
 
-	path, _ := launcher.LookPath()
-	u := launcher.New().Bin(path).MustLaunch()
-	b := rod.New().ControlURL(u).MustConnect()
-	defer b.MustClose()
+	page := a.Browser.Get().MustPage()
+	defer page.MustClose()
 
-	page := b.MustPage(a.MangaURL).MustWaitDOMStable()
-	manga.Title = sanitize.Filename(page.MustElement("span.text-xl.font-bold").MustText())
+	pageWithTimeout := page.Timeout(browser.Timeout)
 
-	chapterElements, err := page.Elements(".pl-4.py-2")
+	err := rod.Try(func() {
+		_ = pageWithTimeout.MustNavigate(a.MangaURL).WaitDOMStable(time.Second, 1)
+
+		titleContainer := pageWithTimeout.MustElement(".space-y-7")
+		titleElement := titleContainer.MustElement("span.text-xl.font-bold")
+		manga.Title = sanitize.Filename(titleElement.MustText())
+	})
+	if err != nil {
+		return domain.Manga{}, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
+	}
+
+	chapterElements, err := pageWithTimeout.Elements(".pl-4.py-2")
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("failed to find chapter elements: %w", err)
 	}
 
 	for _, e := range chapterElements {
+		// skip early access chapters as they are only available to ASURA+ Premium members
+		isEarlyAccess, _, err := e.Has("svg")
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to determine if chapter is early access: %w", err))
+			continue
+		}
+		if isEarlyAccess {
+			continue
+		}
+
 		chapterElement, err := e.Element(".flex")
 		if err != nil {
 			errors = append(errors, fmt.Errorf("failed to get chapter element from URL %s: %w", a.MangaURL, err))
@@ -123,17 +143,21 @@ func (a *asurascans) GetChapters(_ context.Context, _ domain.Manga) error {
 
 func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
 	var imageInfos []domain.ImageInfo
+	var imageElements rod.Elements
 	var errors []error
 
-	path, _ := launcher.LookPath()
-	u := launcher.New().Bin(path).MustLaunch()
-	b := rod.New().ControlURL(u).MustConnect()
-	defer b.MustClose()
+	page := a.Browser.Get().MustPage()
+	defer page.MustClose()
 
-	page := b.MustPage(asurascansURL + chapter.URL).MustWaitDOMStable()
-	imageElements, err := page.Elements(".w-full.mx-auto img")
+	pageWithTimeout := page.Timeout(browser.Timeout)
+
+	err := rod.Try(func() {
+		_ = pageWithTimeout.MustNavigate(asurascansURL+chapter.URL).WaitDOMStable(time.Second, 1)
+
+		imageElements = pageWithTimeout.MustElements(".w-full.mx-auto img")
+	})
 	if err != nil {
-		return fmt.Errorf("failed to find image element: %w", err)
+		return fmt.Errorf("failed to open image page: %w", browser.HandleError(err))
 	}
 
 	for _, e := range imageElements {

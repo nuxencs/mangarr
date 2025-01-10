@@ -39,6 +39,7 @@ func Filename(title string) string {
 		// Use replacement if found
 		if replacement, hasReplacement := replacementCharacters[r]; hasReplacement {
 			builder.WriteRune(replacement)
+			continue
 		}
 
 		// Keep the character as is

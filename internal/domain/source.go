@@ -13,6 +13,7 @@ type Source interface {
 }
 
 type Manga struct {
+	ID       string
 	URL      string
 	Title    string
 	Chapters map[float32]Chapter

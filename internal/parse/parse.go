@@ -69,8 +69,8 @@ func getRange(part string) (float32, float32, error) {
 	return float32(start), float32(end), nil
 }
 
-// GetMinAndMaxKeys returns the lowest and highest keys from a map that has keys that can be ordered
-func GetMinAndMaxKeys[K cmp.Ordered, V any](someMap map[K]V) ([]K, []K, error) {
+// MinMaxKeys returns the lowest and highest keys from a map that has keys that can be ordered
+func MinMaxKeys[K cmp.Ordered, V any](someMap map[K]V) ([]K, []K, error) {
 	if len(someMap) == 0 {
 		var zero []K
 		return zero, zero, fmt.Errorf("map is empty")

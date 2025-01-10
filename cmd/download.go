@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/download"
 	"mangarr/internal/files"
@@ -35,6 +36,9 @@ var downloadCmd = &cobra.Command{
 
 		var s domain.Source
 
+		bm := browser.NewManager()
+		defer bm.Close()
+
 		switch mangaSource {
 		case "tcbscans":
 			s = source.NewTCBScans(manga)
@@ -45,9 +49,11 @@ var downloadCmd = &cobra.Command{
 		case "flamecomics":
 			s = source.NewFlamecomics(manga)
 		case "asurascans":
-			s = source.NewAsurascans(manga)
+			s = source.NewAsurascans(manga, bm)
 		case "cubari":
 			s = source.NewCubari(manga, group)
+		case "comick":
+			s = source.NewComick(manga, group, language, bm)
 		default:
 			fmt.Println("Invalid source:", mangaSource)
 			return
@@ -71,7 +77,7 @@ var downloadCmd = &cobra.Command{
 
 		var selectedChapterNumbers []float32
 
-		firstChapterNr, latestChapterNr, err := parse.GetMinAndMaxKeys(selectedManga.Chapters)
+		firstChapterNr, latestChapterNr, err := parse.MinMaxKeys(selectedManga.Chapters)
 		if err != nil {
 			fmt.Printf("Failed to parse chapter number for %s: %v\n", selectedManga.Title, err)
 			return
@@ -112,11 +118,6 @@ var downloadCmd = &cobra.Command{
 					return
 				}
 
-				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
-					fmt.Printf("Failed to get image URLs for chapter %g: %v\n", selectedChapter.Number, err)
-					return
-				}
-
 				overwrittenTitle := sanitize.Filename(overwrite)
 
 				if len(overwrittenTitle) != 0 {
@@ -131,6 +132,11 @@ var downloadCmd = &cobra.Command{
 
 				if _, err := os.Stat(contentPath); err == nil {
 					fmt.Println("Chapter has already been downloaded, skipping", templatedName)
+					return
+				}
+
+				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
+					fmt.Printf("Failed to get image URLs for chapter %g: %v\n", selectedChapter.Number, err)
 					return
 				}
 

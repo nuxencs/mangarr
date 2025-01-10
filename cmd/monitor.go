@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"mangarr/internal/browser"
 	"mangarr/internal/buildinfo"
 	"mangarr/internal/config"
 	"mangarr/internal/download"
@@ -51,6 +52,8 @@ var monitorCmd = &cobra.Command{
 		ticker := time.NewTicker(cfg.Config.CheckInterval * time.Minute)
 		defer ticker.Stop()
 
+		bm := browser.NewManager()
+
 		// semaphore to limit concurrency to maxConcurrentSourceProcesses which is set to 10
 		sem := semaphore.NewWeighted(maxConcurrentSourceProcesses)
 		quit := make(chan bool, 1)
@@ -69,7 +72,7 @@ var monitorCmd = &cobra.Command{
 							sem.Acquire()
 							defer func() { sem.Release(); wg.Done() }()
 
-							mangaSource, err := source.Select(*monitoredManga)
+							mangaSource, err := source.Select(*monitoredManga, bm)
 							if err != nil {
 								log.Error().Err(err).Msgf("error selecting manga source")
 								return
@@ -92,7 +95,7 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							_, latestChapterNr, err := parse.GetMinAndMaxKeys(selectedManga.Chapters)
+							_, latestChapterNr, err := parse.MinMaxKeys(selectedManga.Chapters)
 							if err != nil {
 								mLog.Error().Err(err).Msg("error getting latest chapter number")
 								return
@@ -115,11 +118,6 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							if err := mangaSource.GetImageURLs(ctx, &selectedChapter); err != nil {
-								mLog.Error().Err(err).Msgf("error getting image urls for chapter %g", selectedChapter.Number)
-								return
-							}
-
 							overwrittenTitle := sanitize.Filename(monitoredManga.Overwrite)
 
 							if len(overwrittenTitle) != 0 {
@@ -134,6 +132,11 @@ var monitorCmd = &cobra.Command{
 
 							if _, err := os.Stat(contentPath); err == nil {
 								mLog.Debug().Msgf("chapter has already been downloaded, skipping %s", templatedName)
+								return
+							}
+
+							if err := mangaSource.GetImageURLs(ctx, &selectedChapter); err != nil {
+								mLog.Error().Err(err).Msgf("error getting image urls for chapter %g", selectedChapter.Number)
 								return
 							}
 
@@ -158,5 +161,6 @@ var monitorCmd = &cobra.Command{
 		fmt.Printf("received signal: %s, stopping monitoring.\n", <-sigCh)
 		quit <- true
 		wg.Wait()
+		bm.Close()
 	},
 }
