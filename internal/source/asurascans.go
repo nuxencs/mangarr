@@ -75,6 +75,16 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	}
 
 	for _, e := range chapterElements {
+		// skip early access chapters as they are only available to ASURA+ Premium members
+		isEarlyAccess, _, err := e.Has("svg")
+		if err != nil {
+			errors = append(errors, fmt.Errorf("failed to determine if chapter is early access: %w", err))
+			continue
+		}
+		if isEarlyAccess {
+			continue
+		}
+
 		chapterElement, err := e.Element(".flex")
 		if err != nil {
 			errors = append(errors, fmt.Errorf("failed to get chapter element from URL %s: %w", a.MangaURL, err))
