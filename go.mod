@@ -14,7 +14,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/viper v1.19.0
 	golang.org/x/image v0.23.0
-	google.golang.org/protobuf v1.36.0
+	google.golang.org/protobuf v1.36.2
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
 
