@@ -31,7 +31,7 @@ type flamecomicsResponse struct {
 				Description string      `json:"description"`
 				Language    string      `json:"language"`
 				Type        string      `json:"type"`
-				Tags        string      `json:"tags"`
+				Tags        []string    `json:"tags"`
 				Country     string      `json:"country"`
 				Author      string      `json:"author"`
 				Artist      string      `json:"artist"`
