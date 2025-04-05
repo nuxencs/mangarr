@@ -61,9 +61,8 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	err := rod.Try(func() {
 		_ = pageWithTimeout.MustNavigate(a.MangaURL).WaitDOMStable(time.Second, 1)
 
-		titleContainer := pageWithTimeout.MustElement(".space-y-7")
-		titleElement := titleContainer.MustElement("span.text-xl.font-bold")
-		manga.Title = sanitize.Filename(titleElement.MustText())
+		titleElement := pageWithTimeout.MustElement(".font-bold.pb-3\\.5")
+		manga.Title = sanitize.Filename(strings.TrimPrefix(titleElement.MustText(), "Chapter "))
 	})
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
