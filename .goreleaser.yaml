@@ -40,11 +40,11 @@ builds:
 
 archives:
   - id: mangarr
-    builds:
+    ids:
       - mangarr
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [ "zip" ]
     files:
       - none*
     name_template: >-
