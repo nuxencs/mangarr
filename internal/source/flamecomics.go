@@ -25,26 +25,17 @@ type flamecomicsResponse struct {
 	Props struct {
 		PageProps struct {
 			Series struct {
-				SeriesId    int         `json:"series_id"`
-				Title       string      `json:"title"`
-				AltTitles   string      `json:"altTitles"`
-				Description string      `json:"description"`
-				Language    string      `json:"language"`
-				Type        string      `json:"type"`
-				Tags        []string    `json:"tags"`
-				Country     string      `json:"country"`
-				Author      string      `json:"author"`
-				Artist      string      `json:"artist"`
-				Publisher   string      `json:"publisher"`
-				Year        int         `json:"year"`
-				Status      string      `json:"status"`
-				Schedule    string      `json:"schedule"`
-				Views       int         `json:"views"`
-				Likes       interface{} `json:"likes"`
-				Cover       string      `json:"cover"`
-				Draft       int         `json:"draft"`
-				LastEdit    string      `json:"last_edit"`
-				Time        int         `json:"time"`
+				SeriesId    int    `json:"series_id"`
+				Title       string `json:"title"`
+				AltTitles   string `json:"altTitles"`
+				Description string `json:"description"`
+				Language    string `json:"language"`
+				Type        string `json:"type"`
+				Year        int    `json:"year"`
+				Status      string `json:"status"`
+				Schedule    string `json:"schedule"`
+				LastEdit    string `json:"last_edit"`
+				Time        int    `json:"time"`
 			} `json:"series"`
 			Chapters []flamescansChapter `json:"chapters"`
 		} `json:"pageProps"`
@@ -61,9 +52,6 @@ type flamescansChapter struct {
 	Title         string                     `json:"title"`
 	Images        map[string]flamescansImage `json:"images"`
 	Language      string                     `json:"language"`
-	Views         int                        `json:"views"`
-	Likes         int                        `json:"likes"`
-	Hidden        int                        `json:"hidden"`
 	ReleaseDate   int64                      `json:"release_date"`
 	Token         string                     `json:"token"`
 	UnixTimestamp int64                      `json:"unix_timestamp"`
