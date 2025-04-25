@@ -39,7 +39,7 @@ func (a *asurascans) ValidateInput() error {
 	}
 
 	if _, err := url.Parse(a.MangaURL); err != nil {
-		return fmt.Errorf("failed to parse URL %s: %w", a.MangaURL, err)
+		return fmt.Errorf("parsing URL %s: %w", a.MangaURL, err)
 	}
 
 	return nil
@@ -65,19 +65,19 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		manga.Title = sanitize.Filename(strings.TrimPrefix(titleElement.MustText(), "Chapter "))
 	})
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
+		return domain.Manga{}, fmt.Errorf("opening manga page: %w", browser.HandleError(err))
 	}
 
 	chapterElements, err := pageWithTimeout.Elements(".pl-4.py-2")
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to find chapter elements: %w", err)
+		return domain.Manga{}, fmt.Errorf("finding chapter elements: %w", err)
 	}
 
 	for _, e := range chapterElements {
 		// skip early access chapters as they are only available to ASURA+ Premium members
 		isEarlyAccess, _, err := e.Has("svg")
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to determine if chapter is early access: %w", err))
+			errors = append(errors, fmt.Errorf("determine if chapter is early access: %w", err))
 			continue
 		}
 		if isEarlyAccess {
@@ -86,31 +86,31 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 
 		chapterElement, err := e.Element(".flex")
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to get chapter element from URL %s: %w", a.MangaURL, err))
+			errors = append(errors, fmt.Errorf("getting chapter element from URL %s: %w", a.MangaURL, err))
 			continue
 		}
 
 		linkElement, err := e.Element("a")
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to get link element from URL %s: %w", a.MangaURL, err))
+			errors = append(errors, fmt.Errorf("getting link element from URL %s: %w", a.MangaURL, err))
 			continue
 		}
 
 		link, err := linkElement.Attribute("href")
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to get link from URL %s: %w", a.MangaURL, err))
+			errors = append(errors, fmt.Errorf("getting link from URL %s: %w", a.MangaURL, err))
 		}
 		chapterURL := *link
 
 		chapterLine, err := chapterElement.Text()
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to get chapter line from URL %s: %w", a.MangaURL, err))
+			errors = append(errors, fmt.Errorf("getting chapter line from URL %s: %w", a.MangaURL, err))
 			continue
 		}
 
 		chapterNum, chapterTitle, err := a.splitChapterInfo(chapterLine)
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to split chapter info %s: %w", chapterLine, err))
+			errors = append(errors, fmt.Errorf("splitting chapter info %s: %w", chapterLine, err))
 			continue
 		}
 
@@ -122,15 +122,15 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	}
 
 	if len(errors) > 0 {
-		return domain.Manga{}, fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
+		return domain.Manga{}, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
 	}
 
 	if len(manga.Title) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga for URL %s", a.MangaURL)
+		return domain.Manga{}, fmt.Errorf("getting manga for URL %s", a.MangaURL)
 	}
 
 	if len(manga.Chapters) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get chapters for manga %s", manga.Title)
+		return domain.Manga{}, fmt.Errorf("getting chapters for manga %s", manga.Title)
 	}
 
 	return manga, nil
@@ -156,13 +156,13 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 		imageElements = pageWithTimeout.MustElements(".w-full.mx-auto img")
 	})
 	if err != nil {
-		return fmt.Errorf("failed to open image page: %w", browser.HandleError(err))
+		return fmt.Errorf("opening image page: %w", browser.HandleError(err))
 	}
 
 	for _, e := range imageElements {
 		imgURL, err := e.Attribute("src")
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to get image URL: %w", err))
+			errors = append(errors, fmt.Errorf("getting image URL: %w", err))
 		}
 
 		// skip images that are not hosted on https://gg.asuracomic.net
@@ -172,11 +172,11 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
+		return fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image URLs for chapter %g", chapter.Number)
+		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
 	}
 
 	chapter.ImageInfo = imageInfos
@@ -196,12 +196,12 @@ func (a *asurascans) splitChapterInfo(chapterLine string) (float32, string, erro
 
 	_, cutChapterLine, ok := strings.Cut(split[0], "Chapter ")
 	if !ok {
-		return 0, "", fmt.Errorf("failed to split chapter string %q", cutChapterLine)
+		return 0, "", fmt.Errorf("splitting chapter string %q", cutChapterLine)
 	}
 
 	chapterNumber, err := strconv.ParseFloat(cutChapterLine, 32)
 	if err != nil {
-		return 0, "", fmt.Errorf("failed to parse chapter number from %s: %w", cutChapterLine, err)
+		return 0, "", fmt.Errorf("parsing chapter number from %s: %w", cutChapterLine, err)
 	}
 
 	var chapterTitle string

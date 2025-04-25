@@ -108,32 +108,32 @@ func (c *comick) GetManga(_ context.Context) (domain.Manga, error) {
 
 	mangaSlug, err := c.extractSlug(c.MangaURL)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to extract manga slug: %w", err)
+		return domain.Manga{}, fmt.Errorf("extracting manga slug: %w", err)
 	}
 
 	path, err := url.JoinPath(comickURL, "comic", mangaSlug)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to build URL: %w", err)
+		return domain.Manga{}, fmt.Errorf("building URL: %w", err)
 	}
 
 	jsonResp, err := c.fetchJSON(path)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to fetch json from URL %s: %w", path, err)
+		return domain.Manga{}, fmt.Errorf("fetching json from URL %s: %w", path, err)
 	}
 
 	err = json.NewDecoder(strings.NewReader(jsonResp)).Decode(&mangaResp)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to decode response: %w", err)
+		return domain.Manga{}, fmt.Errorf("decoding response: %w", err)
 	}
 
 	id := mangaResp.Comic.Hid
 	if len(id) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga id for slug %s", mangaSlug)
+		return domain.Manga{}, fmt.Errorf("getting manga id for slug %s", mangaSlug)
 	}
 
 	title := mangaResp.Comic.Title
 	if len(title) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga title for slug %s", mangaSlug)
+		return domain.Manga{}, fmt.Errorf("getting manga title for slug %s", mangaSlug)
 	}
 
 	for _, tag := range mangaResp.Comic.MdComicMdGenres {
@@ -156,12 +156,12 @@ func (c *comick) GetChapters(_ context.Context, manga domain.Manga) error {
 
 	path, err := url.JoinPath(comickURL, "comic", manga.ID, "chapters")
 	if err != nil {
-		return fmt.Errorf("failed to build URL: %w", err)
+		return fmt.Errorf("building URL: %w", err)
 	}
 
 	u, err := url.Parse(path)
 	if err != nil {
-		return fmt.Errorf("failed to parse URL %s: %w", path, err)
+		return fmt.Errorf("parsing URL %s: %w", path, err)
 	}
 
 	params := url.Values{
@@ -173,12 +173,12 @@ func (c *comick) GetChapters(_ context.Context, manga domain.Manga) error {
 
 	jsonResp, err := c.fetchJSON(u.String())
 	if err != nil {
-		return fmt.Errorf("failed to fetch json from URL %s: %w", u.String(), err)
+		return fmt.Errorf("fetching json from URL %s: %w", u.String(), err)
 	}
 
 	err = json.NewDecoder(strings.NewReader(jsonResp)).Decode(&chapterResp)
 	if err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return fmt.Errorf("decoding response: %w", err)
 	}
 
 	processedChapters := make(map[string]bool)
@@ -190,14 +190,14 @@ func (c *comick) GetChapters(_ context.Context, manga domain.Manga) error {
 			}
 
 			if err := c.processChapter(data, &manga); err != nil {
-				return fmt.Errorf("failed to process chapter: %w", err)
+				return fmt.Errorf("processing chapter: %w", err)
 			}
 			processedChapters[data.Chap] = true
 		}
 	}
 
 	if len(manga.Chapters) == 0 {
-		return fmt.Errorf("failed to get chapters for manga %s", c.MangaURL)
+		return fmt.Errorf("getting chapters for manga %s", c.MangaURL)
 	}
 
 	return nil
@@ -209,17 +209,17 @@ func (c *comick) GetImageURLs(_ context.Context, chapter *domain.Chapter) error 
 
 	path, err := url.JoinPath(comickURL, "chapter", chapter.ID, "get_images")
 	if err != nil {
-		return fmt.Errorf("failed to build URL: %w", err)
+		return fmt.Errorf("building URL: %w", err)
 	}
 
 	jsonResp, err := c.fetchJSON(path)
 	if err != nil {
-		return fmt.Errorf("failed to fetch json from URL %s: %w", path, err)
+		return fmt.Errorf("fetching json from URL %s: %w", path, err)
 	}
 
 	err = json.NewDecoder(strings.NewReader(jsonResp)).Decode(&imageResp)
 	if err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
+		return fmt.Errorf("decoding response: %w", err)
 	}
 
 	if len(imageResp) == 0 {
@@ -229,14 +229,14 @@ func (c *comick) GetImageURLs(_ context.Context, chapter *domain.Chapter) error 
 	for _, image := range imageResp {
 		imagePath, err := url.JoinPath(comickImageHost, image.B2Key)
 		if err != nil {
-			return fmt.Errorf("failed to build URL: %w", err)
+			return fmt.Errorf("building URL: %w", err)
 		}
 
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imagePath})
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image URLs for chapter")
+		return fmt.Errorf("getting image URLs for chapter")
 	}
 
 	chapter.ImageInfo = imageInfos
@@ -275,12 +275,12 @@ func (c *comick) fetchJSON(path string) (string, error) {
 		respElement = pageWithTimeout.MustElement("pre")
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to open manga page: %w", browser.HandleError(err))
+		return "", fmt.Errorf("opening manga page: %w", browser.HandleError(err))
 	}
 
 	jsonResp, err := respElement.Text()
 	if err != nil {
-		return "", fmt.Errorf("failed to get json from html: %w", err)
+		return "", fmt.Errorf("getting json from html: %w", err)
 	}
 
 	return jsonResp, nil
@@ -312,7 +312,7 @@ func (c *comick) processChapter(data comickChapterData, manga *domain.Manga) err
 
 	chapterNum64, err := strconv.ParseFloat(chapter, 32)
 	if err != nil {
-		return fmt.Errorf("failed to parse chapter number from %s: %w", chapter, err)
+		return fmt.Errorf("parsing chapter number from %s: %w", chapter, err)
 	}
 	chapterNum := float32(chapterNum64)
 

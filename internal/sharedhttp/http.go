@@ -10,6 +10,8 @@ import (
 	"github.com/avast/retry-go"
 )
 
+var ErrNotFound = fmt.Errorf("not found - retrying: status code %d", http.StatusNotFound)
+
 var Transport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
 	DialContext: (&net.Dialer{
@@ -43,7 +45,7 @@ func CheckStatusCode(statusCode int) error {
 		return retry.Unrecoverable(fmt.Errorf("method not allowed: status code %d", statusCode))
 
 	case http.StatusNotFound:
-		return fmt.Errorf("not found - retrying: status code %d", statusCode)
+		return ErrNotFound
 
 	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusInternalServerError:
 		return fmt.Errorf("server error encountered: status code %d - retrying", statusCode)
@@ -58,11 +60,11 @@ func CheckStatusCode(statusCode int) error {
 func ExecRequest(client http.Client, req *http.Request) (http.Response, error) {
 	resp, err := client.Do(req)
 	if err != nil {
-		return http.Response{}, fmt.Errorf("failed to do request: %w", err)
+		return http.Response{}, fmt.Errorf("doing request: %w", err)
 	}
 
 	if err := CheckStatusCode(resp.StatusCode); err != nil {
-		return http.Response{}, fmt.Errorf("failed to check status code: %w", err)
+		return http.Response{}, fmt.Errorf("checking status code: %w", err)
 	}
 
 	return *resp, nil

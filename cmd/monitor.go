@@ -141,7 +141,7 @@ var monitorCmd = &cobra.Command{
 							}
 
 							mLog.Info().Msgf("downloading %q", templatedName)
-							if err := download.Chapter(ctx, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
+							if err := download.Chapter(ctx, mLog, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
 								mLog.Error().Err(err).Msgf("error downloading chapter %s", templatedName)
 								return
 							}
