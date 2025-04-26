@@ -3,83 +3,107 @@ package parse
 import (
 	"cmp"
 	"fmt"
-	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
 	"mangarr/internal/domain"
 )
 
-// ChapterSelection parses the user input for ranges and parts
-func ChapterSelection(input string, availableChapters map[float32]domain.Chapter) ([]float32, error) {
-	parts := strings.Split(input, ",")
-	uniqueChapters := make(map[float32]bool)
+// ChapterSelection parses a comma-separated list that may contain single chapters or ranges (e.g. "1,2-4,5.5").
+func ChapterSelection(input string, available map[float32]domain.Chapter) ([]float32, error) {
+	uniq := make(map[float32]struct{})
 
-	for _, part := range parts {
-		if strings.Contains(part, "-") {
-			start, end, err := getRange(part)
+	for _, raw := range strings.Split(input, ",") {
+		part := strings.TrimSpace(raw)
+		if part == "" {
+			continue // ignore empty segments like ",,"
+		}
+
+		// Range e.g. "2-5"
+		if strings.ContainsRune(part, '-') {
+			start, end, err := parseRange(part)
 			if err != nil {
-				return nil, fmt.Errorf("getting range from part %s: %w", part, err)
+				return nil, err
 			}
-
-			for chapter := range availableChapters {
-				if chapter >= start && chapter <= end {
-					uniqueChapters[chapter] = true
+			for ch := range available {
+				if ch >= start && ch <= end {
+					uniq[ch] = struct{}{}
 				}
 			}
-		} else {
-			chapter, err := strconv.ParseFloat(strings.TrimSpace(part), 32)
-			if err != nil {
-				return nil, fmt.Errorf("parsing chapter number from part %s: %w", part, err)
-			}
-
-			uniqueChapters[float32(chapter)] = true
+			continue
 		}
+
+		// Single chapter
+		ch, err := parseChapter(part)
+		if err != nil {
+			return nil, err
+		}
+		uniq[ch] = struct{}{}
 	}
 
-	selectedChapters := make([]float32, 0, len(uniqueChapters))
-	for chapterNumber := range uniqueChapters {
-		selectedChapters = append(selectedChapters, chapterNumber)
+	// Convert map → slice and sort for stable output.
+	out := make([]float32, 0, len(uniq))
+	for ch := range uniq {
+		out = append(out, ch)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 
-	return selectedChapters, nil
+	return out, nil
 }
 
-// getRange parses the user input for chapter ranges
-func getRange(part string) (float32, float32, error) {
-	rangeParts := strings.Split(part, "-")
-	if len(rangeParts) != 2 {
-		return 0, 0, fmt.Errorf("invalid range format: %s", part)
+// parseRange expects the form "start-end".
+func parseRange(s string) (float32, float32, error) {
+	parts := strings.Split(s, "-")
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("invalid range %q", s)
 	}
 
-	start, err := strconv.ParseFloat(strings.TrimSpace(rangeParts[0]), 32)
+	start, err := parseChapter(parts[0])
 	if err != nil {
-		return 0, 0, fmt.Errorf("parsing start of range %s: %w", rangeParts[0], err)
+		return 0, 0, fmt.Errorf("range start: %w", err)
 	}
-
-	end, err := strconv.ParseFloat(strings.TrimSpace(rangeParts[1]), 32)
+	end, err := parseChapter(parts[1])
 	if err != nil {
-		return 0, 0, fmt.Errorf("parsing end of range %s: %w", rangeParts[1], err)
+		return 0, 0, fmt.Errorf("range end: %w", err)
 	}
-
 	if start > end {
-		return 0, 0, fmt.Errorf("start of range should not be greater than end")
+		return 0, 0, fmt.Errorf("start (%v) > end (%v)", start, end)
 	}
+	return start, end, nil
+}
 
-	return float32(start), float32(end), nil
+// parseChapter converts a trimmed string to float32.
+func parseChapter(s string) (float32, error) {
+	f, err := strconv.ParseFloat(strings.TrimSpace(s), 32)
+	if err != nil {
+		return 0, fmt.Errorf("invalid chapter %q: %w", s, err)
+	}
+	return float32(f), nil
 }
 
 // MinMaxKeys returns the lowest and highest keys from a map that has keys that can be ordered
-func MinMaxKeys[K cmp.Ordered, V any](someMap map[K]V) ([]K, []K, error) {
-	if len(someMap) == 0 {
-		var zero []K
-		return zero, zero, fmt.Errorf("map is empty")
+func MinMaxKeys[K cmp.Ordered, V any](m map[K]V) (min K, max K, err error) {
+	if len(m) == 0 {
+		return min, max, fmt.Errorf("map is empty")
 	}
 
-	keys := make([]K, 0, len(someMap))
-	for key := range someMap {
-		keys = append(keys, key)
+	first := true
+	for k := range m {
+		if first {
+			min, max = k, k
+			first = false
+			continue
+		}
+
+		if k < min {
+			min = k
+		}
+
+		if k > max {
+			max = k
+		}
 	}
 
-	return []K{slices.Min(keys)}, []K{slices.Max(keys)}, nil
+	return min, max, nil
 }

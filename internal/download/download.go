@@ -11,229 +11,134 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"mangarr/internal/domain"
-	"mangarr/internal/files"
-	"mangarr/internal/semaphore"
 	"mangarr/internal/sharedhttp"
 
 	"github.com/avast/retry-go"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
 )
 
-const maxConcurrentImageDownloads = 10
+const (
+	maxConcurrentImageDownloads = 10
+	userAgent                   = "mangarr"
+)
 
-// Chapter downloads and processes manga chapter images to create a CBZ archive.
-func Chapter(ctx context.Context, log zerolog.Logger, contentPath string, chapter domain.Chapter, isManhwa bool) error {
-	// if chapter.IsManhwa {
-	// 	 outputPath = contentPath + ".pdf"
-	// } else {
-	// 	 outputPath = contentPath + ".cbz"
-	// }
+type ArchiveWriter func(tmpDir, outPath string, isManhwa bool) error
 
-	temp, err := os.MkdirTemp("", "mangarr-*")
+func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter domain.Chapter, isManhwa bool, archiveWriter ArchiveWriter) error {
+	tmpDir, err := os.MkdirTemp("", "mangarr-*")
 	if err != nil {
-		return fmt.Errorf("creating temp directory %s: %w", temp, err)
+		return fmt.Errorf("creating temp dir: %w", err)
 	}
-	defer os.RemoveAll(temp)
+	defer os.RemoveAll(tmpDir)
 
-	// semaphore to limit concurrency to maxConcurrentImageDownloads which is set to 10
-	sem := semaphore.NewWeighted(maxConcurrentImageDownloads)
-	errc := make(chan error, len(chapter.ImageInfo))
-	var wg sync.WaitGroup
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(maxConcurrentImageDownloads)
 
-	for i, imageInfo := range chapter.ImageInfo {
-		wg.Add(1)
-
-		go func() {
-			sem.Acquire()
-			defer func() { sem.Release(); wg.Done() }()
-
-			filenameNoExt := filepath.Join(temp, fmt.Sprintf("%03d", i+1))
-
-			var err error
-			if len(imageInfo.EncryptionKey) != 0 {
-				if err = decryptImage(ctx, log, imageInfo.ImageURL, imageInfo.EncryptionKey, filenameNoExt); err != nil {
-					errc <- fmt.Errorf("decrypting and downloading image %s: %w", imageInfo.ImageURL, err)
-					return
-				}
-			} else {
-				if err = singleFile(ctx, log, imageInfo.ImageURL, filenameNoExt); err != nil {
-					errc <- fmt.Errorf("downloading image %s: %w", imageInfo.ImageURL, err)
-					return
-				}
-			}
-		}()
+	for i, img := range chapter.ImageInfo {
+		g.Go(func() error {
+			base := filepath.Join(tmpDir, fmt.Sprintf("%03d", i+1))
+			return downloadImage(ctx, log, img.ImageURL, img.EncryptionKey, base)
+		})
 	}
 
-	go func() {
-		wg.Wait()
-		close(errc)
-	}()
-
-	var errors []error
-	for err := range errc {
-		errors = append(errors, err)
+	if err := g.Wait(); err != nil {
+		return err
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("processing %d images: %w", len(errors), errors[0])
-	}
-
-	// if chapter.IsManhwa {
-	// 	 err = files.CreatePDF(temp, outputPath)
-	// 	 if err != nil {
-	// 	 	 return err
-	// 	 }
-	// } else {
-	// 	 err = files.CreateCbzArchive(temp, outputPath)
-	// 	 if err != nil {
-	// 	 	 return err
-	// 	 }
-	// }
-
-	if err := files.CreateCbzArchive(temp, contentPath, isManhwa); err != nil {
-		return fmt.Errorf("creating cbz archive: %w", err)
+	if err := archiveWriter(tmpDir, outputPath, isManhwa); err != nil {
+		return fmt.Errorf("creating archive: %w", err)
 	}
 
 	return nil
 }
 
-// singleFile downloads a single file
-func singleFile(ctx context.Context, log zerolog.Logger, url, filenameNoExt string) error {
+// downloadImage fetches url, applies XOR–decrypt if xorKeyHex isn't empty, and stores the
+// file using the right extension that is inferred from the response headers.
+func downloadImage(ctx context.Context, log zerolog.Logger, url, xorKeyHex, filenameNoExt string) error {
+	var body []byte
+	var contentType string
+
+	if err := fetchWithRetry(ctx, url, func(resp *http.Response) error {
+		contentType = resp.Header.Get("Content-Type")
+
+		// If we only need to save the stream, we could pipe directly, but for the
+		// XOR-decrypt branch we need everything in memory anyway, so always read
+		// into a buffer for simplicity.
+		var err error
+		body, err = io.ReadAll(bufio.NewReader(resp.Body))
+
+		return err
+	}); err != nil {
+		if errors.Is(err, sharedhttp.ErrNotFound) {
+			log.Warn().Msgf("image url returned 404, skipping %q", url)
+			return nil
+		}
+
+		return err
+	}
+
+	// Decrypt if needed.
+	if xorKeyHex != "" {
+		key, err := hex.DecodeString(xorKeyHex)
+		if err != nil {
+			return fmt.Errorf("decoding encryption key: %w", err)
+		}
+
+		for i := range body {
+			body[i] ^= key[i%len(key)]
+		}
+	}
+
+	filename, err := appendImageExtension(contentType, filenameNoExt)
+	if err != nil {
+		return err
+	}
+
+	out, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("creating file %s: %w", filename, err)
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, bytes.NewReader(body))
+	return err
+}
+
+// fetchWithRetry executes the GET request with a common retry strategy and passes the successful response to onSuccess.
+func fetchWithRetry(ctx context.Context, url string, onSuccess func(*http.Response) error) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
-
-	req.Header.Set("User-Agent", "mangarr")
+	req.Header.Set("User-Agent", userAgent)
 
 	client := http.Client{
 		Timeout:   60 * time.Second,
 		Transport: sharedhttp.Transport,
 	}
 
-	retryErr := retry.Do(func() error {
+	return retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(client, req)
 		if err != nil {
-			if errors.Is(err, sharedhttp.ErrNotFound) {
-				log.Warn().Msgf("image url returned 404, skipping %q", url)
-				return nil
-			}
-			return fmt.Errorf("executing request: %w", err)
+			return err
 		}
+		defer resp.Body.Close()
 
-		filename, err := appendImageExtension(&resp, filenameNoExt)
-		if err != nil {
-			return fmt.Errorf("appending image extension: %w", err)
-		}
-
-		out, err := os.Create(filename)
-		if err != nil {
-			return fmt.Errorf("creating file %s: %w", filename, err)
-		}
-		defer out.Close()
-
-		readBuf := bufio.NewReader(resp.Body)
-		writeBuf := bufio.NewWriter(out)
-		defer writeBuf.Flush()
-
-		_, err = io.Copy(writeBuf, readBuf)
-		if err != nil {
-			return fmt.Errorf("copying buffer to file %s: %w", filename, err)
-		}
-
-		return nil
+		return onSuccess(&resp)
 	},
 		retry.Delay(time.Second*3),
 		retry.Attempts(3),
-		retry.MaxJitter(time.Second*1),
+		retry.MaxJitter(time.Second),
+		retry.Context(ctx),
 	)
-	if retryErr != nil {
-		return fmt.Errorf("executing request: %w", retryErr)
-	}
-
-	return nil
 }
 
-// decryptImage fetches an image from the URL and decrypts it with the given encryption key.
-func decryptImage(ctx context.Context, log zerolog.Logger, url string, encryptionHex string, filenameNoExt string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", "mangarr")
-
-	client := http.Client{
-		Timeout:   60 * time.Second,
-		Transport: sharedhttp.Transport,
-	}
-
-	retryErr := retry.Do(func() error {
-		resp, err := sharedhttp.ExecRequest(client, req)
-		if err != nil {
-			if errors.Is(err, sharedhttp.ErrNotFound) {
-				log.Warn().Msgf("image url returned 404, skipping %q", url)
-				return nil
-			}
-			return fmt.Errorf("executing request: %w", err)
-		}
-
-		data, err := io.ReadAll(bufio.NewReader(resp.Body))
-		if err != nil {
-			return fmt.Errorf("reading response body: %w", err)
-		}
-
-		key, err := hex.DecodeString(encryptionHex)
-		if err != nil {
-			return fmt.Errorf("decoding image using encryption key: %w", err)
-		}
-
-		// perform XOR decryption
-		keyLen := len(key)
-		for i := range data {
-			data[i] ^= key[i%keyLen]
-		}
-
-		filename, err := appendImageExtension(&resp, filenameNoExt)
-		if err != nil {
-			return fmt.Errorf("appending image extension: %w", err)
-		}
-
-		out, err := os.Create(filename)
-		if err != nil {
-			return fmt.Errorf("creating file %s: %w", filename, err)
-		}
-		defer out.Close()
-
-		byteBuf := bytes.NewBuffer(data)
-		writeBuf := bufio.NewWriter(out)
-		defer writeBuf.Flush()
-
-		_, err = io.Copy(writeBuf, byteBuf)
-		if err != nil {
-			return fmt.Errorf("copying buffer to file %s: %w", filename, err)
-		}
-
-		return nil
-	},
-		retry.Delay(time.Second*3),
-		retry.Attempts(3),
-		retry.MaxJitter(time.Second*1),
-	)
-	if retryErr != nil {
-		return fmt.Errorf("executing request: %w", retryErr)
-	}
-
-	return nil
-}
-
-func appendImageExtension(resp *http.Response, filename string) (string, error) {
-	contentType := resp.Header.Get("Content-Type")
-
+// appendImageExtension returns filename with an extension deduced from the content-type header.
+func appendImageExtension(contentType, filename string) (string, error) {
 	switch contentType {
 	case "image/jpeg", "image/jpg":
 		return filename + ".jpg", nil

@@ -5,27 +5,27 @@ import (
 	"strings"
 )
 
-// PadFloat formats a float32 with specified total width, preserving original decimals
+// PadFloat left-pads the integer portion of num with zeros so that it
+// reaches the requested width, while keeping the original fractional part.
+// Example: PadFloat(3.14, 4) => "0003.14".
 func PadFloat(num float32, width int) string {
-	// Convert float to string with full precision
-	str := strconv.FormatFloat(float64(num), 'f', -1, 32)
+	// Convert with full precision for a float32.
+	s := strconv.FormatFloat(float64(num), 'f', -1, 32)
 
-	// Split into integer and decimal parts
-	parts := strings.Split(str, ".")
-	intPart := parts[0]
-
-	// Calculate required padding for integer part only
-	padding := width - len(intPart)
-
-	// Add padding if needed
-	if padding > 0 {
-		intPart = strings.Repeat("0", padding) + intPart
+	// Locate the decimal point (if any). Everything before it is the integer part.
+	dot := strings.IndexByte(s, '.')
+	if dot == -1 { // no fractional part
+		dot = len(s)
 	}
 
-	// Reconstruct number with original decimal part if it exists
-	if len(parts) > 1 {
-		return intPart + "." + parts[1]
+	// If the integer part is already at least 'width' wide, we can return early.
+	if pad := width - dot; pad > 0 {
+		var b strings.Builder
+		b.Grow(width + len(s) - dot) // pre-allocate target size
+		b.WriteString(strings.Repeat("0", pad))
+		b.WriteString(s)
+		return b.String()
 	}
 
-	return intPart
+	return s
 }
