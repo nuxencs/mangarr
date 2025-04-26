@@ -11,6 +11,7 @@ import (
 	"sort"
 
 	"github.com/go-pdf/fpdf"
+	"github.com/rs/zerolog"
 	_ "golang.org/x/image/webp" // needed to decode webp
 )
 
@@ -32,7 +33,7 @@ func IsValidLocation(location string) error {
 }
 
 // CreateCbzArchive creates a zip (.cbz) archive from the images in sourceDir.
-func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
+func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bool) error {
 	if err := os.MkdirAll(filepath.Dir(cbzPath), os.ModePerm); err != nil {
 		return fmt.Errorf("creating destination dir: %w", err)
 	}
@@ -96,10 +97,12 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 	defer zipWriter.Close()
 
 	for _, img := range images {
-		// TODO: find better solution for filtering
+		// TODO: find better solution for filtering unwanted images
 		// Skip pages that are highly likely not a Manhwa page
 		if isManhwa {
 			if img.width < mostCommonW-binSize || img.width > mostCommonW+binSize || img.width > img.height {
+				log.Debug().Str("cbz", filepath.Base(cbzPath)).Str("name", img.name).
+					Msg("image would have been skipped")
 				// continue
 			}
 		}

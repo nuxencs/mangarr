@@ -26,7 +26,7 @@ const (
 	userAgent                   = "mangarr"
 )
 
-type ArchiveWriter func(tmpDir, outPath string, isManhwa bool) error
+type ArchiveWriter func(log zerolog.Logger, tmpDir, outPath string, isManhwa bool) error
 
 func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter domain.Chapter, isManhwa bool, archiveWriter ArchiveWriter) error {
 	tmpDir, err := os.MkdirTemp("", "mangarr-*")
@@ -49,7 +49,7 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 		return err
 	}
 
-	if err := archiveWriter(tmpDir, outputPath, isManhwa); err != nil {
+	if err := archiveWriter(log, tmpDir, outputPath, isManhwa); err != nil {
 		return fmt.Errorf("creating archive: %w", err)
 	}
 
