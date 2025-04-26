@@ -47,7 +47,11 @@ var monitorCmd = &cobra.Command{
 			log.Fatal().Err(err).Msgf("invalid download location")
 		}
 
-		log.Info().Msg("starting to monitor configured manga")
+		log.Info().Msg("Starting to monitor configured manga")
+		log.Info().Msgf("Version: %s", buildinfo.Version)
+		log.Info().Msgf("Commit: %s", buildinfo.Commit)
+		log.Info().Msgf("Build date: %s", buildinfo.Date)
+		log.Info().Msgf("Log-level: %s", cfg.Config.LogLevel)
 
 		ticker := time.NewTicker(cfg.Config.CheckInterval * time.Minute)
 		defer ticker.Stop()
