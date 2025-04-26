@@ -1,6 +1,6 @@
 module mangarr
 
-go 1.23.2
+go 1.24.2
 
 require (
 	github.com/avast/retry-go v3.0.0+incompatible
