@@ -96,7 +96,7 @@ func (f *flamecomics) ValidateInput() error {
 	}
 
 	if _, err := url.Parse(f.MangaURL); err != nil {
-		return fmt.Errorf("failed to parse URL %s: %w", f.MangaURL, err)
+		return fmt.Errorf("parsing URL %s: %w", f.MangaURL, err)
 	}
 
 	return nil
@@ -114,13 +114,13 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 	c := f.Collector.Clone()
 
 	c.OnError(func(r *colly.Response, err error) {
-		errors = append(errors, fmt.Errorf("failed to request URL %s: %w", r.Request.URL, err))
+		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
 	})
 
 	c.OnResponse(func(r *colly.Response) {
 		match := jsonRegex.FindSubmatch(r.Body)
 		if len(match) < 2 {
-			errors = append(errors, fmt.Errorf("failed to find chapter data in response from URL %s", r.Request.URL))
+			errors = append(errors, fmt.Errorf("finding chapter data in response from URL %s", r.Request.URL))
 			return
 		}
 
@@ -128,18 +128,18 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 
 		err := json.NewDecoder(buf).Decode(&responseData)
 		if err != nil {
-			errors = append(errors, fmt.Errorf("failed to decode chapter data from json: %w", err))
+			errors = append(errors, fmt.Errorf("decoding chapter data from json: %w", err))
 			return
 		}
 	})
 
 	err := c.Visit(f.MangaURL)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to visit URL %s: %w", f.MangaURL, err)
+		return domain.Manga{}, fmt.Errorf("visiting URL %s: %w", f.MangaURL, err)
 	}
 
 	if len(errors) > 0 {
-		return domain.Manga{}, fmt.Errorf("failed to process %d URLs: %w", len(errors), errors[0])
+		return domain.Manga{}, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
 	}
 
 	manga.Title = sanitize.Filename(responseData.Props.PageProps.Series.Title)
@@ -147,7 +147,7 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 	for _, responseChapter := range responseData.Props.PageProps.Chapters {
 		chapterNumF64, err := strconv.ParseFloat(responseChapter.Chapter, 32)
 		if err != nil {
-			return domain.Manga{}, fmt.Errorf("failed to parse chapter number %s: %w", responseChapter.Chapter, err)
+			return domain.Manga{}, fmt.Errorf("parsing chapter number %s: %w", responseChapter.Chapter, err)
 		}
 
 		chapterNum := float32(chapterNumF64)
@@ -185,11 +185,11 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 	}
 
 	if len(manga.Title) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga for URL %s", f.MangaURL)
+		return domain.Manga{}, fmt.Errorf("getting manga for URL %s", f.MangaURL)
 	}
 
 	if len(manga.Chapters) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get chapters for manga %s", manga.Title)
+		return domain.Manga{}, fmt.Errorf("getting chapters for manga %s", manga.Title)
 	}
 
 	return manga, nil

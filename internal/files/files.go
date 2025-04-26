@@ -17,7 +17,7 @@ const binSize = 10
 
 func IsValidLocation(location string) error {
 	if _, err := os.Stat(location); err != nil {
-		return fmt.Errorf("failed to stat location %s: %w", location, err)
+		return fmt.Errorf("stat location %s: %w", location, err)
 	}
 
 	return nil
@@ -29,12 +29,12 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 
 	err := os.MkdirAll(cbzDir, os.ModePerm)
 	if err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", cbzDir, err)
+		return fmt.Errorf("creating directory %s: %w", cbzDir, err)
 	}
 
 	cbzFile, err := os.Create(cbzPath)
 	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", cbzPath, err)
+		return fmt.Errorf("creating file %s: %w", cbzPath, err)
 	}
 	defer cbzFile.Close()
 
@@ -49,7 +49,7 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 
 	walkErr := filepath.Walk(sourceDir, func(imgPath string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("failed to walk directory %s: %w", sourceDir, err)
+			return fmt.Errorf("walking directory %s: %w", sourceDir, err)
 		}
 
 		if info.IsDir() {
@@ -58,13 +58,13 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 
 		imgFile, err := os.Open(imgPath)
 		if err != nil {
-			return fmt.Errorf("failed to open image %s: %w", imgPath, err)
+			return fmt.Errorf("opening image %s: %w", imgPath, err)
 		}
 		defer imgFile.Close()
 
 		img, _, err := image.DecodeConfig(imgFile)
 		if err != nil {
-			return fmt.Errorf("failed to decode image %s: %w", imgPath, err)
+			return fmt.Errorf("decoding image %s: %w", imgPath, err)
 		}
 
 		bin := (img.Width / binSize) * binSize
@@ -73,7 +73,7 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 		return nil
 	})
 	if walkErr != nil {
-		return fmt.Errorf("failed to walk directory %s: %w", sourceDir, walkErr)
+		return fmt.Errorf("walking directory %s: %w", sourceDir, walkErr)
 	}
 
 	maxCount := 0
@@ -86,7 +86,7 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 
 	walkErr = filepath.Walk(sourceDir, func(imgPath string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("failed to walk directory %s: %w", sourceDir, err)
+			return fmt.Errorf("walking directory %s: %w", sourceDir, err)
 		}
 
 		// skip directories
@@ -96,13 +96,13 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 
 		imgFile, err := os.Open(imgPath)
 		if err != nil {
-			return fmt.Errorf("failed to open image %s: %w", imgPath, err)
+			return fmt.Errorf("opening image %s: %w", imgPath, err)
 		}
 		defer imgFile.Close()
 
 		img, _, err := image.DecodeConfig(imgFile)
 		if err != nil {
-			return fmt.Errorf("failed to decode image %s: %w", imgPath, err)
+			return fmt.Errorf("decoding image %s: %w", imgPath, err)
 		}
 
 		// for manhwa skip uncommon image widths and images that are wider than high
@@ -114,13 +114,13 @@ func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
 
 		err = addFileToZip(zipWriter, imgPath, info.Name())
 		if err != nil {
-			return fmt.Errorf("failed to add file to cbz archive %s: %w", imgPath, err)
+			return fmt.Errorf("adding file to cbz archive %s: %w", imgPath, err)
 		}
 
 		return nil
 	})
 	if walkErr != nil {
-		return fmt.Errorf("failed to walk directory %s: %w", sourceDir, walkErr)
+		return fmt.Errorf("walking directory %s: %w", sourceDir, walkErr)
 	}
 
 	return nil
@@ -167,20 +167,20 @@ func CreatePDF(sourceDir, pdfPath string) error {
 func addFileToZip(zipWriter *zip.Writer, filePath, fileName string) error {
 	fileToZip, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
+		return fmt.Errorf("opening file: %w", err)
 	}
 	defer fileToZip.Close()
 
 	writer, err := zipWriter.Create(fileName)
 	if err != nil {
-		return fmt.Errorf("failed to create zip file: %w", err)
+		return fmt.Errorf("creating zip file: %w", err)
 	}
 
 	readerBuf := bufio.NewReader(fileToZip)
 
 	_, err = io.Copy(writer, readerBuf)
 	if err != nil {
-		return fmt.Errorf("failed to copy buffer to cbz file: %w", err)
+		return fmt.Errorf("copying buffer to cbz file: %w", err)
 	}
 
 	return err

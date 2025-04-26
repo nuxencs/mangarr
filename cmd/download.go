@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"mangarr/internal/browser"
 	"mangarr/internal/domain"
@@ -16,6 +16,7 @@ import (
 	"mangarr/internal/source"
 	"mangarr/internal/templater"
 
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
 
@@ -25,12 +26,15 @@ var downloadCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, _ []string) {
 		ctx := cmd.Context()
 
+		// init new logger
+		log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Logger()
+
 		if !cmd.Flags().Changed("first") && !cmd.Flags().Changed("chapters") {
 			latest = true
 		}
 
 		if err := files.IsValidLocation(downloadDirectory); err != nil {
-			fmt.Println("Invalid location:", err)
+			log.Error().Err(err).Msgf("Invalid download location")
 			return
 		}
 
@@ -55,23 +59,23 @@ var downloadCmd = &cobra.Command{
 		case "comick":
 			s = source.NewComick(manga, group, language, bm)
 		default:
-			fmt.Println("Invalid source:", mangaSource)
+			log.Error().Msgf("Invalid source: %s", mangaSource)
 			return
 		}
 
 		if err := s.ValidateInput(); err != nil {
-			fmt.Println("Invalid input:", err)
+			log.Error().Err(err).Msgf("Invalid input")
 			return
 		}
 
 		selectedManga, err := s.GetManga(ctx)
 		if err != nil {
-			fmt.Printf("Failed to get manga from %s: %v\n", s, err)
+			log.Error().Err(err).Msgf("Failed to get manga from %s", s)
 			return
 		}
 
 		if err := s.GetChapters(ctx, selectedManga); err != nil {
-			fmt.Printf("Failed to get chapters for %s: %v\n", selectedManga.Title, err)
+			log.Error().Err(err).Msgf("Failed to get chapters for %s", selectedManga.Title)
 			return
 		}
 
@@ -79,7 +83,7 @@ var downloadCmd = &cobra.Command{
 
 		firstChapterNr, latestChapterNr, err := parse.MinMaxKeys(selectedManga.Chapters)
 		if err != nil {
-			fmt.Printf("Failed to parse chapter number for %s: %v\n", selectedManga.Title, err)
+			log.Error().Err(err).Msgf("Failed to parse chapter number for %s", selectedManga.Title)
 			return
 		}
 
@@ -91,13 +95,13 @@ var downloadCmd = &cobra.Command{
 		default:
 			selectedChapterNumbers, err = parse.ChapterSelection(chapterNumbers, selectedManga.Chapters)
 			if err != nil {
-				fmt.Printf("Failed to parse chapter selection for %s: %v\n", selectedManga.Title, err)
+				log.Error().Err(err).Msgf("Failed to parse chapter selection for %s", selectedManga.Title)
 				return
 			}
 		}
 
 		if len(selectedChapterNumbers) == 0 {
-			fmt.Printf("Failed to find matching chapters in range %s for %s\n", chapterNumbers, selectedManga.Title)
+			log.Error().Msgf("Failed to find matching chapters in range %s for %s", chapterNumbers, selectedManga.Title)
 			return
 		}
 
@@ -114,7 +118,7 @@ var downloadCmd = &cobra.Command{
 
 				selectedChapter, ok := selectedManga.Chapters[num]
 				if !ok {
-					fmt.Println("Failed to find chapter with number", num)
+					log.Error().Msgf("Failed to find chapter with number %g", num)
 					return
 				}
 
@@ -131,22 +135,22 @@ var downloadCmd = &cobra.Command{
 				contentPath := filepath.Join(downloadDirectory, selectedManga.Title, chapterFolder+".cbz")
 
 				if _, err := os.Stat(contentPath); err == nil {
-					fmt.Println("Chapter has already been downloaded, skipping", templatedName)
+					log.Info().Msgf("Chapter has already been downloaded, skipping %q", templatedName)
 					return
 				}
 
 				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
-					fmt.Printf("Failed to get image URLs for chapter %g: %v\n", selectedChapter.Number, err)
+					log.Error().Err(err).Msgf("Failed to get image URLs for chapter %g", selectedChapter.Number)
 					return
 				}
 
-				fmt.Printf("Downloading %q...\n", templatedName)
-				if err := download.Chapter(ctx, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
-					fmt.Printf("Failed to download chapter %q: %v\n", templatedName, err)
+				log.Info().Msgf("Downloading %q", templatedName)
+				if err := download.Chapter(ctx, log, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
+					log.Error().Err(err).Msgf("Failed to download chapter %q", templatedName)
 					return
 				}
 
-				fmt.Println("Finished downloading", templatedName)
+				log.Info().Msgf("Finished downloading %q", templatedName)
 			}()
 		}
 

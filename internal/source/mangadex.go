@@ -94,11 +94,11 @@ func (m *mangadex) String() string {
 
 func (m *mangadex) ValidateInput() error {
 	if _, err := uuid.Parse(m.MangaID); err != nil {
-		return fmt.Errorf("failed to parse MangaDex manga id: %w", err)
+		return fmt.Errorf("parsing MangaDex manga id: %w", err)
 	}
 
 	// if _, err := uuid.Parse(m.GroupID); err != nil {
-	// 	 return fmt.Errorf("failed to parse Manga PLUS group id: %w", err)
+	// 	 return fmt.Errorf("parsing Manga PLUS group id: %w", err)
 	// }
 
 	if len(m.Language) == 0 {
@@ -114,12 +114,12 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 
 	path, err := url.JoinPath(mangadexURL, "manga", m.MangaID)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to build URL: %w", err)
+		return domain.Manga{}, fmt.Errorf("building URL: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to create request: %w", err)
+		return domain.Manga{}, fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "mangarr")
@@ -127,14 +127,14 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
+			return fmt.Errorf("executing request %s: %w", req.URL, err)
 		}
 
 		buf := bufio.NewReader(resp.Body)
 
 		err = json.NewDecoder(buf).Decode(&mangaResp)
 		if err != nil {
-			return retry.Unrecoverable(fmt.Errorf("failed to decode response: %w", err))
+			return retry.Unrecoverable(fmt.Errorf("decoding response: %w", err))
 		}
 
 		return nil
@@ -144,12 +144,12 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 		retry.MaxJitter(time.Second*1),
 	)
 	if retryErr != nil {
-		return domain.Manga{}, fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+		return domain.Manga{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
 	}
 
 	title := mangaResp.Data.Attributes.Title.En
 	if len(title) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga for ID %s", m.MangaID)
+		return domain.Manga{}, fmt.Errorf("getting manga for ID %s", m.MangaID)
 	}
 
 	for _, tag := range mangaResp.Data.Attributes.Tags {
@@ -174,12 +174,12 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 
 	path, err := url.JoinPath(mangadexURL, "manga", m.MangaID, "feed")
 	if err != nil {
-		return fmt.Errorf("failed to build URL: %w", err)
+		return fmt.Errorf("building URL: %w", err)
 	}
 
 	u, err := url.Parse(path)
 	if err != nil {
-		return fmt.Errorf("failed to parse URL %s: %w", path, err)
+		return fmt.Errorf("parsing URL %s: %w", path, err)
 	}
 
 	processedChapters := make(map[string]bool)
@@ -197,7 +197,7 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
+			return fmt.Errorf("creating request: %w", err)
 		}
 
 		req.Header.Set("User-Agent", "mangarr")
@@ -205,14 +205,14 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 		retryErr = retry.Do(func() error {
 			resp, err := sharedhttp.ExecRequest(*m.Client, req)
 			if err != nil {
-				return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
+				return fmt.Errorf("executing request %s: %w", req.URL, err)
 			}
 
 			buf := bufio.NewReader(resp.Body)
 
 			err = json.NewDecoder(buf).Decode(&chapterResp)
 			if err != nil {
-				return retry.Unrecoverable(fmt.Errorf("failed to decode response: %w", err))
+				return retry.Unrecoverable(fmt.Errorf("decoding response: %w", err))
 			}
 
 			return nil
@@ -222,7 +222,7 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 			retry.MaxJitter(time.Second*1),
 		)
 		if retryErr != nil {
-			return fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+			return fmt.Errorf("executing request %s: %w", req.URL, retryErr)
 		}
 
 		for _, data := range chapterResp.Data {
@@ -232,14 +232,14 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 				}
 
 				if err := m.processChapter(data, &manga); err != nil {
-					return fmt.Errorf("failed to process chapter: %w", err)
+					return fmt.Errorf("processing chapter: %w", err)
 				}
 				processedChapters[data.Attributes.Chapter] = true
 			}
 		}
 
 		if len(manga.Chapters) == 0 {
-			return fmt.Errorf("failed to get chapters for manga ID %s", m.MangaID)
+			return fmt.Errorf("getting chapters for manga ID %s", m.MangaID)
 		}
 
 		chapterCount += len(chapterResp.Data)
@@ -258,12 +258,12 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 
 	path, err := url.JoinPath(mangadexURL, "at-home/server", chapter.ID)
 	if err != nil {
-		return fmt.Errorf("failed to build URL: %w", err)
+		return fmt.Errorf("building URL: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "mangarr")
@@ -271,14 +271,14 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
+			return fmt.Errorf("executing request %s: %w", req.URL, err)
 		}
 
 		buf := bufio.NewReader(resp.Body)
 
 		err = json.NewDecoder(buf).Decode(&chapterResp)
 		if err != nil {
-			return retry.Unrecoverable(fmt.Errorf("failed to decode response: %w", err))
+			return retry.Unrecoverable(fmt.Errorf("decoding response: %w", err))
 		}
 
 		return nil
@@ -288,20 +288,20 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 		retry.MaxJitter(time.Second*1),
 	)
 	if retryErr != nil {
-		return fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+		return fmt.Errorf("executing request %s: %w", req.URL, retryErr)
 	}
 
 	for _, imageURL := range chapterResp.Chapter.Data {
 		imagePath, err := url.JoinPath(chapterResp.BaseURL, "data", chapterResp.Chapter.Hash, imageURL)
 		if err != nil {
-			return fmt.Errorf("failed to build URL: %w", err)
+			return fmt.Errorf("building URL: %w", err)
 		}
 
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imagePath})
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image URLs for chapter ID %s", chapter.ID)
+		return fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
 	}
 
 	chapter.ImageInfo = imageInfos
@@ -331,7 +331,7 @@ func (m *mangadex) processChapter(data mangadexChaptersData, manga *domain.Manga
 
 	chapterNum64, err := strconv.ParseFloat(chapter, 32)
 	if err != nil {
-		return fmt.Errorf("failed to parse chapter number from %s: %w", chapter, err)
+		return fmt.Errorf("parsing chapter number from %s: %w", chapter, err)
 	}
 	chapterNum := float32(chapterNum64)
 

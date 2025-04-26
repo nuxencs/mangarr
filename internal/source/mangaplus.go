@@ -65,19 +65,19 @@ func (m *mangaplus) GetManga(ctx context.Context) (domain.Manga, error) {
 
 	path, err := url.JoinPath(mangaplusURL, "title_detailV3")
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to build URL: %w", err)
+		return domain.Manga{}, fmt.Errorf("building URL: %w", err)
 	}
 
 	u, err := url.Parse(path)
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to parse URL %s: %w", path, err)
+		return domain.Manga{}, fmt.Errorf("parsing URL %s: %w", path, err)
 	}
 
 	u.RawQuery = params.Encode()
 
 	protoResp, err := m.getProtoResponse(ctx, u.String())
 	if err != nil {
-		return domain.Manga{}, fmt.Errorf("failed to get protobuf response from %s: %w", u.String(), err)
+		return domain.Manga{}, fmt.Errorf("getting protobuf response from %s: %w", u.String(), err)
 	}
 
 	chaptersGroup := protoResp.GetSuccess().GetTitleDetailView().GetChapterListGroup()
@@ -86,13 +86,13 @@ func (m *mangaplus) GetManga(ctx context.Context) (domain.Manga, error) {
 	for _, chapters := range chaptersGroup {
 		err := m.addChapters(c, chapters.GetFirstChapterList(), chapters.GetLastChapterList())
 		if err != nil {
-			return domain.Manga{}, fmt.Errorf("failed to add chapters to chapter map: %w", err)
+			return domain.Manga{}, fmt.Errorf("adding chapters to chapter map: %w", err)
 		}
 	}
 
 	title := protoResp.GetSuccess().GetTitleDetailView().GetTitle().GetName()
 	if len(title) == 0 {
-		return domain.Manga{}, fmt.Errorf("failed to get manga for ID %s", m.MangaID)
+		return domain.Manga{}, fmt.Errorf("getting manga for ID %s", m.MangaID)
 	}
 
 	return domain.Manga{
@@ -114,19 +114,19 @@ func (m *mangaplus) GetImageURLs(ctx context.Context, chapter *domain.Chapter) e
 
 	path, err := url.JoinPath(mangaplusURL, "manga_viewer")
 	if err != nil {
-		return fmt.Errorf("failed to build URL: %w", err)
+		return fmt.Errorf("building URL: %w", err)
 	}
 
 	u, err := url.Parse(path)
 	if err != nil {
-		return fmt.Errorf("failed to parse URL %s: %w", path, err)
+		return fmt.Errorf("parsing URL %s: %w", path, err)
 	}
 
 	u.RawQuery = params.Encode()
 
 	protoResp, err := m.getProtoResponse(ctx, u.String())
 	if err != nil {
-		return fmt.Errorf("failed to get protobuf response: %w", err)
+		return fmt.Errorf("getting protobuf response: %w", err)
 	}
 
 	var imageInfos []domain.ImageInfo
@@ -141,7 +141,7 @@ func (m *mangaplus) GetImageURLs(ctx context.Context, chapter *domain.Chapter) e
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("failed to get image URLs for chapter ID %s", chapter.ID)
+		return fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
 	}
 
 	chapter.ImageInfo = imageInfos
@@ -151,7 +151,7 @@ func (m *mangaplus) GetImageURLs(ctx context.Context, chapter *domain.Chapter) e
 func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobuf.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return &protobuf.Response{}, fmt.Errorf("failed to create request: %w", err)
+		return &protobuf.Response{}, fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "mangarr")
@@ -161,16 +161,16 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobu
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return fmt.Errorf("failed to execute request %s: %w", req.URL, err)
+			return fmt.Errorf("executing request %s: %w", req.URL, err)
 		}
 
 		body, err := io.ReadAll(bufio.NewReader(resp.Body))
 		if err != nil {
-			return fmt.Errorf("failed to read response body: %w", err)
+			return fmt.Errorf("reading response body: %w", err)
 		}
 
 		if err := proto.Unmarshal(body, &protoResp); err != nil {
-			return retry.Unrecoverable(fmt.Errorf("failed to unmarshal response body: %w", err))
+			return retry.Unrecoverable(fmt.Errorf("unmarshalling response body: %w", err))
 		}
 
 		return nil
@@ -180,7 +180,7 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobu
 		retry.MaxJitter(time.Second*1),
 	)
 	if retryErr != nil {
-		return &protobuf.Response{}, fmt.Errorf("failed to execute request %s: %w", req.URL, retryErr)
+		return &protobuf.Response{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
 	}
 
 	return &protoResp, nil
@@ -200,7 +200,7 @@ func (m *mangaplus) addChapters(chapters map[float32]domain.Chapter, chapterList
 
 			number, err := strconv.ParseFloat(name, 32)
 			if err != nil {
-				return fmt.Errorf("failed to parse chapter number from %s: %w", name, err)
+				return fmt.Errorf("parsing chapter number from %s: %w", name, err)
 			}
 
 			chapters[float32(number)] = domain.Chapter{

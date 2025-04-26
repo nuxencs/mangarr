@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,12 +20,13 @@ import (
 	"mangarr/internal/sharedhttp"
 
 	"github.com/avast/retry-go"
+	"github.com/rs/zerolog"
 )
 
 const maxConcurrentImageDownloads = 10
 
 // Chapter downloads and processes manga chapter images to create a CBZ archive.
-func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter, isManhwa bool) error {
+func Chapter(ctx context.Context, log zerolog.Logger, contentPath string, chapter domain.Chapter, isManhwa bool) error {
 	// if chapter.IsManhwa {
 	// 	 outputPath = contentPath + ".pdf"
 	// } else {
@@ -33,7 +35,7 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter, is
 
 	temp, err := os.MkdirTemp("", "mangarr-*")
 	if err != nil {
-		return fmt.Errorf("failed to create temp directory %s: %w", temp, err)
+		return fmt.Errorf("creating temp directory %s: %w", temp, err)
 	}
 	defer os.RemoveAll(temp)
 
@@ -53,13 +55,13 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter, is
 
 			var err error
 			if len(imageInfo.EncryptionKey) != 0 {
-				if err = decryptImage(ctx, imageInfo.ImageURL, imageInfo.EncryptionKey, filenameNoExt); err != nil {
-					errc <- fmt.Errorf("failed to decrypt and download image %s: %w", imageInfo.ImageURL, err)
+				if err = decryptImage(ctx, log, imageInfo.ImageURL, imageInfo.EncryptionKey, filenameNoExt); err != nil {
+					errc <- fmt.Errorf("decrypting and downloading image %s: %w", imageInfo.ImageURL, err)
 					return
 				}
 			} else {
-				if err = singleFile(ctx, imageInfo.ImageURL, filenameNoExt); err != nil {
-					errc <- fmt.Errorf("failed to download image %s: %w", imageInfo.ImageURL, err)
+				if err = singleFile(ctx, log, imageInfo.ImageURL, filenameNoExt); err != nil {
+					errc <- fmt.Errorf("downloading image %s: %w", imageInfo.ImageURL, err)
 					return
 				}
 			}
@@ -77,7 +79,7 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter, is
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("failed to process %d images: %w", len(errors), errors[0])
+		return fmt.Errorf("processing %d images: %w", len(errors), errors[0])
 	}
 
 	// if chapter.IsManhwa {
@@ -93,17 +95,17 @@ func Chapter(ctx context.Context, contentPath string, chapter domain.Chapter, is
 	// }
 
 	if err := files.CreateCbzArchive(temp, contentPath, isManhwa); err != nil {
-		return fmt.Errorf("failed to create cbz archive: %w", err)
+		return fmt.Errorf("creating cbz archive: %w", err)
 	}
 
 	return nil
 }
 
 // singleFile downloads a single file
-func singleFile(ctx context.Context, url, filenameNoExt string) error {
+func singleFile(ctx context.Context, log zerolog.Logger, url, filenameNoExt string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "mangarr")
@@ -116,17 +118,21 @@ func singleFile(ctx context.Context, url, filenameNoExt string) error {
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(client, req)
 		if err != nil {
-			return fmt.Errorf("failed to execute request: %w", err)
+			if errors.Is(err, sharedhttp.ErrNotFound) {
+				log.Warn().Msgf("image url returned 404, skipping %q", url)
+				return nil
+			}
+			return fmt.Errorf("executing request: %w", err)
 		}
 
 		filename, err := appendImageExtension(&resp, filenameNoExt)
 		if err != nil {
-			return fmt.Errorf("failed to append image extension: %w", err)
+			return fmt.Errorf("appending image extension: %w", err)
 		}
 
 		out, err := os.Create(filename)
 		if err != nil {
-			return fmt.Errorf("failed to create file %s: %w", filename, err)
+			return fmt.Errorf("creating file %s: %w", filename, err)
 		}
 		defer out.Close()
 
@@ -136,7 +142,7 @@ func singleFile(ctx context.Context, url, filenameNoExt string) error {
 
 		_, err = io.Copy(writeBuf, readBuf)
 		if err != nil {
-			return fmt.Errorf("failed to copy buffer to file %s: %w", filename, err)
+			return fmt.Errorf("copying buffer to file %s: %w", filename, err)
 		}
 
 		return nil
@@ -146,17 +152,17 @@ func singleFile(ctx context.Context, url, filenameNoExt string) error {
 		retry.MaxJitter(time.Second*1),
 	)
 	if retryErr != nil {
-		return fmt.Errorf("failed to execute request: %w", retryErr)
+		return fmt.Errorf("executing request: %w", retryErr)
 	}
 
 	return nil
 }
 
 // decryptImage fetches an image from the URL and decrypts it with the given encryption key.
-func decryptImage(ctx context.Context, url string, encryptionHex string, filenameNoExt string) error {
+func decryptImage(ctx context.Context, log zerolog.Logger, url string, encryptionHex string, filenameNoExt string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "mangarr")
@@ -169,17 +175,21 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(client, req)
 		if err != nil {
-			return fmt.Errorf("failed to execute request: %w", err)
+			if errors.Is(err, sharedhttp.ErrNotFound) {
+				log.Warn().Msgf("image url returned 404, skipping %q", url)
+				return nil
+			}
+			return fmt.Errorf("executing request: %w", err)
 		}
 
 		data, err := io.ReadAll(bufio.NewReader(resp.Body))
 		if err != nil {
-			return fmt.Errorf("failed to read response body: %w", err)
+			return fmt.Errorf("reading response body: %w", err)
 		}
 
 		key, err := hex.DecodeString(encryptionHex)
 		if err != nil {
-			return fmt.Errorf("failed to decode image using encryption key: %w", err)
+			return fmt.Errorf("decoding image using encryption key: %w", err)
 		}
 
 		// perform XOR decryption
@@ -190,12 +200,12 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 
 		filename, err := appendImageExtension(&resp, filenameNoExt)
 		if err != nil {
-			return fmt.Errorf("failed to append image extension: %w", err)
+			return fmt.Errorf("appending image extension: %w", err)
 		}
 
 		out, err := os.Create(filename)
 		if err != nil {
-			return fmt.Errorf("failed to create file %s: %w", filename, err)
+			return fmt.Errorf("creating file %s: %w", filename, err)
 		}
 		defer out.Close()
 
@@ -205,7 +215,7 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 
 		_, err = io.Copy(writeBuf, byteBuf)
 		if err != nil {
-			return fmt.Errorf("failed to copy buffer to file %s: %w", filename, err)
+			return fmt.Errorf("copying buffer to file %s: %w", filename, err)
 		}
 
 		return nil
@@ -215,7 +225,7 @@ func decryptImage(ctx context.Context, url string, encryptionHex string, filenam
 		retry.MaxJitter(time.Second*1),
 	)
 	if retryErr != nil {
-		return fmt.Errorf("failed to execute request: %w", retryErr)
+		return fmt.Errorf("executing request: %w", retryErr)
 	}
 
 	return nil

@@ -19,7 +19,7 @@ func ChapterSelection(input string, availableChapters map[float32]domain.Chapter
 		if strings.Contains(part, "-") {
 			start, end, err := getRange(part)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get range from part %s: %w", part, err)
+				return nil, fmt.Errorf("getting range from part %s: %w", part, err)
 			}
 
 			for chapter := range availableChapters {
@@ -30,7 +30,7 @@ func ChapterSelection(input string, availableChapters map[float32]domain.Chapter
 		} else {
 			chapter, err := strconv.ParseFloat(strings.TrimSpace(part), 32)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse chapter number from part %s: %w", part, err)
+				return nil, fmt.Errorf("parsing chapter number from part %s: %w", part, err)
 			}
 
 			uniqueChapters[float32(chapter)] = true
@@ -54,12 +54,12 @@ func getRange(part string) (float32, float32, error) {
 
 	start, err := strconv.ParseFloat(strings.TrimSpace(rangeParts[0]), 32)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to parse start of range %s: %w", rangeParts[0], err)
+		return 0, 0, fmt.Errorf("parsing start of range %s: %w", rangeParts[0], err)
 	}
 
 	end, err := strconv.ParseFloat(strings.TrimSpace(rangeParts[1]), 32)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to parse end of range %s: %w", rangeParts[1], err)
+		return 0, 0, fmt.Errorf("parsing end of range %s: %w", rangeParts[1], err)
 	}
 
 	if start > end {
