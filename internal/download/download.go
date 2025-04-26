@@ -56,7 +56,7 @@ func Chapter(ctx context.Context, log zerolog.Logger, contentPath string, chapte
 			var err error
 			if len(imageInfo.EncryptionKey) != 0 {
 				if err = decryptImage(ctx, log, imageInfo.ImageURL, imageInfo.EncryptionKey, filenameNoExt); err != nil {
-					errc <- fmt.Errorf("decrypting and download image %s: %w", imageInfo.ImageURL, err)
+					errc <- fmt.Errorf("decrypting and downloading image %s: %w", imageInfo.ImageURL, err)
 					return
 				}
 			} else {
@@ -119,7 +119,7 @@ func singleFile(ctx context.Context, log zerolog.Logger, url, filenameNoExt stri
 		resp, err := sharedhttp.ExecRequest(client, req)
 		if err != nil {
 			if errors.Is(err, sharedhttp.ErrNotFound) {
-				log.Debug().Msgf("image not found, skipping %q", url)
+				log.Warn().Msgf("image url returned 404, skipping %q", url)
 				return nil
 			}
 			return fmt.Errorf("executing request: %w", err)
@@ -176,7 +176,7 @@ func decryptImage(ctx context.Context, log zerolog.Logger, url string, encryptio
 		resp, err := sharedhttp.ExecRequest(client, req)
 		if err != nil {
 			if errors.Is(err, sharedhttp.ErrNotFound) {
-				log.Debug().Msgf("image not found, skipping %q", url)
+				log.Warn().Msgf("image url returned 404, skipping %q", url)
 				return nil
 			}
 			return fmt.Errorf("executing request: %w", err)

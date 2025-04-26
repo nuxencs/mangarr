@@ -10,7 +10,7 @@ import (
 	"github.com/avast/retry-go"
 )
 
-var ErrNotFound = fmt.Errorf("not found - retrying: status code %d", http.StatusNotFound)
+var ErrNotFound = fmt.Errorf("not found: status code %d", http.StatusNotFound)
 
 var Transport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
