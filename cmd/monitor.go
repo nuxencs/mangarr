@@ -61,7 +61,7 @@ var monitorCmd = &cobra.Command{
 		// semaphore to limit concurrency to maxConcurrentSourceProcesses which is set to 10
 		sem := semaphore.NewWeighted(maxConcurrentSourceProcesses)
 		quit := make(chan bool, 1)
-		wg := sync.WaitGroup{}
+		var wg sync.WaitGroup
 
 		go func() {
 			for {

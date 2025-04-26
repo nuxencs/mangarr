@@ -107,7 +107,7 @@ var downloadCmd = &cobra.Command{
 
 		// semaphore to limit concurrency to maxConcurrentChapterProcesses which is set to 10
 		sem := semaphore.NewWeighted(maxConcurrentChapterProcesses)
-		wg := sync.WaitGroup{}
+		var wg sync.WaitGroup
 
 		for _, num := range selectedChapterNumbers {
 			wg.Add(1)
