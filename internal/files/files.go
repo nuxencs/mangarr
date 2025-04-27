@@ -15,7 +15,10 @@ import (
 	_ "golang.org/x/image/webp" // needed to decode webp
 )
 
-const binSize = 10
+const (
+	binSize       = 10
+	maxWidthMulti = 1.25
+)
 
 type imageMeta struct {
 	path   string
@@ -97,14 +100,12 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	defer zipWriter.Close()
 
 	for _, img := range images {
-		// TODO: find better solution for filtering unwanted images
 		// Skip pages that are highly likely not a Manhwa page
-		if isManhwa {
-			if img.width < mostCommonW-binSize || img.width > mostCommonW+binSize || img.width > img.height {
-				log.Debug().Str("cbz", filepath.Base(cbzPath)).Str("name", img.name).
-					Msg("image would have been skipped")
-				// continue
-			}
+		if isManhwa && isLikelyUnwanted(img, mostCommonW) {
+			log.Debug().Str("cbz", filepath.Base(cbzPath)).Str("name", img.name).
+				Int("width", img.width).Int("height", img.height).
+				Msg("skipped image because it's likely not a Manhwa page")
+			continue
 		}
 		if err := addFileToZip(zipWriter, img.path, img.name); err != nil {
 			return err
@@ -112,6 +113,21 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	}
 
 	return nil
+}
+
+func isLikelyUnwanted(img imageMeta, dominantW int) bool {
+	// Skip pages that are not higher than wide
+	if img.width < img.height {
+		return false
+	}
+
+	// Skip pages that are wider than 1.25x the dominant width
+	allowed := float64(dominantW) * maxWidthMulti
+	if float64(img.width) < allowed {
+		return false
+	}
+
+	return true
 }
 
 // CreatePDF creates a pdf file named pdfPath and adds all files from sourceDir to it
