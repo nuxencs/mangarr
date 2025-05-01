@@ -1,7 +1,9 @@
 package cmd
 
-const maxConcurrentChapterProcesses = 10
-const maxConcurrentSourceProcesses = 10
+const (
+	maxConcurrentChapterProcesses = 10
+	maxConcurrentSourceProcesses  = 10
+)
 
 var (
 	configPath        string

@@ -8,12 +8,24 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/go-pdf/fpdf"
+	"github.com/rs/zerolog"
 	_ "golang.org/x/image/webp" // needed to decode webp
 )
 
-const binSize = 10
+const (
+	binSize       = 10
+	maxWidthMulti = 1.25
+)
+
+type imageMeta struct {
+	path   string
+	name   string
+	width  int
+	height int
+}
 
 func IsValidLocation(location string) error {
 	if _, err := os.Stat(location); err != nil {
@@ -23,107 +35,99 @@ func IsValidLocation(location string) error {
 	return nil
 }
 
-// CreateCbzArchive creates a zip archive named cbzPath and adds all files from sourceDir to it
-func CreateCbzArchive(sourceDir, cbzPath string, isManhwa bool) error {
-	cbzDir := filepath.Dir(cbzPath)
-
-	err := os.MkdirAll(cbzDir, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("creating directory %s: %w", cbzDir, err)
+// CreateCbzArchive creates a zip (.cbz) archive from the images in sourceDir.
+func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bool) error {
+	if err := os.MkdirAll(filepath.Dir(cbzPath), os.ModePerm); err != nil {
+		return fmt.Errorf("creating destination dir: %w", err)
 	}
 
-	cbzFile, err := os.Create(cbzPath)
-	if err != nil {
-		return fmt.Errorf("creating file %s: %w", cbzPath, err)
-	}
-	defer cbzFile.Close()
+	var (
+		images      []imageMeta
+		widthCount  = make(map[int]int)
+		mostCommonW int
+	)
 
-	writeBuf := bufio.NewWriter(cbzFile)
-	defer writeBuf.Flush()
-
-	zipWriter := zip.NewWriter(writeBuf)
-	defer zipWriter.Close()
-
-	var mostCommonWidth int
-	widthCount := make(map[int]int)
-
-	walkErr := filepath.Walk(sourceDir, func(imgPath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("walking directory %s: %w", sourceDir, err)
+	if err := filepath.WalkDir(sourceDir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
 		}
-
-		if info.IsDir() {
+		if d.IsDir() {
 			return nil
 		}
 
-		imgFile, err := os.Open(imgPath)
+		f, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf("opening image %s: %w", imgPath, err)
+			return fmt.Errorf("opening %s: %w", path, err)
 		}
-		defer imgFile.Close()
+		defer f.Close()
 
-		img, _, err := image.DecodeConfig(imgFile)
+		img, _, err := image.DecodeConfig(bufio.NewReader(f))
 		if err != nil {
-			return fmt.Errorf("decoding image %s: %w", imgPath, err)
+			return fmt.Errorf("decoding %s: %w", path, err)
 		}
 
 		bin := (img.Width / binSize) * binSize
 		widthCount[bin]++
 
+		images = append(images, imageMeta{
+			path:   path,
+			name:   d.Name(),
+			width:  img.Width,
+			height: img.Height,
+		})
 		return nil
-	})
-	if walkErr != nil {
-		return fmt.Errorf("walking directory %s: %w", sourceDir, walkErr)
+	}); err != nil {
+		return fmt.Errorf("scanning %s: %w", sourceDir, err)
 	}
 
-	maxCount := 0
+	// Determine the most common width bin.
 	for bin, count := range widthCount {
-		if count > maxCount {
-			maxCount = count
-			mostCommonWidth = bin
+		if count > widthCount[mostCommonW] {
+			mostCommonW = bin
 		}
 	}
 
-	walkErr = filepath.Walk(sourceDir, func(imgPath string, info os.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("walking directory %s: %w", sourceDir, err)
-		}
+	// Sort images lexicographically so they stay in page order.
+	sort.Slice(images, func(i, j int) bool { return images[i].name < images[j].name })
 
-		// skip directories
-		if info.IsDir() {
-			return nil
-		}
+	cbzFile, err := os.Create(cbzPath)
+	if err != nil {
+		return fmt.Errorf("creating %s: %w", cbzPath, err)
+	}
+	defer cbzFile.Close()
 
-		imgFile, err := os.Open(imgPath)
-		if err != nil {
-			return fmt.Errorf("opening image %s: %w", imgPath, err)
-		}
-		defer imgFile.Close()
+	zipWriter := zip.NewWriter(bufio.NewWriter(cbzFile))
+	defer zipWriter.Close()
 
-		img, _, err := image.DecodeConfig(imgFile)
-		if err != nil {
-			return fmt.Errorf("decoding image %s: %w", imgPath, err)
+	for _, img := range images {
+		// Skip pages that are highly likely not a Manhwa page
+		if isManhwa && isLikelyUnwanted(img, mostCommonW) {
+			log.Debug().Str("cbz", filepath.Base(cbzPath)).Str("name", img.name).
+				Int("width", img.width).Int("height", img.height).
+				Msg("skipped image because it's likely not a Manhwa page")
+			continue
 		}
-
-		// for manhwa skip uncommon image widths and images that are wider than high
-		if isManhwa {
-			if img.Width < mostCommonWidth-binSize || img.Width > mostCommonWidth+binSize || img.Width > img.Height {
-				return nil
-			}
+		if err := addFileToZip(zipWriter, img.path, img.name); err != nil {
+			return err
 		}
-
-		err = addFileToZip(zipWriter, imgPath, info.Name())
-		if err != nil {
-			return fmt.Errorf("adding file to cbz archive %s: %w", imgPath, err)
-		}
-
-		return nil
-	})
-	if walkErr != nil {
-		return fmt.Errorf("walking directory %s: %w", sourceDir, walkErr)
 	}
 
 	return nil
+}
+
+func isLikelyUnwanted(img imageMeta, dominantW int) bool {
+	// Skip pages that are not higher than wide
+	if img.width < img.height {
+		return false
+	}
+
+	// Skip pages that are wider than 1.25x the dominant width
+	allowed := float64(dominantW) * maxWidthMulti
+	if float64(img.width) < allowed {
+		return false
+	}
+
+	return true
 }
 
 // CreatePDF creates a pdf file named pdfPath and adds all files from sourceDir to it
@@ -163,25 +167,26 @@ func CreatePDF(sourceDir, pdfPath string) error {
 	return pdf.OutputFileAndClose(pdfPath)
 }
 
-// addFileToZip adds a single file to the zip archive
+// addFileToZip copies a single file into an open zip archive.
 func addFileToZip(zipWriter *zip.Writer, filePath, fileName string) error {
-	fileToZip, err := os.Open(filePath)
+	src, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("opening file: %w", err)
+		return fmt.Errorf("opening %s: %w", filePath, err)
 	}
-	defer fileToZip.Close()
+	defer src.Close()
 
-	writer, err := zipWriter.Create(fileName)
-	if err != nil {
-		return fmt.Errorf("creating zip file: %w", err)
+	hdr := &zip.FileHeader{
+		Name:   fileName,
+		Method: zip.Store,
 	}
-
-	readerBuf := bufio.NewReader(fileToZip)
-
-	_, err = io.Copy(writer, readerBuf)
+	dst, err := zipWriter.CreateHeader(hdr)
 	if err != nil {
-		return fmt.Errorf("copying buffer to cbz file: %w", err)
+		return fmt.Errorf("creating zip entry: %w", err)
 	}
 
-	return err
+	if _, err := io.Copy(dst, src); err != nil {
+		return fmt.Errorf("writing %s: %w", fileName, err)
+	}
+
+	return nil
 }

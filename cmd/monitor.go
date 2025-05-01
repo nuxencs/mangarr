@@ -105,20 +105,14 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							if len(latestChapterNr) == 0 {
+							if latestChapterNr == 0 {
 								mLog.Error().Msg("error finding latest chapter")
 								return
 							}
 
-							var num float32
-							for _, n := range latestChapterNr {
-								num = n
-								break
-							}
-
-							selectedChapter, ok := selectedManga.Chapters[num]
+							selectedChapter, ok := selectedManga.Chapters[latestChapterNr]
 							if !ok {
-								mLog.Error().Err(err).Msgf("error finding chapter with number %g", num)
+								mLog.Error().Err(err).Msgf("error finding chapter with number %g", latestChapterNr)
 								return
 							}
 
@@ -145,7 +139,7 @@ var monitorCmd = &cobra.Command{
 							}
 
 							mLog.Info().Msgf("downloading %q", templatedName)
-							if err := download.Chapter(ctx, mLog, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
+							if err := download.Chapter(ctx, mLog, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
 								mLog.Error().Err(err).Msgf("error downloading chapter %s", templatedName)
 								return
 							}

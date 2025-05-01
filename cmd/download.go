@@ -89,9 +89,9 @@ var downloadCmd = &cobra.Command{
 
 		switch {
 		case first:
-			selectedChapterNumbers = firstChapterNr
+			selectedChapterNumbers = []float32{firstChapterNr}
 		case latest:
-			selectedChapterNumbers = latestChapterNr
+			selectedChapterNumbers = []float32{latestChapterNr}
 		default:
 			selectedChapterNumbers, err = parse.ChapterSelection(chapterNumbers, selectedManga.Chapters)
 			if err != nil {
@@ -145,7 +145,7 @@ var downloadCmd = &cobra.Command{
 				}
 
 				log.Info().Msgf("Downloading %q", templatedName)
-				if err := download.Chapter(ctx, log, contentPath, selectedChapter, selectedManga.IsManhwa); err != nil {
+				if err := download.Chapter(ctx, log, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
 					log.Error().Err(err).Msgf("Failed to download chapter %q", templatedName)
 					return
 				}
