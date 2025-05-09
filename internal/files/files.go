@@ -3,8 +3,10 @@ package files
 import (
 	"archive/zip"
 	"bufio"
+	"errors"
 	"fmt"
 	"image"
+	"image/jpeg"
 	"io"
 	"os"
 	"path/filepath"
@@ -18,6 +20,9 @@ import (
 const (
 	binSize       = 10
 	maxWidthMulti = 1.25
+
+	// errUnsupportedSubsamplingRatio indicates an unsupported luma/chroma subsampling ratio in JPEG images.
+	errUnsupportedSubsamplingRatio = jpeg.UnsupportedError("luma/chroma subsampling ratio")
 )
 
 type imageMeta struct {
@@ -47,7 +52,7 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 		mostCommonW int
 	)
 
-	if err := filepath.WalkDir(sourceDir, func(path string, d os.DirEntry, walkErr error) error {
+	if walkErr := filepath.WalkDir(sourceDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
@@ -55,15 +60,27 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 			return nil
 		}
 
-		f, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("opening %s: %w", path, err)
+		f, openErr := os.Open(path)
+		if openErr != nil {
+			return fmt.Errorf("opening %s: %w", path, openErr)
 		}
 		defer f.Close()
 
-		img, _, err := image.DecodeConfig(bufio.NewReader(f))
-		if err != nil {
-			return fmt.Errorf("decoding %s: %w", path, err)
+		img, _, decodeErr := image.DecodeConfig(bufio.NewReader(f))
+		if decodeErr != nil {
+			if errors.Is(decodeErr, errUnsupportedSubsamplingRatio) {
+				log.Debug().Str("cbz", filepath.Base(cbzPath)).Str("name", d.Name()).
+					Msg("skipping size check for image because it has an unsupported subsampling ratio")
+
+				images = append(images, imageMeta{
+					path: path,
+					name: d.Name(),
+				})
+
+				return nil
+			}
+
+			return fmt.Errorf("decoding %s: %w", path, decodeErr)
 		}
 
 		bin := (img.Width / binSize) * binSize
@@ -76,8 +93,8 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 			height: img.Height,
 		})
 		return nil
-	}); err != nil {
-		return fmt.Errorf("scanning %s: %w", sourceDir, err)
+	}); walkErr != nil {
+		return fmt.Errorf("walking directory %s: %w", sourceDir, walkErr)
 	}
 
 	// Determine the most common width bin.
@@ -90,9 +107,9 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	// Sort images lexicographically so they stay in page order.
 	sort.Slice(images, func(i, j int) bool { return images[i].name < images[j].name })
 
-	cbzFile, err := os.Create(cbzPath)
-	if err != nil {
-		return fmt.Errorf("creating %s: %w", cbzPath, err)
+	cbzFile, createErr := os.Create(cbzPath)
+	if createErr != nil {
+		return fmt.Errorf("creating %s: %w", cbzPath, createErr)
 	}
 	defer cbzFile.Close()
 
@@ -107,8 +124,8 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 				Msg("skipped image because it's likely not a Manhwa page")
 			continue
 		}
-		if err := addFileToZip(zipWriter, img.path, img.name); err != nil {
-			return err
+		if addErr := addFileToZip(zipWriter, img.path, img.name); addErr != nil {
+			return addErr
 		}
 	}
 
