@@ -308,11 +308,14 @@ func (c *comick) shouldProcessChapter(data comickChapterData, groupID string) bo
 }
 
 func (c *comick) processChapter(data comickChapterData, manga *domain.Manga) error {
-	chapter := data.Chap
+	// if the chapter field is empty and the volume field is not nil, skip because it's a volume
+	if data.Chap == "" && data.Vol != nil {
+		return nil
+	}
 
-	chapterNum64, err := strconv.ParseFloat(chapter, 32)
+	chapterNum64, err := strconv.ParseFloat(data.Chap, 32)
 	if err != nil {
-		return fmt.Errorf("parsing chapter number from %s: %w", chapter, err)
+		return fmt.Errorf("parsing chapter number from %s: %w", data.Chap, err)
 	}
 	chapterNum := float32(chapterNum64)
 
