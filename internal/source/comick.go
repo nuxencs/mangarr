@@ -54,7 +54,7 @@ type comickChapters struct {
 }
 
 type comickChapterData struct {
-	Chap             string     `json:"chap"`
+	Chap             *string    `json:"chap"`
 	Title            *string    `json:"title"`
 	Vol              *string    `json:"vol"`
 	PublishAt        *time.Time `json:"publish_at"`
@@ -184,15 +184,20 @@ func (c *comick) GetChapters(_ context.Context, manga domain.Manga) error {
 	processedChapters := make(map[string]bool)
 
 	for _, data := range chapterResp.Chapters {
+		// skip empty chapter numbers, this should also skip volume releases
+		if data.Chap == nil {
+			continue
+		}
+
 		if c.shouldProcessChapter(data, c.GroupID) {
-			if processedChapters[data.Chap] {
+			if processedChapters[*data.Chap] {
 				continue
 			}
 
 			if err := c.processChapter(data, &manga); err != nil {
 				return fmt.Errorf("processing chapter: %w", err)
 			}
-			processedChapters[data.Chap] = true
+			processedChapters[*data.Chap] = true
 		}
 	}
 
@@ -308,11 +313,13 @@ func (c *comick) shouldProcessChapter(data comickChapterData, groupID string) bo
 }
 
 func (c *comick) processChapter(data comickChapterData, manga *domain.Manga) error {
-	chapter := data.Chap
+	if data.Chap == nil {
+		return fmt.Errorf("chapter number is empty")
+	}
 
-	chapterNum64, err := strconv.ParseFloat(chapter, 32)
+	chapterNum64, err := strconv.ParseFloat(*data.Chap, 32)
 	if err != nil {
-		return fmt.Errorf("parsing chapter number from %s: %w", chapter, err)
+		return fmt.Errorf("parsing chapter number from %s: %w", *data.Chap, err)
 	}
 	chapterNum := float32(chapterNum64)
 
