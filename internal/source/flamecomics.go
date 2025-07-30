@@ -167,7 +167,7 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 			i := responseChapter.Images[key]
 
 			imageURLs = append(imageURLs, domain.ImageInfo{
-				ImageURL: fmt.Sprintf("%s/series/%d/%s/%s",
+				ImageURL: fmt.Sprintf("%s/uploads/images/series/%d/%s/%s",
 					flamecomicsCDNURL,
 					responseData.Props.PageProps.Series.SeriesId,
 					responseChapter.Token,
