@@ -30,7 +30,7 @@ RUN --network=none --mount=target=. \
 
 # build runner
 FROM alpine:latest AS runner
-RUN apk add --no-cache ca-certificates curl tzdata jq chromium
+RUN apk add --no-cache ca-certificates curl tzdata jq chromium tini
 
 LABEL org.opencontainers.image.source="https://github.com/nuxencs/mangarr" \
       org.opencontainers.image.licenses="MIT" \
@@ -40,9 +40,12 @@ ENV HOME="/config" \
     XDG_CONFIG_HOME="/config" \
     XDG_DATA_HOME="/config"
 
-WORKDIR /app
-VOLUME /config
-
 COPY --link --from=mangarr /out/bin/mangarr /usr/bin/
 
-ENTRYPOINT ["/usr/bin/mangarr", "monitor", "--config", "/config"]
+USER nobody:nogroup
+WORKDIR /config
+VOLUME ["/config"]
+
+ENTRYPOINT ["/sbin/tini", "--"]
+
+CMD ["/usr/bin/mangarr", "monitor", "--config", "/config"]
