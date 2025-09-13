@@ -25,17 +25,17 @@ type flamecomicsResponse struct {
 	Props struct {
 		PageProps struct {
 			Series struct {
-				SeriesId    int    `json:"series_id"`
-				Title       string `json:"title"`
-				AltTitles   string `json:"altTitles"`
-				Description string `json:"description"`
-				Language    string `json:"language"`
-				Type        string `json:"type"`
-				Year        int    `json:"year"`
-				Status      string `json:"status"`
-				Schedule    string `json:"schedule"`
-				LastEdit    string `json:"last_edit"`
-				Time        int    `json:"time"`
+				SeriesId    int      `json:"series_id"`
+				Title       string   `json:"title"`
+				AltTitles   []string `json:"altTitles"`
+				Description string   `json:"description"`
+				Language    string   `json:"language"`
+				Type        string   `json:"type"`
+				Year        int      `json:"year"`
+				Status      string   `json:"status"`
+				Schedule    string   `json:"schedule"`
+				LastEdit    string   `json:"last_edit"`
+				Time        int      `json:"time"`
 			} `json:"series"`
 			Chapters []flamescansChapter `json:"chapters"`
 		} `json:"pageProps"`
