@@ -38,10 +38,8 @@ type mangadexManga struct {
 	Data struct {
 		ID         string `json:"id"`
 		Attributes struct {
-			Title struct {
-				En string `json:"en"`
-			} `json:"title"`
-			Tags []struct {
+			Title map[string]string `json:"title"`
+			Tags  []struct {
 				ID string `json:"id"`
 			} `json:"tags"`
 		} `json:"attributes"`
@@ -147,7 +145,7 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 		return domain.Manga{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
 	}
 
-	title := mangaResp.Data.Attributes.Title.En
+	title := m.getMangaTitle(mangaResp.Data.Attributes.Title)
 	if len(title) == 0 {
 		return domain.Manga{}, fmt.Errorf("getting manga for ID %s", m.MangaID)
 	}
@@ -306,6 +304,14 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 
 	chapter.ImageInfo = imageInfos
 	return nil
+}
+
+func (m *mangadex) getMangaTitle(titles map[string]string) string {
+	for _, title := range titles {
+		return title
+	}
+
+	return ""
 }
 
 func (m *mangadex) shouldProcessChapter(data mangadexChaptersData, groupID string) bool {
