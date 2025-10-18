@@ -19,6 +19,7 @@ var (
 	chapterNumbers string
 	first          bool
 	latest         bool
+	downloadAll    bool
 )
 
 func initRootFlags() {
@@ -104,10 +105,20 @@ func initDownloadFlags() {
 		false,
 		"download the latest chapter",
 	)
+	downloadCmd.Flags().BoolVarP(
+		&downloadAll,
+		"all",
+		"A",
+		false,
+		"download all available chapters",
+	)
 
 	downloadCmd.MarkFlagsMutuallyExclusive("first", "chapters")
 	downloadCmd.MarkFlagsMutuallyExclusive("latest", "chapters")
 	downloadCmd.MarkFlagsMutuallyExclusive("first", "latest")
+	downloadCmd.MarkFlagsMutuallyExclusive("all", "chapters")
+	downloadCmd.MarkFlagsMutuallyExclusive("all", "first")
+	downloadCmd.MarkFlagsMutuallyExclusive("all", "latest")
 
 	_ = downloadCmd.MarkFlagRequired("downloadDirectory")
 	_ = downloadCmd.MarkFlagRequired("source")

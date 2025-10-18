@@ -3,6 +3,8 @@ package parse
 import (
 	"cmp"
 	"fmt"
+	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,6 +53,8 @@ func ChapterSelection(input string, available map[float32]domain.Chapter) ([]flo
 
 	return out, nil
 }
+
+const floatEqualityEpsilon = 1e-4
 
 // parseRange expects the form "start-end".
 func parseRange(s string) (float32, float32, error) {
@@ -106,4 +110,59 @@ func MinMaxKeys[K cmp.Ordered, V any](m map[K]V) (min K, max K, err error) {
 	}
 
 	return min, max, nil
+}
+
+// FormatChapterList sorts the provided chapters and returns a string displaying
+// consecutive numbers as ranges, e.g. "1-3, 5, 7.5".
+func FormatChapterList(chapters []float32) string {
+	if len(chapters) == 0 {
+		return ""
+	}
+
+	sorted := slices.Clone(chapters)
+	slices.Sort(sorted)
+
+	var parts []string
+	start := sorted[0]
+	prev := sorted[0]
+
+	for i := 1; i < len(sorted); i++ {
+		current := sorted[i]
+		if isConsecutive(prev, current) {
+			prev = current
+			continue
+		}
+
+		parts = append(parts, formatRange(start, prev))
+		start = current
+		prev = current
+	}
+
+	parts = append(parts, formatRange(start, prev))
+
+	return strings.Join(parts, ", ")
+}
+
+func formatRange(start, end float32) string {
+	if almostEqual(start, end) {
+		return formatChapterNumber(start)
+	}
+
+	return fmt.Sprintf("%s-%s", formatChapterNumber(start), formatChapterNumber(end))
+}
+
+func formatChapterNumber(num float32) string {
+	return fmt.Sprintf("%g", num)
+}
+
+func isConsecutive(prev, current float32) bool {
+	if almostEqual(prev, current) {
+		return true
+	}
+
+	return almostEqual(current, prev+1)
+}
+
+func almostEqual(a, b float32) bool {
+	return math.Abs(float64(a-b)) <= floatEqualityEpsilon
 }
