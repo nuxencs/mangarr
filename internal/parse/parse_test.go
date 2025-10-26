@@ -365,3 +365,60 @@ func TestParseChapter(t *testing.T) {
 		})
 	}
 }
+
+func TestFormatChapterList(t *testing.T) {
+	cases := []struct {
+		name     string
+		chapters []float32
+		expected string
+	}{
+		{
+			name:     "empty slice",
+			chapters: nil,
+			expected: "",
+		},
+		{
+			name:     "single entry",
+			chapters: []float32{3},
+			expected: "3",
+		},
+		{
+			name:     "unordered list",
+			chapters: []float32{5, 1, 3},
+			expected: "1, 3, 5",
+		},
+		{
+			name:     "decimal chapters",
+			chapters: []float32{1.5, 1, 2, 3.5, 3},
+			expected: "1, 1.5, 2-3, 3.5",
+		},
+		{
+			name:     "duplicates",
+			chapters: []float32{1, 1, 2, 3, 3},
+			expected: "1-3",
+		},
+		{
+			name:     "non consecutive",
+			chapters: []float32{1, 3, 5},
+			expected: "1, 3, 5",
+		},
+		{
+			name:     "single gaps",
+			chapters: []float32{1, 2, 4, 5, 7},
+			expected: "1-2, 4-5, 7",
+		},
+		{
+			name:     "floats with epsilon",
+			chapters: []float32{1.00001, 2.00001, 3.00001},
+			expected: "1.00001-3.00001",
+		},
+	}
+
+	for _, tc := range cases {
+		ftc := tc
+		t.Run(ftc.name, func(t *testing.T) {
+			t.Parallel()
+			assert.Equal(t, ftc.expected, FormatChapterList(ftc.chapters))
+		})
+	}
+}
