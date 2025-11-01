@@ -183,6 +183,10 @@ func (m *mangapark) GetImageURLs(_ context.Context, chapter *domain.Chapter) err
 			errors = append(errors, fmt.Errorf("getting image URL: %w", err))
 		}
 
+		if imgURL == nil {
+			continue
+		}
+
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: *imgURL})
 	}
 
