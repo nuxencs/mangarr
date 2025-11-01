@@ -169,7 +169,7 @@ func (m *mangapark) GetImageURLs(_ context.Context, chapter *domain.Chapter) err
 	pageWithTimeout := page.Timeout(browser.Timeout)
 
 	err = rod.Try(func() {
-		_ = pageWithTimeout.MustNavigate(path).WaitDOMStable(time.Second, 1)
+		_ = pageWithTimeout.MustNavigate(path).WaitDOMStable(time.Second, 0)
 
 		imageElements = pageWithTimeout.MustElements("div[data-name='image-item'] img")
 	})
