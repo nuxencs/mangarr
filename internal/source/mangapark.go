@@ -118,7 +118,7 @@ func (m *mangapark) GetChapters(_ context.Context, manga domain.Manga) error {
 		name := firstChild.Find("a").Text()
 		number, err := m.getChapterNumber(name)
 		if err != nil {
-			errors = append(errors, fmt.Errorf("parsing chapter number from URL %s: %w", e.Request.URL, err))
+			// Skip chapters that don't match the regex pattern instead of failing
 			return
 		}
 
