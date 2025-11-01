@@ -23,6 +23,8 @@ func Select(monitoredManga domain.MonitoredManga, bm *browser.Manager) (domain.S
 		return NewCubari(monitoredManga.Manga, monitoredManga.Group), nil
 	case "comick":
 		return NewComick(monitoredManga.Manga, monitoredManga.Group, monitoredManga.Language, bm), nil
+	case "mangapark":
+		return NewMangaPark(monitoredManga.Manga, bm), nil
 	}
 
 	return nil, fmt.Errorf("unknown monitored manga source %s", monitoredManga.Source)

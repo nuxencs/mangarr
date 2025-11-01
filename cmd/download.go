@@ -60,6 +60,8 @@ var downloadCmd = &cobra.Command{
 			s = source.NewCubari(manga, group)
 		case "comick":
 			s = source.NewComick(manga, group, language, bm)
+		case "mangapark":
+			s = source.NewMangaPark(manga, bm)
 		default:
 			log.Error().Msgf("Invalid source: %s", mangaSource)
 			return
