@@ -3,6 +3,7 @@ module mangarr
 go 1.24.2
 
 require (
+	github.com/PuerkitoBio/goquery v1.10.3
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-pdf/fpdf v0.9.0
@@ -21,7 +22,6 @@ require (
 )
 
 require (
-	github.com/PuerkitoBio/goquery v1.10.3 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/antchfx/htmlquery v1.3.4 // indirect
 	github.com/antchfx/xmlquery v1.4.4 // indirect

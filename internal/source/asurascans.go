@@ -165,6 +165,10 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 			errors = append(errors, fmt.Errorf("getting image URL: %w", err))
 		}
 
+		if imgURL == nil {
+			continue
+		}
+
 		// skip images that are not hosted on https://gg.asuracomic.net
 		if strings.HasPrefix(*imgURL, "https://gg.asuracomic.net") {
 			imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: *imgURL})
