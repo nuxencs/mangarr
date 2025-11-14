@@ -37,7 +37,7 @@ type flamecomicsResponse struct {
 				Year        int      `json:"year"`
 				Status      string   `json:"status"`
 				Schedule    string   `json:"schedule"`
-				LastEdit    string   `json:"last_edit"`
+				LastEdit    int      `json:"last_edit"`
 				Time        int      `json:"time"`
 			} `json:"series"`
 			Chapters []flamescansChapter `json:"chapters"`
