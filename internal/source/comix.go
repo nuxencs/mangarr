@@ -10,9 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
-
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 	"mangarr/internal/sharedhttp"
@@ -28,10 +25,50 @@ const (
 )
 
 type comix struct {
-	MangaURL  string
-	GroupID   string
-	Client    *http.Client
-	Collector colly.Collector
+	MangaURL string
+	GroupID  string
+	Client   *http.Client
+}
+
+type comixMangaResponse struct {
+	Status int `json:"status"`
+	Result struct {
+		MangaID   int      `json:"manga_id"`
+		HashID    string   `json:"hash_id"`
+		Title     string   `json:"title"`
+		AltTitles []string `json:"alt_titles"`
+		Synopsis  string   `json:"synopsis"`
+		Slug      string   `json:"slug"`
+		Rank      int      `json:"rank"`
+		Type      string   `json:"type"`
+		Poster    struct {
+			Small  string `json:"small"`
+			Medium string `json:"medium"`
+			Large  string `json:"large"`
+		} `json:"poster"`
+		OriginalLanguage string  `json:"original_language"`
+		Status           string  `json:"status"`
+		FinalVolume      int     `json:"final_volume"`
+		FinalChapter     int     `json:"final_chapter"`
+		HasChapters      bool    `json:"has_chapters"`
+		LatestChapter    int     `json:"latest_chapter"`
+		ChapterUpdatedAt int     `json:"chapter_updated_at"`
+		StartDate        int     `json:"start_date"`
+		EndDate          string  `json:"end_date"`
+		CreatedAt        int     `json:"created_at"`
+		UpdatedAt        int     `json:"updated_at"`
+		RatedAvg         float64 `json:"rated_avg"`
+		RatedCount       int     `json:"rated_count"`
+		FollowsTotal     int     `json:"follows_total"`
+		Links            struct {
+			Al  string `json:"al"`
+			Mal string `json:"mal"`
+			Mu  string `json:"mu"`
+		} `json:"links"`
+		IsNsfw  bool  `json:"is_nsfw"`
+		Year    int   `json:"year"`
+		TermIds []int `json:"term_ids"`
+	} `json:"result"`
 }
 
 type comixChaptersResponse struct {
@@ -93,24 +130,16 @@ type comixChapter struct {
 	Images []string `json:"images"`
 }
 
-func NewComix(manga, group string) domain.Source {
+func NewComix(mangaURL, groupID string) domain.Source {
 	client := http.Client{
 		Timeout:   60 * time.Second,
 		Transport: sharedhttp.Transport,
 	}
 
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-	)
-	extensions.RandomUserAgent(collector)
-
-	collector.SetRequestTimeout(120 * time.Second)
-
 	return &comix{
-		MangaURL:  manga,
-		GroupID:   group,
-		Client:    &client,
-		Collector: *collector,
+		MangaURL: mangaURL,
+		GroupID:  groupID,
+		Client:   &client,
 	}
 }
 
@@ -130,37 +159,61 @@ func (c *comix) ValidateInput() error {
 	return nil
 }
 
-func (c *comix) GetManga(_ context.Context) (domain.Manga, error) {
-	var manga domain.Manga
-	var errors []error
-	col := c.Collector.Clone()
-
-	col.OnError(func(r *colly.Response, err error) {
-		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
-	})
-
-	col.OnHTML(".comic-info .title", func(e *colly.HTMLElement) {
-		manga = domain.Manga{
-			Title:    sanitize.Filename(e.Text),
-			Chapters: make(map[float32]domain.Chapter),
-		}
-	})
-
-	err := col.Visit(c.MangaURL)
-	if err != nil {
-		return domain.Manga{}, fmt.Errorf("visiting URL %s: %w", c.MangaURL, err)
-	}
-
-	if len(errors) > 0 {
-		return domain.Manga{}, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
-	}
+func (c *comix) GetManga(ctx context.Context) (domain.Manga, error) {
+	var (
+		mangaResp comixMangaResponse
+		manga     domain.Manga
+	)
 
 	mangaID, err := c.extractIDFromURL(c.MangaURL)
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("extracting ID from URL %s: %w", c.MangaURL, err)
 	}
 
-	manga.ID = mangaID
+	path, err := url.JoinPath(comixURL, "api/v2/manga/", mangaID)
+	if err != nil {
+		return domain.Manga{}, fmt.Errorf("building URL: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
+	if err != nil {
+		return domain.Manga{}, fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "mangarr")
+
+	retryErr := retry.Do(func() error {
+		resp, err := sharedhttp.ExecRequest(*c.Client, req)
+		if err != nil {
+			return fmt.Errorf("executing request %s: %w", req.URL, err)
+		}
+
+		buf := bufio.NewReader(resp.Body)
+
+		err = json.NewDecoder(buf).Decode(&mangaResp)
+		if err != nil {
+			return retry.Unrecoverable(fmt.Errorf("decoding response: %w", err))
+		}
+
+		return nil
+	},
+		retry.Delay(time.Second*3),
+		retry.Attempts(3),
+		retry.MaxJitter(time.Second*1),
+	)
+	if retryErr != nil {
+		return domain.Manga{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
+	}
+
+	if mangaResp.Status != http.StatusOK {
+		return domain.Manga{}, fmt.Errorf("unexpected status code: %d", mangaResp.Status)
+	}
+
+	manga = domain.Manga{
+		ID:       mangaID,
+		Title:    sanitize.Filename(mangaResp.Result.Title),
+		Chapters: make(map[float32]domain.Chapter),
+	}
 
 	return manga, nil
 }
