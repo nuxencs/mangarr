@@ -238,10 +238,6 @@ func (c *comix) GetChapters(ctx context.Context, manga domain.Manga) error {
 
 	processedChapters := make(map[float32]bool)
 
-	if len(c.GroupID) == 0 {
-		c.GroupID = comixOfficialGroupID
-	}
-
 	for {
 		params := url.Values{
 			"order[number]":       []string{"desc"},
