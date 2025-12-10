@@ -105,7 +105,7 @@ type comixChapterResponse struct {
 			Name              string `json:"name"`
 			Slug              string `json:"slug"`
 		} `json:"scanlation_group"`
-		Images []string     `json:"images"`
+		Images []comixImage `json:"images"`
 		Prev   comixChapter `json:"prev"`
 		Next   comixChapter `json:"next"`
 	} `json:"result"`
@@ -127,7 +127,13 @@ type comixChapter struct {
 		Name              string `json:"name"`
 		Slug              string `json:"slug"`
 	} `json:"scanlation_group"`
-	Images []string `json:"images"`
+	Images []comixImage `json:"images"`
+}
+
+type comixImage struct {
+	Width  int    `json:"width"`
+	Height int    `json:"height"`
+	URL    string `json:"url"`
 }
 
 func NewComix(mangaURL, groupID string) domain.Source {
@@ -345,8 +351,8 @@ func (c *comix) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error
 		return fmt.Errorf("executing request %s: %w", req.URL, retryErr)
 	}
 
-	for _, imageURL := range chapterResp.Result.Images {
-		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
+	for _, image := range chapterResp.Result.Images {
+		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: image.URL})
 	}
 
 	if len(imageInfos) == 0 {
