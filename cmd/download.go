@@ -58,8 +58,6 @@ var downloadCmd = &cobra.Command{
 			s = source.NewAsurascans(manga, bm)
 		case "cubari":
 			s = source.NewCubari(manga, group)
-		case "comick":
-			s = source.NewComick(manga, group, language, bm)
 		case "mangapark":
 			s = source.NewMangaPark(manga, bm)
 		case "weebcentral":
