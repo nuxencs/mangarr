@@ -57,7 +57,7 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 }
 
 // downloadImage fetches url, applies XOR–decrypt if xorKeyHex isn't empty, and stores the
-// file using the right extension that is inferred from the response headers.
+// file using the right extension that is inferred from the response headers or magic bytes.
 func downloadImage(ctx context.Context, log zerolog.Logger, url, xorKeyHex, filenameNoExt string) error {
 	var (
 		body        []byte
@@ -70,17 +70,25 @@ func downloadImage(ctx context.Context, log zerolog.Logger, url, xorKeyHex, file
 
 		contentType = resp.Header.Get("Content-Type")
 
+		// If we only need to save the stream, we could pipe directly, but for the
+		// XOR-decrypt branch we need everything in memory anyway, so always read
+		// into a buffer for simplicity.
+		body, fetchErr = io.ReadAll(bufio.NewReader(resp.Body))
+		if fetchErr != nil {
+			return fetchErr
+		}
+
+		// For application/octet-stream, detect the actual image type from magic bytes.
+		if contentType == "application/octet-stream" {
+			contentType = http.DetectContentType(body)
+		}
+
 		filename, fetchErr = appendImageExtension(contentType, filenameNoExt)
 		if fetchErr != nil {
 			return retry.Unrecoverable(fetchErr)
 		}
 
-		// If we only need to save the stream, we could pipe directly, but for the
-		// XOR-decrypt branch we need everything in memory anyway, so always read
-		// into a buffer for simplicity.
-		body, fetchErr = io.ReadAll(bufio.NewReader(resp.Body))
-
-		return fetchErr
+		return nil
 	}); err != nil {
 		if errors.Is(err, sharedhttp.ErrNotFound) {
 			log.Warn().Msgf("image url returned 404, skipping %q", url)
