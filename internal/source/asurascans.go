@@ -13,6 +13,7 @@ import (
 	"mangarr/internal/sanitize"
 
 	"github.com/go-rod/rod"
+	"github.com/go-rod/stealth"
 )
 
 const asurascansURL = "https://asuracomic.net/series/"
@@ -53,7 +54,7 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		IsManhwa: true,
 	}
 
-	page := a.Browser.Get().MustPage()
+	page := stealth.MustPage(a.Browser.Get())
 	defer page.MustClose()
 
 	pageWithTimeout := page.Timeout(browser.Timeout)
@@ -145,7 +146,7 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	var imageElements rod.Elements
 	var errors []error
 
-	page := a.Browser.Get().MustPage()
+	page := stealth.MustPage(a.Browser.Get())
 	defer page.MustClose()
 
 	pageWithTimeout := page.Timeout(browser.Timeout)
