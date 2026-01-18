@@ -91,6 +91,24 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 			continue
 		}
 
+		chapterTitleElement, err := chapterElement.Element("span")
+		if err != nil {
+			errors = append(errors, fmt.Errorf("getting chapter title element from URL %s: %w", a.MangaURL, err))
+			continue
+		}
+
+		chapterLine, err := chapterElement.Text()
+		if err != nil {
+			errors = append(errors, fmt.Errorf("getting chapter line from URL %s: %w", a.MangaURL, err))
+			continue
+		}
+
+		chapterTitleLine, err := chapterTitleElement.Text()
+		if err != nil {
+			errors = append(errors, fmt.Errorf("getting chapter line from URL %s: %w", a.MangaURL, err))
+			continue
+		}
+
 		linkElement, err := e.Element("a")
 		if err != nil {
 			errors = append(errors, fmt.Errorf("getting link element from URL %s: %w", a.MangaURL, err))
@@ -100,16 +118,11 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		link, err := linkElement.Attribute("href")
 		if err != nil {
 			errors = append(errors, fmt.Errorf("getting link from URL %s: %w", a.MangaURL, err))
+			continue
 		}
 		chapterURL := *link
 
-		chapterLine, err := chapterElement.Text()
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting chapter line from URL %s: %w", a.MangaURL, err))
-			continue
-		}
-
-		chapterNum, chapterTitle, err := a.splitChapterInfo(chapterLine)
+		chapterNum, err := a.separateChapterNum(chapterLine, chapterTitleLine)
 		if err != nil {
 			errors = append(errors, fmt.Errorf("splitting chapter info %s: %w", chapterLine, err))
 			continue
@@ -118,7 +131,7 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		manga.Chapters[chapterNum] = domain.Chapter{
 			URL:    chapterURL,
 			Number: chapterNum,
-			Title:  chapterTitle,
+			Title:  sanitize.Filename(chapterTitleLine),
 		}
 	}
 
@@ -188,31 +201,19 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	return nil
 }
 
-func (a *asurascans) splitChapterInfo(chapterLine string) (float32, string, error) {
+func (a *asurascans) separateChapterNum(chapterLine, chapterTitleLine string) (float32, error) {
 	if len(chapterLine) == 0 {
-		return 0, "", fmt.Errorf("chapter line is empty")
+		return 0, fmt.Errorf("chapter line is empty")
 	}
 
-	// splits a chapter line into split[0] = chapter part and split[1] = chapter title
-	split := strings.Split(chapterLine, "\n")
-	if len(split) > 2 {
-		return 0, "", fmt.Errorf("chapter line is not in the correct format")
-	}
+	trimmed := strings.TrimSuffix(chapterLine, chapterTitleLine)
+	trimmed = strings.TrimSuffix(trimmed, "\n")
+	trimmed = strings.TrimPrefix(trimmed, "Chapter ")
 
-	_, cutChapterLine, ok := strings.Cut(split[0], "Chapter ")
-	if !ok {
-		return 0, "", fmt.Errorf("splitting chapter string %q", cutChapterLine)
-	}
-
-	chapterNumber, err := strconv.ParseFloat(cutChapterLine, 32)
+	chapterNumber, err := strconv.ParseFloat(trimmed, 32)
 	if err != nil {
-		return 0, "", fmt.Errorf("parsing chapter number from %s: %w", cutChapterLine, err)
+		return 0, fmt.Errorf("parsing chapter number from %s: %w", trimmed, err)
 	}
 
-	var chapterTitle string
-	if len(split) == 2 {
-		chapterTitle = sanitize.Filename(split[1])
-	}
-
-	return float32(chapterNumber), chapterTitle, nil
+	return float32(chapterNumber), nil
 }
