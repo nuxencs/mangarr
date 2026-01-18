@@ -3,7 +3,10 @@ package source
 import (
 	"context"
 	"fmt"
+
 	"github.com/go-rod/rod"
+	"github.com/go-rod/stealth"
+
 	"net/url"
 	"regexp"
 	"strconv"
@@ -145,7 +148,7 @@ func (w *weebcentral) GetImageURLs(_ context.Context, chapter *domain.Chapter) e
 	var imageElements rod.Elements
 	var errors []error
 
-	page := w.Browser.Get().MustPage()
+	page := stealth.MustPage(w.Browser.Get())
 	defer page.MustClose()
 
 	pageWithTimeout := page.Timeout(browser.Timeout)

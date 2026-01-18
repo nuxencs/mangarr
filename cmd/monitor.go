@@ -69,7 +69,7 @@ var monitorCmd = &cobra.Command{
 				case <-quit:
 					return
 				case <-ticker.C:
-					for _, monitoredManga := range cfg.Config.MonitoredManga {
+					for mangaTitle, monitoredManga := range cfg.Config.MonitoredManga {
 						wg.Add(1)
 
 						go func() {
@@ -81,18 +81,18 @@ var monitorCmd = &cobra.Command{
 								log.Error().Err(err).Msgf("error selecting manga source")
 								return
 							}
+							mLog := log.With().Str("manga", mangaTitle).Str("source", mangaSource.String()).Logger()
 
 							if err := mangaSource.ValidateInput(); err != nil {
-								log.Error().Err(err).Msgf("error validating input")
+								mLog.Error().Err(err).Msgf("error validating input")
 								return
 							}
 
 							selectedManga, err := mangaSource.GetManga(ctx)
 							if err != nil {
-								log.Error().Err(err).Msgf("error getting manga from %s", monitoredManga.Source)
+								mLog.Error().Err(err).Msgf("error getting manga from %s", monitoredManga.Source)
 								return
 							}
-							mLog := log.With().Str("manga", selectedManga.Title).Str("source", mangaSource.String()).Logger()
 
 							if err := mangaSource.GetChapters(ctx, selectedManga); err != nil {
 								mLog.Error().Err(err).Msg("error getting manga chapters")

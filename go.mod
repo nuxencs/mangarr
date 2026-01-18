@@ -7,6 +7,7 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/go-rod/rod v0.116.2
+	github.com/go-rod/stealth v0.4.9
 	github.com/gocolly/colly v1.2.0
 	github.com/google/uuid v1.6.0
 	github.com/pkg/errors v0.9.1

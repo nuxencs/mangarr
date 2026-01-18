@@ -14,6 +14,7 @@ import (
 	"mangarr/internal/sanitize"
 
 	"github.com/go-rod/rod"
+	"github.com/go-rod/stealth"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 )
@@ -163,7 +164,7 @@ func (m *mangapark) GetImageURLs(_ context.Context, chapter *domain.Chapter) err
 		return fmt.Errorf("building URL: %w", err)
 	}
 
-	page := m.Browser.Get().MustPage()
+	page := stealth.MustPage(m.Browser.Get())
 	defer page.MustClose()
 
 	pageWithTimeout := page.Timeout(browser.Timeout)
