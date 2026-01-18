@@ -14,9 +14,11 @@ import (
 	"mangarr/internal/domain"
 	"mangarr/internal/logger"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/providers/structs"
+	"github.com/knadh/koanf/v2"
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 )
 
 var configTemplate = `# config.yaml
@@ -192,19 +194,21 @@ type Config interface {
 type AppConfig struct {
 	Config *domain.Config
 	m      *sync.Mutex
+	k      *koanf.Koanf
 }
 
 func New(configPath string, version string) *AppConfig {
 	c := &AppConfig{
+		Config: &domain.Config{
+			Version:    version,
+			ConfigPath: configPath,
+		},
 		m: new(sync.Mutex),
-	}
-	c.defaults()
-	c.Config = &domain.Config{
-		Version:    version,
-		ConfigPath: configPath,
+		k: koanf.New("."),
 	}
 
-	c.load(configPath)
+	c.defaults()
+	c.load()
 	c.loadFromEnv()
 
 	if c.Config.DownloadLocation == "" {
@@ -215,14 +219,19 @@ func New(configPath string, version string) *AppConfig {
 }
 
 func (c *AppConfig) defaults() {
-	viper.SetDefault("downloadLocation", "")
-	viper.SetDefault("namingTemplate", "{manga:<.>} Ch. {num:3}")
-	viper.SetDefault("checkInterval", 15)
-	viper.SetDefault("monitoredManga", make(map[string]*domain.MonitoredManga))
-	viper.SetDefault("logPath", "")
-	viper.SetDefault("logLevel", "DEBUG")
-	viper.SetDefault("logMaxSize", 50)
-	viper.SetDefault("logMaxBackups", 3)
+	c.Config.DownloadLocation = ""
+	c.Config.NamingTemplate = "{manga:<.>} Ch. {num:3}"
+	c.Config.CheckInterval = 15
+	c.Config.MonitoredManga = make(map[string]*domain.MonitoredManga)
+	c.Config.LogPath = ""
+	c.Config.LogLevel = "DEBUG"
+	c.Config.LogMaxSize = 50
+	c.Config.LogMaxBackups = 3
+
+	// load default values into koanf
+	if err := c.k.Load(structs.Provider(c.Config, "yaml"), nil); err != nil {
+		log.Fatalf("could not load default values into config: %q", err)
+	}
 }
 
 func (c *AppConfig) loadFromEnv() {
@@ -259,87 +268,108 @@ func (c *AppConfig) loadFromEnv() {
 			}
 		}
 	}
+
+	if err := c.k.Load(structs.Provider(c.Config, "yaml"), nil); err != nil {
+		log.Fatalf("could not load env vars into config: %q", err)
+	}
 }
 
-func (c *AppConfig) load(configPath string) {
-	viper.SetConfigType("yaml")
+func (c *AppConfig) load() {
+	configPath := path.Clean(c.Config.ConfigPath)
 
-	// clean trailing slash from configPath
-	configPath = path.Clean(configPath)
+	var configFile string
+
 	if configPath != "" {
-		// check if path and file exists
-		// if not, create path and file
 		if err := c.writeConfig(configPath, "config.yaml"); err != nil {
-			log.Printf("write error: %q", err)
+			log.Printf("config write error: %q", err)
 		}
 
-		viper.SetConfigFile(path.Join(configPath, "config.yaml"))
+		configFile = path.Join(configPath, "config.yaml")
 	} else {
-		viper.SetConfigName("config")
+		locations := []string{
+			"./config.yaml",
+			"$HOME/.config/seasonpackarr/config.yaml",
+			"$HOME/.seasonpackarr/config.yaml",
+		}
 
-		// Search config in directories
-		viper.AddConfigPath(".")
-		viper.AddConfigPath("$HOME/.config/mangarr")
-		viper.AddConfigPath("$HOME/.mangarr")
+		for _, loc := range locations {
+			expandedLoc := os.ExpandEnv(loc)
+			if _, err := os.Stat(expandedLoc); err == nil {
+				configFile = expandedLoc
+				break
+			}
+		}
+
+		if configFile == "" {
+			log.Fatalf("could not find config file")
+		}
 	}
 
-	// read config
-	if err := viper.ReadInConfig(); err != nil {
-		log.Printf("config read error: %q", err)
+	if err := c.k.Load(file.Provider(configFile), yaml.Parser()); err != nil {
+		log.Fatalf("config read error: %q", err)
 	}
 
-	if err := viper.Unmarshal(c.Config); err != nil {
-		log.Fatalf("Could not unmarshal config file: %v: err %q", viper.ConfigFileUsed(), err)
+	if err := c.k.Unmarshal("", c.Config); err != nil {
+		log.Fatalf("could not unmarshal config file: %v: err %q", configFile, err)
 	}
 }
 
 func (c *AppConfig) DynamicReload(log logger.Logger) {
-	viper.WatchConfig()
+	configFile := path.Join(c.Config.ConfigPath, "config.yaml")
 
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		c.m.Lock()
-		defer c.m.Unlock()
+	f := file.Provider(configFile)
 
-		// only reload config on write to config file
-		if !e.Op.Has(fsnotify.Write) {
+	f.Watch(func(event any, err error) {
+		if err != nil {
+			log.Error().Err(err).Msg("error watching config file")
 			return
 		}
 
-		namingTemplate := viper.GetString("namingTemplate")
-		c.Config.NamingTemplate = namingTemplate
+		c.m.Lock()
+		defer c.m.Unlock()
 
-		logLevel := viper.GetString("logLevel")
-		c.Config.LogLevel = logLevel
+		// create a new koanf instance for reloading
+		k := koanf.New(".")
+
+		// load the config file
+		if err := k.Load(f, yaml.Parser()); err != nil {
+			log.Error().Err(err).Msg("failed to reload config file")
+			return
+		}
+
+		// unmarshal the updated config into the Config struct
+		if err := k.Unmarshal("", c.Config); err != nil {
+			log.Error().Err(err).Msg("failed to unmarshal updated config")
+			return
+		}
+
 		log.SetLogLevel(c.Config.LogLevel)
-
-		logPath := viper.GetString("logPath")
-		c.Config.LogPath = logPath
 
 		log.Debug().Msg("config file reloaded!")
 	})
 }
 
 func (c *AppConfig) UpdateConfig() error {
-	filePath := path.Join(c.Config.ConfigPath, "config.yaml")
+	configFile := path.Join(c.Config.ConfigPath, "config.yaml")
 
-	f, err := os.ReadFile(filePath)
+	f, err := os.ReadFile(configFile)
 	if err != nil {
-		return fmt.Errorf("could not read config filePath: %s: %w", filePath, err)
+		return fmt.Errorf("could not read config configFile: %s: %w", configFile, err)
 	}
 
 	lines := strings.Split(string(f), "\n")
 	lines = c.processLines(lines)
 
 	output := strings.Join(lines, "\n")
-	if err := os.WriteFile(filePath, []byte(output), 0o644); err != nil {
-		return fmt.Errorf("could not write config file: %s: %w", filePath, err)
+	if err := os.WriteFile(configFile, []byte(output), 0o644); err != nil {
+		return fmt.Errorf("could not write config file: %s: %w", configFile, err)
 	}
 
 	return nil
 }
 
 func (c *AppConfig) processLines(lines []string) []string {
-	// keep track of not found values to append at bottom
+	// keep track of not found values to append at the bottom
 	var (
 		foundLineLogLevel = false
 		foundLineLogPath  = false
