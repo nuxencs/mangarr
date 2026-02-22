@@ -5,10 +5,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -35,13 +35,30 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 	}
 	defer os.RemoveAll(tmpDir)
 
+	chapterLog := log.With().
+		Float32("chapter_number", chapter.Number).
+		Str("chapter_title", chapter.Title).
+		Str("chapter_id", chapter.ID).
+		Str("chapter_url", chapter.URL).
+		Int("image_total", len(chapter.ImageInfo)).
+		Logger()
+
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(maxConcurrentImageDownloads)
 
 	for i, img := range chapter.ImageInfo {
 		g.Go(func() error {
-			base := filepath.Join(tmpDir, fmt.Sprintf("%03d", i+1))
-			return downloadImage(ctx, log, img.ImageURL, img.EncryptionKey, base)
+			imageIndex := i + 1
+			base := filepath.Join(tmpDir, fmt.Sprintf("%03d", imageIndex))
+			imageLog := chapterLog.With().
+				Int("image_index", imageIndex).
+				Str("image_url", img.ImageURL).
+				Str("image_host", imageHost(img.ImageURL)).
+				Bool("encrypted", img.EncryptionKey != "").
+				Str("tmp_name", filepath.Base(base)).
+				Logger()
+
+			return downloadImage(ctx, imageLog, img.ImageURL, img.EncryptionKey, base, imageIndex, len(chapter.ImageInfo))
 		})
 	}
 
@@ -58,14 +75,14 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 
 // downloadImage fetches url, applies XOR–decrypt if xorKeyHex isn't empty, and stores the
 // file using the right extension that is inferred from the response headers or magic bytes.
-func downloadImage(ctx context.Context, log zerolog.Logger, url, xorKeyHex, filenameNoExt string) error {
+func downloadImage(ctx context.Context, log zerolog.Logger, imageURL, xorKeyHex, filenameNoExt string, imageIndex, imageTotal int) error {
 	var (
 		body        []byte
 		contentType string
 		filename    string
 	)
 
-	if err := fetchWithRetry(ctx, url, func(resp *http.Response) error {
+	if err := fetchWithRetry(ctx, log, imageURL, func(resp *http.Response) error {
 		var fetchErr error
 
 		contentType = resp.Header.Get("Content-Type")
@@ -90,19 +107,14 @@ func downloadImage(ctx context.Context, log zerolog.Logger, url, xorKeyHex, file
 
 		return nil
 	}); err != nil {
-		if errors.Is(err, sharedhttp.ErrNotFound) {
-			log.Warn().Msgf("image url returned 404, skipping %q", url)
-			return nil
-		}
-
-		return err
+		return wrapImageError(imageIndex, imageTotal, imageURL, err)
 	}
 
 	// Decrypt if needed.
 	if xorKeyHex != "" {
 		key, err := hex.DecodeString(xorKeyHex)
 		if err != nil {
-			return fmt.Errorf("decoding encryption key: %w", err)
+			return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("decoding encryption key: %w", err))
 		}
 
 		for i := range body {
@@ -112,16 +124,20 @@ func downloadImage(ctx context.Context, log zerolog.Logger, url, xorKeyHex, file
 
 	out, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("creating file %s: %w", filename, err)
+		return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("creating file %s: %w", filename, err))
 	}
 	defer out.Close()
 
 	_, err = io.Copy(out, bytes.NewReader(body))
-	return err
+	if err != nil {
+		return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("writing file %s: %w", filename, err))
+	}
+
+	return nil
 }
 
 // fetchWithRetry executes the GET request with a common retry strategy and passes the successful response to onSuccess.
-func fetchWithRetry(ctx context.Context, url string, onSuccess func(*http.Response) error) error {
+func fetchWithRetry(ctx context.Context, log zerolog.Logger, url string, onSuccess func(*http.Response) error) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
@@ -145,6 +161,12 @@ func fetchWithRetry(ctx context.Context, url string, onSuccess func(*http.Respon
 		retry.Delay(time.Second*3),
 		retry.Attempts(3),
 		retry.MaxJitter(time.Second),
+		retry.OnRetry(func(n uint, err error) {
+			log.Warn().
+				Err(err).
+				Uint("attempt_failed", n+1).
+				Msg("Retrying image download")
+		}),
 		retry.Context(ctx),
 	)
 }
@@ -163,4 +185,17 @@ func appendImageExtension(contentType, filename string) (string, error) {
 	default:
 		return filename, fmt.Errorf("unsupported content type: %s", contentType)
 	}
+}
+
+func wrapImageError(imageIndex, imageTotal int, imageURL string, err error) error {
+	return fmt.Errorf("image %d/%d (%s): %w", imageIndex, imageTotal, imageURL, err)
+}
+
+func imageHost(rawURL string) string {
+	parsed, err := neturl.Parse(rawURL)
+	if err != nil {
+		return ""
+	}
+
+	return parsed.Host
 }
