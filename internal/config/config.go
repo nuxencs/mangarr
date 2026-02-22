@@ -288,8 +288,8 @@ func (c *AppConfig) load() {
 	} else {
 		locations := []string{
 			"./config.yaml",
-			"$HOME/.config/seasonpackarr/config.yaml",
-			"$HOME/.seasonpackarr/config.yaml",
+			"$HOME/.config/mangarr/config.yaml",
+			"$HOME/.mangarr/config.yaml",
 		}
 
 		for _, loc := range locations {
@@ -308,6 +308,7 @@ func (c *AppConfig) load() {
 	if err := c.k.Load(file.Provider(configFile), yaml.Parser()); err != nil {
 		log.Fatalf("config read error: %q", err)
 	}
+	c.Config.ConfigPath = filepath.Dir(configFile)
 
 	if err := c.k.Unmarshal("", c.Config); err != nil {
 		log.Fatalf("could not unmarshal config file: %v: err %q", configFile, err)
