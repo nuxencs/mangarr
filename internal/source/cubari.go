@@ -148,7 +148,7 @@ func (c *cubari) GetImageURLs(_ context.Context, _ *domain.Chapter) error {
 }
 
 func (c *cubari) getChapterName(chapterString string) string {
-	colonIndex := strings.Index(chapterString, ":")
+	_, after, _ := strings.Cut(chapterString, ":")
 
-	return strings.TrimSpace(chapterString[colonIndex+1:])
+	return strings.TrimSpace(after)
 }

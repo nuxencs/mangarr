@@ -138,11 +138,7 @@ var downloadCmd = &cobra.Command{
 		var wg sync.WaitGroup
 
 		for _, chapterNumber := range selectedChapterNumbers {
-			wg.Add(1)
-
-			go func() {
-				defer wg.Done()
-
+			wg.Go(func() {
 				sem.Acquire()
 
 				result := chapterResult{
@@ -199,7 +195,7 @@ var downloadCmd = &cobra.Command{
 				log.Info().Msgf("Finished downloading %q", templatedName)
 				result.status = chapterStatusDownloaded
 				result.err = nil
-			}()
+			})
 		}
 
 		wg.Wait()

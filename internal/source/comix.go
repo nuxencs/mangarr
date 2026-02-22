@@ -389,8 +389,8 @@ func (c *comix) extractIDFromURL(urlStr string) (string, error) {
 	}
 
 	slug := parts[1]
-	if idx := strings.Index(slug, "-"); idx != -1 {
-		return slug[:idx], nil
+	if before, _, ok := strings.Cut(slug, "-"); ok {
+		return before, nil
 	}
 
 	return slug, nil
