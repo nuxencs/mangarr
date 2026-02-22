@@ -1,5 +1,5 @@
 # build base
-FROM --platform=$BUILDPLATFORM golang:1.24.2-alpine3.21 AS app-base
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.23 AS app-base
 
 WORKDIR /src
 
@@ -33,8 +33,8 @@ FROM alpine:latest AS runner
 RUN apk add --no-cache ca-certificates curl tzdata jq chromium tini
 
 LABEL org.opencontainers.image.source="https://github.com/nuxencs/mangarr" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.base.name="alpine:latest"
+    org.opencontainers.image.licenses="MIT" \
+    org.opencontainers.image.base.name="alpine:latest"
 
 ENV HOME="/config" \
     XDG_CONFIG_HOME="/config" \

@@ -70,11 +70,9 @@ var monitorCmd = &cobra.Command{
 					return
 				case <-ticker.C:
 					for mangaTitle, monitoredManga := range cfg.Config.MonitoredManga {
-						wg.Add(1)
-
-						go func() {
+						wg.Go(func() {
 							sem.Acquire()
-							defer func() { sem.Release(); wg.Done() }()
+							defer sem.Release()
 
 							mangaSource, err := source.Select(*monitoredManga, bm)
 							if err != nil {
@@ -144,7 +142,7 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 							mLog.Info().Msgf("finished downloading %s", templatedName)
-						}()
+						})
 					}
 
 					wg.Wait()

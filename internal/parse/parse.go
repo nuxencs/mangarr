@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -16,7 +15,7 @@ import (
 func ChapterSelection(input string, available map[float32]domain.Chapter) ([]float32, error) {
 	uniq := make(map[float32]struct{})
 
-	for _, raw := range strings.Split(input, ",") {
+	for raw := range strings.SplitSeq(input, ",") {
 		part := strings.TrimSpace(raw)
 		if part == "" {
 			continue // ignore empty segments like ",,"
@@ -49,7 +48,7 @@ func ChapterSelection(input string, available map[float32]domain.Chapter) ([]flo
 	for ch := range uniq {
 		out = append(out, ch)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	slices.Sort(out)
 
 	return out, nil
 }
