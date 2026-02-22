@@ -80,6 +80,7 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 		if err != nil {
 			return fmt.Errorf("executing request %s: %w", req.URL, err)
 		}
+		defer resp.Body.Close()
 
 		buf := bufio.NewReader(resp.Body)
 

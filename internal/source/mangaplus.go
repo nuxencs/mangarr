@@ -163,6 +163,7 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobu
 		if err != nil {
 			return fmt.Errorf("executing request %s: %w", req.URL, err)
 		}
+		defer resp.Body.Close()
 
 		body, err := io.ReadAll(bufio.NewReader(resp.Body))
 		if err != nil {

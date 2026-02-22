@@ -64,6 +64,7 @@ func ExecRequest(client http.Client, req *http.Request) (http.Response, error) {
 	}
 
 	if err := CheckStatusCode(resp.StatusCode); err != nil {
+		_ = resp.Body.Close()
 		return http.Response{}, fmt.Errorf("checking status code: %w", err)
 	}
 

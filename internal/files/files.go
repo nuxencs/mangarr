@@ -113,7 +113,10 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	}
 	defer cbzFile.Close()
 
-	zipWriter := zip.NewWriter(bufio.NewWriter(cbzFile))
+	bufWriter := bufio.NewWriter(cbzFile)
+	defer bufWriter.Flush()
+
+	zipWriter := zip.NewWriter(bufWriter)
 	defer zipWriter.Close()
 
 	for _, img := range images {

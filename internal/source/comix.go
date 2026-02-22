@@ -193,6 +193,7 @@ func (c *comix) GetManga(ctx context.Context) (domain.Manga, error) {
 		if err != nil {
 			return fmt.Errorf("executing request %s: %w", req.URL, err)
 		}
+		defer resp.Body.Close()
 
 		buf := bufio.NewReader(resp.Body)
 
@@ -266,6 +267,7 @@ func (c *comix) GetChapters(ctx context.Context, manga domain.Manga) error {
 			if err != nil {
 				return fmt.Errorf("executing request %s: %w", req.URL, err)
 			}
+			defer resp.Body.Close()
 
 			buf := bufio.NewReader(resp.Body)
 
@@ -333,6 +335,7 @@ func (c *comix) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error
 		if err != nil {
 			return fmt.Errorf("executing request %s: %w", req.URL, err)
 		}
+		defer resp.Body.Close()
 
 		buf := bufio.NewReader(resp.Body)
 
