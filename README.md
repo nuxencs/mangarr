@@ -157,6 +157,14 @@ namingTemplate: "{manga:<.>} Ch. {num:3}{title: - <.>}"
 # Default: 15
 checkInterval: 15
 
+# Enable pprof endpoint for runtime profiling
+# Default: false
+pprofEnabled: false
+
+# pprof endpoint address
+# Default: "127.0.0.1:6060"
+pprofAddress: "127.0.0.1:6060"
+
 # Monitored Manga
 monitoredManga:
   # Entry for TCB Scans
@@ -211,10 +219,32 @@ You can override configuration values using environment variables with the `MANG
 - `MANGARR__DOWNLOAD_LOCATION` - Download directory path
 - `MANGARR__NAMING_TEMPLATE` - Naming template string
 - `MANGARR__CHECK_INTERVAL` - Check interval in minutes
+- `MANGARR__PPROF_ENABLED` - Enable/disable pprof endpoint (`true`/`false`)
+- `MANGARR__PPROF_ADDRESS` - pprof bind address (e.g. `127.0.0.1:6060`)
 - `MANGARR__LOG_LEVEL` - Log level (ERROR, DEBUG, INFO, WARN, TRACE)
 - `MANGARR__LOG_PATH` - Path to log file
 - `MANGARR__LOG_MAX_SIZE` - Maximum log file size in megabytes
 - `MANGARR__LOG_MAX_BACKUPS` - Maximum number of old log files to keep
+
+### Performance Profiling (pprof)
+
+Enable `pprofEnabled: true` in your monitor config, then start:
+
+```bash
+mangarr monitor -c ./config/mangarr
+```
+
+Check endpoint:
+
+```bash
+curl http://127.0.0.1:6060/debug/pprof/
+```
+
+Capture a CPU profile:
+
+```bash
+go tool pprof http://127.0.0.1:6060/debug/pprof/profile?seconds=30
+```
 
 ### Naming Templates
 

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -16,6 +17,7 @@ import (
 	"mangarr/internal/files"
 	"mangarr/internal/logger"
 	"mangarr/internal/parse"
+	"mangarr/internal/perf"
 	"mangarr/internal/sanitize"
 	"mangarr/internal/semaphore"
 	"mangarr/internal/source"
@@ -28,7 +30,8 @@ var monitorCmd = &cobra.Command{
 	Use:   "monitor",
 	Short: "Monitor a specified manga for new chapters",
 	Run: func(cmd *cobra.Command, _ []string) {
-		ctx := cmd.Context()
+		runCtx, cancel := context.WithCancel(cmd.Context())
+		defer cancel()
 
 		// read config
 		cfg := config.New(configPath, buildinfo.Version)
@@ -52,6 +55,15 @@ var monitorCmd = &cobra.Command{
 		log.Info().Msgf("Commit: %s", buildinfo.Commit)
 		log.Info().Msgf("Build date: %s", buildinfo.Date)
 		log.Info().Msgf("Log-level: %s", cfg.Config.LogLevel)
+
+		if cfg.Config.PprofEnabled {
+			pprofAddress, err := perf.StartPprofServer(runCtx, log, cfg.Config.PprofAddress)
+			if err != nil {
+				log.Error().Err(err).Msgf("error starting pprof endpoint")
+			} else {
+				log.Info().Msgf("pprof endpoint available at http://%s/debug/pprof/", pprofAddress)
+			}
+		}
 
 		ticker := time.NewTicker(cfg.Config.CheckInterval * time.Minute)
 		defer ticker.Stop()
@@ -86,13 +98,13 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							selectedManga, err := mangaSource.GetManga(ctx)
+							selectedManga, err := mangaSource.GetManga(runCtx)
 							if err != nil {
 								mLog.Error().Err(err).Msgf("error getting manga from %s", monitoredManga.Source)
 								return
 							}
 
-							if err := mangaSource.GetChapters(ctx, selectedManga); err != nil {
+							if err := mangaSource.GetChapters(runCtx, selectedManga); err != nil {
 								mLog.Error().Err(err).Msg("error getting manga chapters")
 								return
 							}
@@ -131,13 +143,13 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							if err := mangaSource.GetImageURLs(ctx, &selectedChapter); err != nil {
+							if err := mangaSource.GetImageURLs(runCtx, &selectedChapter); err != nil {
 								mLog.Error().Err(err).Msgf("error getting image urls for chapter %g", selectedChapter.Number)
 								return
 							}
 
 							mLog.Info().Msgf("downloading %q", templatedName)
-							if err := download.Chapter(ctx, mLog, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
+							if err := download.Chapter(runCtx, mLog, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
 								mLog.Error().Err(err).Msgf("error downloading chapter %s", templatedName)
 								return
 							}
@@ -154,7 +166,9 @@ var monitorCmd = &cobra.Command{
 		sigCh := make(chan os.Signal, 1)
 		signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 
-		fmt.Printf("received signal: %s, stopping monitoring.\n", <-sigCh)
+		sig := <-sigCh
+		fmt.Printf("received signal: %s, stopping monitoring.\n", sig)
+		cancel()
 		quit <- true
 		wg.Wait()
 		bm.Close()

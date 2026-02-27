@@ -3,10 +3,6 @@ package source
 import (
 	"context"
 	"fmt"
-
-	"github.com/go-rod/rod"
-	"github.com/go-rod/stealth"
-
 	"net/url"
 	"regexp"
 	"strconv"
@@ -17,6 +13,7 @@ import (
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 
+	"github.com/go-rod/stealth"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 )
@@ -58,7 +55,7 @@ func (w *weebcentral) ValidateInput() error {
 	}
 
 	if !strings.HasPrefix(w.MangaURL, weebcentralURL) {
-		return fmt.Errorf("the URL for Weeb Central must start with %s", mangaparkURL)
+		return fmt.Errorf("the URL for Weeb Central must start with %s", weebcentralURL)
 	}
 
 	if _, err := url.Parse(w.MangaURL); err != nil {
@@ -144,43 +141,45 @@ func (w *weebcentral) GetChapters(_ context.Context, manga domain.Manga) error {
 
 // GetImageURLs gets all image urls for a chapter
 func (w *weebcentral) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
-	var imageInfos []domain.ImageInfo
-	var imageElements rod.Elements
-	var errors []error
+	var imageURLs []string
 
 	page := stealth.MustPage(w.Browser.Get())
 	defer page.MustClose()
 
 	pageWithTimeout := page.Timeout(browser.Timeout)
 
-	err := rod.Try(func() {
-		_ = pageWithTimeout.MustNavigate(chapter.URL).WaitDOMStable(time.Second, 1)
+	if err := pageWithTimeout.Navigate(chapter.URL); err != nil {
+		return fmt.Errorf("navigating to image page: %w", browser.HandleError(err))
+	}
 
-		imageElements = pageWithTimeout.MustElements("img.maw-w-full")
-	})
+	if err := pageWithTimeout.WaitLoad(); err != nil {
+		return fmt.Errorf("waiting for image page load: %w", browser.HandleError(err))
+	}
+
+	if err := pageWithTimeout.WaitElementsMoreThan("img.maw-w-full", 0); err != nil {
+		return fmt.Errorf("waiting for chapter images: %w", browser.HandleError(err))
+	}
+
+	raw, err := pageWithTimeout.Eval(`() => {
+		return Array.from(document.querySelectorAll("img.maw-w-full"))
+			.map((img) => img.getAttribute("src") ?? "")
+			.filter((src) => src !== "")
+	}`)
 	if err != nil {
-		return fmt.Errorf("opening image page: %w", browser.HandleError(err))
+		return fmt.Errorf("extracting chapter image URLs: %w", browser.HandleError(err))
 	}
 
-	for _, e := range imageElements {
-		imgURL, err := e.Attribute("src")
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting image URL: %w", err))
-		}
-
-		if imgURL == nil {
-			continue
-		}
-
-		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: *imgURL})
+	if err := raw.Value.Unmarshal(&imageURLs); err != nil {
+		return fmt.Errorf("decoding chapter image URLs: %w", err)
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
-	}
-
-	if len(imageInfos) == 0 {
+	if len(imageURLs) == 0 {
 		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
+	}
+
+	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
+	for _, imageURL := range imageURLs {
+		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
 	}
 
 	chapter.ImageInfo = imageInfos

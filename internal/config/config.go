@@ -44,6 +44,18 @@ namingTemplate: "{manga:<.>} Ch. {num:3}{title: - <.>}"
 #
 checkInterval: 15
 
+# Enable pprof endpoint for runtime profiling
+#
+# Default: false
+#
+pprofEnabled: false
+
+# pprof endpoint address
+#
+# Default: "127.0.0.1:6060"
+#
+pprofAddress: "127.0.0.1:6060"
+
 # Monitored Manga
 # Here you can define which manga you want to monitor
 #
@@ -222,6 +234,8 @@ func (c *AppConfig) defaults() {
 	c.Config.DownloadLocation = ""
 	c.Config.NamingTemplate = "{manga:<.>} Ch. {num:3}"
 	c.Config.CheckInterval = 15
+	c.Config.PprofEnabled = false
+	c.Config.PprofAddress = "127.0.0.1:6060"
 	c.Config.MonitoredManga = make(map[string]*domain.MonitoredManga)
 	c.Config.LogPath = ""
 	c.Config.LogLevel = "DEBUG"
@@ -252,6 +266,12 @@ func (c *AppConfig) loadFromEnv() {
 					if i, _ := strconv.ParseInt(envPair[1], 10, 32); i > 0 {
 						c.Config.CheckInterval = time.Duration(i)
 					}
+				case prefix + "PPROF_ENABLED":
+					if b, err := strconv.ParseBool(envPair[1]); err == nil {
+						c.Config.PprofEnabled = b
+					}
+				case prefix + "PPROF_ADDRESS":
+					c.Config.PprofAddress = envPair[1]
 				case prefix + "LOG_LEVEL":
 					c.Config.LogLevel = envPair[1]
 				case prefix + "LOG_PATH":
@@ -372,8 +392,10 @@ func (c *AppConfig) UpdateConfig() error {
 func (c *AppConfig) processLines(lines []string) []string {
 	// keep track of not found values to append at the bottom
 	var (
-		foundLineLogLevel = false
-		foundLineLogPath  = false
+		foundLineLogLevel          = false
+		foundLineLogPath           = false
+		foundLinePprofEnabled      = false
+		foundLinePprofAddress      = false
 	)
 
 	for i, line := range lines {
@@ -388,6 +410,14 @@ func (c *AppConfig) processLines(lines []string) []string {
 				lines[i] = fmt.Sprintf(`logPath: "%s"`, c.Config.LogPath)
 			}
 			foundLineLogPath = true
+		}
+		if !foundLinePprofEnabled && strings.Contains(line, "pprofEnabled:") {
+			lines[i] = fmt.Sprintf(`pprofEnabled: %t`, c.Config.PprofEnabled)
+			foundLinePprofEnabled = true
+		}
+		if !foundLinePprofAddress && strings.Contains(line, "pprofAddress:") {
+			lines[i] = fmt.Sprintf(`pprofAddress: "%s"`, c.Config.PprofAddress)
+			foundLinePprofAddress = true
 		}
 	}
 
@@ -411,6 +441,22 @@ func (c *AppConfig) processLines(lines []string) []string {
 		} else {
 			lines = append(lines, fmt.Sprintf(`logPath: "%s"`, c.Config.LogPath))
 		}
+	}
+
+	if !foundLinePprofEnabled {
+		lines = append(lines, "# Enable pprof endpoint for runtime profiling")
+		lines = append(lines, "#")
+		lines = append(lines, "# Default: false")
+		lines = append(lines, "#")
+		lines = append(lines, fmt.Sprintf(`pprofEnabled: %t`, c.Config.PprofEnabled))
+	}
+
+	if !foundLinePprofAddress {
+		lines = append(lines, "# pprof endpoint address")
+		lines = append(lines, "#")
+		lines = append(lines, `# Default: "127.0.0.1:6060"`)
+		lines = append(lines, "#")
+		lines = append(lines, fmt.Sprintf(`pprofAddress: "%s"`, c.Config.PprofAddress))
 	}
 
 	return lines
