@@ -24,6 +24,7 @@ import (
 const (
 	maxConcurrentImageDownloads = 10
 	userAgent                   = "mangarr"
+	maxLoggedLinkLength         = 100
 )
 
 type ArchiveWriter func(log zerolog.Logger, tmpDir, outPath string, isManhwa bool) error
@@ -39,7 +40,7 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 		Float32("chapter_number", chapter.Number).
 		Str("chapter_title", chapter.Title).
 		Str("chapter_id", chapter.ID).
-		Str("chapter_url", chapter.URL).
+		Str("chapter_url", truncateLink(chapter.URL)).
 		Int("image_total", len(chapter.ImageInfo)).
 		Logger()
 
@@ -52,7 +53,7 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 			base := filepath.Join(tmpDir, fmt.Sprintf("%03d", imageIndex))
 			imageLog := chapterLog.With().
 				Int("image_index", imageIndex).
-				Str("image_url", img.ImageURL).
+				Str("image_url", truncateLink(img.ImageURL)).
 				Str("image_host", imageHost(img.ImageURL)).
 				Bool("encrypted", img.EncryptionKey != "").
 				Str("tmp_name", filepath.Base(base)).
@@ -188,7 +189,7 @@ func appendImageExtension(contentType, filename string) (string, error) {
 }
 
 func wrapImageError(imageIndex, imageTotal int, imageURL string, err error) error {
-	return fmt.Errorf("image %d/%d (%s): %w", imageIndex, imageTotal, imageURL, err)
+	return fmt.Errorf("image %d/%d (%s): %w", imageIndex, imageTotal, truncateLink(imageURL), err)
 }
 
 func imageHost(rawURL string) string {
@@ -198,4 +199,12 @@ func imageHost(rawURL string) string {
 	}
 
 	return parsed.Host
+}
+
+func truncateLink(link string) string {
+	if len(link) <= maxLoggedLinkLength {
+		return link
+	}
+
+	return link[:maxLoggedLinkLength] + "..."
 }
