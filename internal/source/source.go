@@ -21,8 +21,6 @@ func Select(monitoredManga domain.MonitoredManga, bm *browser.Manager) (domain.S
 		return NewAsurascans(monitoredManga.Manga, bm), nil
 	case "cubari":
 		return NewCubari(monitoredManga.Manga, monitoredManga.Group), nil
-	case "mangapark":
-		return NewMangaPark(monitoredManga.Manga, bm), nil
 	case "weebcentral":
 		return NewWeebCentral(monitoredManga.Manga, bm), nil
 	case "comix":

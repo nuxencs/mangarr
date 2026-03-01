@@ -65,7 +65,7 @@ func (w *weebcentral) ValidateInput() error {
 	return nil
 }
 
-// GetManga gets the selected manga from Manga Park
+// GetManga gets the selected manga from Weeb Central
 func (w *weebcentral) GetManga(_ context.Context) (domain.Manga, error) {
 	var manga domain.Manga
 	var errors []error

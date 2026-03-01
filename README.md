@@ -19,7 +19,7 @@
 
 ## Supported Sources
 
-Mangarr currently supports downloading from **9 different manga sources**:
+Mangarr currently supports downloading from **8 different manga sources**:
 
 | Source | Identifier | Notes |
 |--------|-----------|-------|
@@ -29,7 +29,6 @@ Mangarr currently supports downloading from **9 different manga sources**:
 | [Flame Comics](https://flamecomics.xyz/) | `flamecomics` | Requires full manga URL |
 | [Asura Scans](https://asuracomic.net/) | `asurascans` | Requires manga identifier, uses browser automation |
 | [Cubari](https://cubari.moe/) | `cubari` | Requires gist URL and group identifier |
-| [MangaPark](https://mangapark.net/) | `mangapark` | Requires manga identifier, uses browser automation |
 | [Weeb Central](https://weebcentral.com/) | `weebcentral` | Requires manga identifier, uses browser automation |
 | [Comix](https://comix-online.org/) | `comix` | Requires manga identifier and group |
 
@@ -314,7 +313,7 @@ docker-compose up -d
 - **Manga URL**: Gist URL for the manga
 - **Group**: Group identifier (e.g., `/r/OnePunchMan`)
 
-### Browser-Based Sources (Asura Scans, MangaPark, Weeb Central)
+### Browser-Based Sources (Asura Scans, Weeb Central)
 
 Some sources use browser automation to bypass Cloudflare protection. These may take slightly longer to process.
 
