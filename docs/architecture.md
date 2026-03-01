@@ -21,7 +21,7 @@
 4. Resolve chapter selection (first/latest/list/range/all).
 5. Skip existing archive files.
 6. Fetch image URLs for each selected chapter.
-7. Download images concurrently (`internal/download`) with retry.
+7. Download images concurrently (`internal/download`) with targeted retry policy.
 8. Build chapter archive via `internal/files.CreateCbzArchive`.
 
 ### Monitor command
@@ -38,13 +38,14 @@
 
 - `cmd/download.go`: chapter-level concurrency capped by `maxConcurrentChapterProcesses` (10), with 2s pacing delay between non-skipped chapter jobs.
 - `cmd/monitor.go`: source-level concurrency capped by `maxConcurrentSourceProcesses` (10), driven by a ticker interval.
-- `internal/download/download.go`: image-level concurrency capped by `maxConcurrentImageDownloads` (10), each request with retry + jitter.
+- `internal/download/download.go`: image-level concurrency capped by `maxConcurrentImageDownloads` (10), each request using shared retry policy.
 
 ## Package Layout
 
 - `cmd/`: CLI commands and orchestration.
 - `internal/source/`: source adapters (scrape/API per site).
 - `internal/download/`: image fetch + decryption + retry behavior.
+- `internal/sharedhttp/`: shared HTTP transport, status-code handling, and retry policy configuration.
 - `internal/files/`: archive creation and image filtering logic.
 - `internal/config/`: config load/default/env/dynamic-reload.
 - `internal/browser/`: Rod browser manager for JS-heavy sources.
@@ -53,6 +54,12 @@
 - `internal/logger/`: zerolog + optional file log sink.
 - `internal/perf/`: optional pprof server.
 - `internal/domain/`: shared structs/interfaces.
+
+## HTTP Retry Policy
+
+- Attempts: 3 total (2 retries), delay `1s`, max jitter `250ms`.
+- Retryable failures: transport errors and `500/502/503/504`.
+- Fail-fast (no retry): `404/429/401/403/405` and other unexpected status codes.
 
 ## Data Contracts
 

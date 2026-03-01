@@ -125,7 +125,7 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return fmt.Errorf("executing request %s: %w", req.URL, err)
+			return err
 		}
 		defer resp.Body.Close()
 
@@ -138,9 +138,7 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 
 		return nil
 	},
-		retry.Delay(time.Second*3),
-		retry.Attempts(3),
-		retry.MaxJitter(time.Second*1),
+		sharedhttp.RetryOptions(ctx)...,
 	)
 	if retryErr != nil {
 		return domain.Manga{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
@@ -204,7 +202,7 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 		retryErr = retry.Do(func() error {
 			resp, err := sharedhttp.ExecRequest(*m.Client, req)
 			if err != nil {
-				return fmt.Errorf("executing request %s: %w", req.URL, err)
+				return err
 			}
 			defer resp.Body.Close()
 
@@ -217,9 +215,7 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 
 			return nil
 		},
-			retry.Delay(time.Second*3),
-			retry.Attempts(3),
-			retry.MaxJitter(time.Second*1),
+			sharedhttp.RetryOptions(ctx)...,
 		)
 		if retryErr != nil {
 			return fmt.Errorf("executing request %s: %w", req.URL, retryErr)
@@ -271,7 +267,7 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return fmt.Errorf("executing request %s: %w", req.URL, err)
+			return err
 		}
 		defer resp.Body.Close()
 
@@ -284,9 +280,7 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 
 		return nil
 	},
-		retry.Delay(time.Second*3),
-		retry.Attempts(3),
-		retry.MaxJitter(time.Second*1),
+		sharedhttp.RetryOptions(ctx)...,
 	)
 	if retryErr != nil {
 		return fmt.Errorf("executing request %s: %w", req.URL, retryErr)

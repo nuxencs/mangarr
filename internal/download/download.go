@@ -189,16 +189,12 @@ func fetchWithRetry(ctx context.Context, log zerolog.Logger, url string, onSucce
 
 		return onSuccess(&resp)
 	},
-		retry.Delay(time.Second*3),
-		retry.Attempts(3),
-		retry.MaxJitter(time.Second),
-		retry.OnRetry(func(n uint, err error) {
+		sharedhttp.RetryOptions(ctx, retry.OnRetry(func(n uint, err error) {
 			log.Warn().
 				Err(err).
 				Uint("attempt_failed", n+1).
 				Msg("Retrying image download")
-		}),
-		retry.Context(ctx),
+		}))...,
 	)
 }
 

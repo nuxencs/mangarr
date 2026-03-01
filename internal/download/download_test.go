@@ -11,7 +11,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
+
+	"mangarr/internal/sharedhttp"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -78,6 +81,48 @@ func TestDownloadImageDetectsTypeFromMagicBytes(t *testing.T) {
 
 	_, statErr := os.Stat(outBase + ".png")
 	require.NoError(t, statErr)
+}
+
+func TestDownloadImageRetriesTransientServerError(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte("retry-success")
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if attempts.Add(1) == 1 {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(payload)
+	}))
+	defer server.Close()
+
+	outBase := filepath.Join(t.TempDir(), "img")
+	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(outBase + ".png")
+	require.NoError(t, err)
+	require.Equal(t, payload, got)
+	require.Equal(t, int32(2), attempts.Load())
+}
+
+func TestDownloadImageStopsAfterThreeAttemptsOnPermanentFailure(t *testing.T) {
+	t.Parallel()
+
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts.Add(1)
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	outBase := filepath.Join(t.TempDir(), "img")
+	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	require.Error(t, err)
+	require.Equal(t, int32(sharedhttp.RetryAttempts), attempts.Load())
 }
 
 func xorBytes(data, key []byte) []byte {
