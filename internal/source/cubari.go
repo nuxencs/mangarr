@@ -1,7 +1,6 @@
 package source
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,15 +24,15 @@ type cubari struct {
 }
 
 type cubariResponse struct {
-	Cover       string `json:"cover"`
-	Description string `json:"description"`
-	Title       string `json:"title"`
-	Chapters    map[string]struct {
-		Groups      map[string][]string `json:"groups"`
-		LastUpdated int64               `json:"last_updated"`
-		Title       string              `json:"title"`
-		Volume      string              `json:"volume"`
-	} `json:"chapters"`
+	Cover       string                     `json:"cover"`
+	Description string                     `json:"description"`
+	Title       string                     `json:"title"`
+	Chapters    map[string]json.RawMessage `json:"chapters"`
+}
+
+type cubariChapter struct {
+	Title  string                     `json:"title"`
+	Groups map[string]json.RawMessage `json:"groups"`
 }
 
 func NewCubari(mangaURL, groupID string) domain.Source {
@@ -82,9 +81,7 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 		}
 		defer resp.Body.Close()
 
-		buf := bufio.NewReader(resp.Body)
-
-		err = json.NewDecoder(buf).Decode(&cubariResp)
+		err = json.NewDecoder(resp.Body).Decode(&cubariResp)
 		if err != nil {
 			return retry.Unrecoverable(fmt.Errorf("decoding response: %w", err))
 		}
@@ -116,20 +113,33 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 		}
 
 		chapterNum := float32(chapterNum64)
-		chapterTitle := c.getChapterName(chapter.Title)
+		var chapterData cubariChapter
+		if err := json.Unmarshal(chapter, &chapterData); err != nil {
+			return domain.Manga{}, fmt.Errorf("decoding chapter %s: %w", num, err)
+		}
 
-		if imageURLs, ok := chapter.Groups[c.GroupID]; ok {
-			var imageInfos []domain.ImageInfo
+		rawURLs, ok := chapterData.Groups[c.GroupID]
+		if !ok {
+			continue
+		}
 
-			for _, imageURL := range imageURLs {
-				imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
-			}
+		var imageURLs []string
+		if err := json.Unmarshal(rawURLs, &imageURLs); err != nil {
+			return domain.Manga{}, fmt.Errorf("decoding chapter %s image URLs for group %s: %w", num, c.GroupID, err)
+		}
+		if len(imageURLs) == 0 {
+			continue
+		}
 
-			manga.Chapters[chapterNum] = domain.Chapter{
-				Number:    chapterNum,
-				Title:     sanitize.Filename(chapterTitle),
-				ImageInfo: imageInfos,
-			}
+		imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
+		for _, imageURL := range imageURLs {
+			imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
+		}
+
+		manga.Chapters[chapterNum] = domain.Chapter{
+			Number:    chapterNum,
+			Title:     sanitize.Filename(c.getChapterName(chapterData.Title)),
+			ImageInfo: imageInfos,
 		}
 	}
 

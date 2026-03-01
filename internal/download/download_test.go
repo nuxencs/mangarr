@@ -1,0 +1,90 @@
+package download
+
+import (
+	"bytes"
+	"context"
+	"encoding/hex"
+	"image"
+	"image/color"
+	"image/png"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+)
+
+func TestDownloadImageStreamsBodyToDisk(t *testing.T) {
+	t.Parallel()
+
+	payload := []byte("stream-me-directly")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(payload)
+	}))
+	defer server.Close()
+
+	outBase := filepath.Join(t.TempDir(), "img")
+	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(outBase + ".png")
+	require.NoError(t, err)
+	require.Equal(t, payload, got)
+}
+
+func TestDownloadImageDecryptsWhileStreaming(t *testing.T) {
+	t.Parallel()
+
+	plain := []byte("decrypt-me-while-streaming")
+	key := []byte{0x12, 0x34, 0x56}
+	encrypted := xorBytes(plain, key)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write(encrypted)
+	}))
+	defer server.Close()
+
+	outBase := filepath.Join(t.TempDir(), "img")
+	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, hex.EncodeToString(key), outBase, 1, 1)
+	require.NoError(t, err)
+
+	got, err := os.ReadFile(outBase + ".jpg")
+	require.NoError(t, err)
+	require.Equal(t, plain, got)
+}
+
+func TestDownloadImageDetectsTypeFromMagicBytes(t *testing.T) {
+	t.Parallel()
+
+	var pngBytes bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.RGBA{R: 255, A: 255})
+	require.NoError(t, png.Encode(&pngBytes, img))
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = w.Write(pngBytes.Bytes())
+	}))
+	defer server.Close()
+
+	outBase := filepath.Join(t.TempDir(), "img")
+	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	require.NoError(t, err)
+
+	_, statErr := os.Stat(outBase + ".png")
+	require.NoError(t, statErr)
+}
+
+func xorBytes(data, key []byte) []byte {
+	out := make([]byte, len(data))
+	for i := range data {
+		out[i] = data[i] ^ key[i%len(key)]
+	}
+
+	return out
+}

@@ -2,11 +2,12 @@ package download
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	neturl "net/url"
 	"os"
@@ -78,32 +79,47 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 // file using the right extension that is inferred from the response headers or magic bytes.
 func downloadImage(ctx context.Context, log zerolog.Logger, imageURL, xorKeyHex, filenameNoExt string, imageIndex, imageTotal int) error {
 	var (
-		body        []byte
-		contentType string
-		filename    string
+		filename string
+		key      []byte
 	)
 
+	if xorKeyHex != "" {
+		decodedKey, err := hex.DecodeString(xorKeyHex)
+		if err != nil {
+			return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("decoding encryption key: %w", err))
+		}
+
+		key = decodedKey
+	}
+
 	if err := fetchWithRetry(ctx, log, imageURL, func(resp *http.Response) error {
-		var fetchErr error
-
-		contentType = resp.Header.Get("Content-Type")
-
-		// If we only need to save the stream, we could pipe directly, but for the
-		// XOR-decrypt branch we need everything in memory anyway, so always read
-		// into a buffer for simplicity.
-		body, fetchErr = io.ReadAll(bufio.NewReader(resp.Body))
-		if fetchErr != nil {
-			return fetchErr
+		reader := bufio.NewReader(resp.Body)
+		contentType, err := detectContentType(resp, reader)
+		if err != nil {
+			return err
 		}
 
-		// For application/octet-stream, detect the actual image type from magic bytes.
-		if contentType == "application/octet-stream" {
-			contentType = http.DetectContentType(body)
+		filename, err = appendImageExtension(contentType, filenameNoExt)
+		if err != nil {
+			return retry.Unrecoverable(err)
 		}
 
-		filename, fetchErr = appendImageExtension(contentType, filenameNoExt)
-		if fetchErr != nil {
-			return retry.Unrecoverable(fetchErr)
+		out, err := os.Create(filename)
+		if err != nil {
+			return fmt.Errorf("creating file %s: %w", filename, err)
+		}
+		defer out.Close()
+
+		var src io.Reader = reader
+		if len(key) > 0 {
+			src = &xorReader{
+				r:   reader,
+				key: key,
+			}
+		}
+
+		if _, err = io.Copy(out, src); err != nil {
+			return fmt.Errorf("writing file %s: %w", filename, err)
 		}
 
 		return nil
@@ -111,30 +127,44 @@ func downloadImage(ctx context.Context, log zerolog.Logger, imageURL, xorKeyHex,
 		return wrapImageError(imageIndex, imageTotal, imageURL, err)
 	}
 
-	// Decrypt if needed.
-	if xorKeyHex != "" {
-		key, err := hex.DecodeString(xorKeyHex)
-		if err != nil {
-			return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("decoding encryption key: %w", err))
-		}
-
-		for i := range body {
-			body[i] ^= key[i%len(key)]
-		}
-	}
-
-	out, err := os.Create(filename)
-	if err != nil {
-		return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("creating file %s: %w", filename, err))
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, bytes.NewReader(body))
-	if err != nil {
-		return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("writing file %s: %w", filename, err))
-	}
-
 	return nil
+}
+
+func detectContentType(resp *http.Response, reader *bufio.Reader) (string, error) {
+	contentType := resp.Header.Get("Content-Type")
+	if contentType != "" {
+		mediaType, _, err := mime.ParseMediaType(contentType)
+		if err == nil {
+			contentType = mediaType
+		}
+	}
+
+	if contentType != "" && contentType != "application/octet-stream" {
+		return contentType, nil
+	}
+
+	sniff, err := reader.Peek(512)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return "", err
+	}
+
+	return http.DetectContentType(sniff), nil
+}
+
+type xorReader struct {
+	r   io.Reader
+	key []byte
+	pos int
+}
+
+func (r *xorReader) Read(p []byte) (int, error) {
+	n, err := r.r.Read(p)
+	for i := range n {
+		p[i] ^= r.key[r.pos%len(r.key)]
+		r.pos++
+	}
+
+	return n, err
 }
 
 // fetchWithRetry executes the GET request with a common retry strategy and passes the successful response to onSuccess.

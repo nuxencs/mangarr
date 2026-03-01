@@ -13,7 +13,6 @@ import (
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 
-	"github.com/go-rod/rod"
 	"github.com/go-rod/stealth"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
@@ -155,9 +154,7 @@ func (m *mangapark) GetChapters(_ context.Context, manga domain.Manga) error {
 
 // GetImageURLs gets all image urls for a chapter
 func (m *mangapark) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
-	var imageInfos []domain.ImageInfo
-	var imageElements rod.Elements
-	var errors []error
+	var imageURLs []string
 
 	path, err := url.JoinPath(mangaparkURL, chapter.URL)
 	if err != nil {
@@ -169,34 +166,38 @@ func (m *mangapark) GetImageURLs(_ context.Context, chapter *domain.Chapter) err
 
 	pageWithTimeout := page.Timeout(browser.Timeout)
 
-	err = rod.Try(func() {
-		_ = pageWithTimeout.MustNavigate(path).WaitDOMStable(time.Second, 0)
+	if err := pageWithTimeout.Navigate(path); err != nil {
+		return fmt.Errorf("navigating to image page: %w", browser.HandleError(err))
+	}
 
-		imageElements = pageWithTimeout.MustElements("div[data-name='image-item'] img")
-	})
+	if err := pageWithTimeout.WaitLoad(); err != nil {
+		return fmt.Errorf("waiting for image page load: %w", browser.HandleError(err))
+	}
+
+	if err := pageWithTimeout.WaitElementsMoreThan("div[data-name='image-item'] img", 0); err != nil {
+		return fmt.Errorf("waiting for chapter images: %w", browser.HandleError(err))
+	}
+
+	raw, err := pageWithTimeout.Eval(`() => {
+		return Array.from(document.querySelectorAll("div[data-name='image-item'] img"))
+			.map((img) => img.getAttribute("src") ?? "")
+			.filter((src) => src !== "")
+	}`)
 	if err != nil {
-		return fmt.Errorf("opening image page: %w", browser.HandleError(err))
+		return fmt.Errorf("extracting chapter image URLs: %w", browser.HandleError(err))
 	}
 
-	for _, e := range imageElements {
-		imgURL, err := e.Attribute("src")
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting image URL: %w", err))
-		}
-
-		if imgURL == nil {
-			continue
-		}
-
-		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: *imgURL})
+	if err := raw.Value.Unmarshal(&imageURLs); err != nil {
+		return fmt.Errorf("decoding chapter image URLs: %w", err)
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
-	}
-
-	if len(imageInfos) == 0 {
+	if len(imageURLs) == 0 {
 		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
+	}
+
+	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
+	for _, imageURL := range imageURLs {
+		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
 	}
 
 	chapter.ImageInfo = imageInfos

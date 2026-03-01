@@ -21,6 +21,18 @@ namingTemplate: "{manga:<.>} Ch. {num:3}{title: - <.>}"
 #
 checkInterval: 15
 
+# Enable pprof endpoint for runtime profiling
+#
+# Default: false
+#
+pprofEnabled: false
+
+# pprof endpoint address
+#
+# Default: "127.0.0.1:6060"
+#
+pprofAddress: "127.0.0.1:6060"
+
 # Monitored Manga
 # Here you can define which manga you want to monitor
 #

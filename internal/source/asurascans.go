@@ -6,13 +6,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 
-	"github.com/go-rod/rod"
 	"github.com/go-rod/stealth"
 )
 
@@ -21,6 +19,18 @@ const asurascansURL = "https://asuracomic.net/series/"
 type asurascans struct {
 	MangaURL string
 	Browser  *browser.Manager
+}
+
+type asurascansPageData struct {
+	Title    string                    `json:"title"`
+	Chapters []asurascansChapterRecord `json:"chapters"`
+}
+
+type asurascansChapterRecord struct {
+	ChapterLine  string `json:"chapterLine"`
+	ChapterTitle string `json:"chapterTitle"`
+	URL          string `json:"url"`
+	EarlyAccess  bool   `json:"earlyAccess"`
 }
 
 func NewAsurascans(mangaURL string, bm *browser.Manager) domain.Source {
@@ -47,8 +57,6 @@ func (a *asurascans) ValidateInput() error {
 }
 
 func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
-	var errors []error
-
 	manga := domain.Manga{
 		Chapters: make(map[float32]domain.Chapter),
 		IsManhwa: true,
@@ -58,85 +66,61 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	defer page.MustClose()
 
 	pageWithTimeout := page.Timeout(browser.Timeout)
+	var pageData asurascansPageData
 
-	err := rod.Try(func() {
-		_ = pageWithTimeout.MustNavigate(a.MangaURL).WaitDOMStable(time.Second, 1)
-
-		titleElement := pageWithTimeout.MustElement(".font-bold.pb-3\\.5")
-		manga.Title = sanitize.Filename(strings.TrimPrefix(titleElement.MustText(), "Chapter "))
-	})
-	if err != nil {
-		return domain.Manga{}, fmt.Errorf("opening manga page: %w", browser.HandleError(err))
+	if err := pageWithTimeout.Navigate(a.MangaURL); err != nil {
+		return domain.Manga{}, fmt.Errorf("navigating to manga page: %w", browser.HandleError(err))
 	}
 
-	chapterElements, err := pageWithTimeout.Elements(".pl-4.py-2")
-	if err != nil {
-		return domain.Manga{}, fmt.Errorf("finding chapter elements: %w", err)
+	if err := pageWithTimeout.WaitLoad(); err != nil {
+		return domain.Manga{}, fmt.Errorf("waiting for manga page load: %w", browser.HandleError(err))
 	}
 
-	for _, e := range chapterElements {
-		// skip early access chapters as they are only available to ASURA+ Premium members
-		isEarlyAccess, _, err := e.Has("svg")
-		if err != nil {
-			errors = append(errors, fmt.Errorf("determine if chapter is early access: %w", err))
-			continue
-		}
-		if isEarlyAccess {
+	if err := pageWithTimeout.WaitElementsMoreThan(".pl-4.py-2", 0); err != nil {
+		return domain.Manga{}, fmt.Errorf("waiting for manga chapter list: %w", browser.HandleError(err))
+	}
+
+	raw, err := pageWithTimeout.Eval(`() => {
+		const title = document.querySelector('.font-bold.pb-3\\.5')?.textContent ?? ''
+		const chapters = Array.from(document.querySelectorAll('.pl-4.py-2')).map((el) => {
+			const chapterEl = el.querySelector('.flex')
+			const chapterTitleEl = chapterEl?.querySelector('span')
+			const linkEl = el.querySelector('a')
+			return {
+				chapterLine: chapterEl?.textContent?.trim() ?? '',
+				chapterTitle: chapterTitleEl?.textContent?.trim() ?? '',
+				url: linkEl?.getAttribute('href') ?? '',
+				earlyAccess: Boolean(el.querySelector('svg')),
+			}
+		})
+
+		return { title, chapters }
+	}`)
+	if err != nil {
+		return domain.Manga{}, fmt.Errorf("extracting manga page data: %w", browser.HandleError(err))
+	}
+
+	if err := raw.Value.Unmarshal(&pageData); err != nil {
+		return domain.Manga{}, fmt.Errorf("decoding manga page data: %w", err)
+	}
+
+	manga.Title = sanitize.Filename(strings.TrimPrefix(pageData.Title, "Chapter "))
+	for _, chapter := range pageData.Chapters {
+		// skip early access chapters, they are only available to ASURA+ Premium members
+		if chapter.EarlyAccess || chapter.URL == "" {
 			continue
 		}
 
-		chapterElement, err := e.Element(".flex")
+		chapterNum, err := a.separateChapterNum(chapter.ChapterLine, chapter.ChapterTitle)
 		if err != nil {
-			errors = append(errors, fmt.Errorf("getting chapter element from URL %s: %w", a.MangaURL, err))
-			continue
-		}
-
-		chapterTitleElement, err := chapterElement.Element("span")
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting chapter title element from URL %s: %w", a.MangaURL, err))
-			continue
-		}
-
-		chapterLine, err := chapterElement.Text()
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting chapter line from URL %s: %w", a.MangaURL, err))
-			continue
-		}
-
-		chapterTitleLine, err := chapterTitleElement.Text()
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting chapter line from URL %s: %w", a.MangaURL, err))
-			continue
-		}
-
-		linkElement, err := e.Element("a")
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting link element from URL %s: %w", a.MangaURL, err))
-			continue
-		}
-
-		link, err := linkElement.Attribute("href")
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting link from URL %s: %w", a.MangaURL, err))
-			continue
-		}
-		chapterURL := *link
-
-		chapterNum, err := a.separateChapterNum(chapterLine, chapterTitleLine)
-		if err != nil {
-			errors = append(errors, fmt.Errorf("splitting chapter info %s: %w", chapterLine, err))
 			continue
 		}
 
 		manga.Chapters[chapterNum] = domain.Chapter{
-			URL:    chapterURL,
+			URL:    chapter.URL,
 			Number: chapterNum,
-			Title:  sanitize.Filename(chapterTitleLine),
+			Title:  sanitize.Filename(chapter.ChapterTitle),
 		}
-	}
-
-	if len(errors) > 0 {
-		return domain.Manga{}, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
 	}
 
 	if len(manga.Title) == 0 {
@@ -155,46 +139,45 @@ func (a *asurascans) GetChapters(_ context.Context, _ domain.Manga) error {
 }
 
 func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
-	var imageInfos []domain.ImageInfo
-	var imageElements rod.Elements
-	var errors []error
+	var imageURLs []string
 
 	page := stealth.MustPage(a.Browser.Get())
 	defer page.MustClose()
 
 	pageWithTimeout := page.Timeout(browser.Timeout)
 
-	err := rod.Try(func() {
-		_ = pageWithTimeout.MustNavigate(asurascansURL+chapter.URL).WaitDOMStable(time.Second, 1)
+	if err := pageWithTimeout.Navigate(asurascansURL + chapter.URL); err != nil {
+		return fmt.Errorf("navigating to chapter page: %w", browser.HandleError(err))
+	}
 
-		imageElements = pageWithTimeout.MustElements(".w-full.mx-auto img")
-	})
+	if err := pageWithTimeout.WaitLoad(); err != nil {
+		return fmt.Errorf("waiting for chapter page load: %w", browser.HandleError(err))
+	}
+
+	if err := pageWithTimeout.WaitElementsMoreThan(".w-full.mx-auto img", 0); err != nil {
+		return fmt.Errorf("waiting for chapter images: %w", browser.HandleError(err))
+	}
+
+	raw, err := pageWithTimeout.Eval(`() => {
+		return Array.from(document.querySelectorAll('.w-full.mx-auto img'))
+			.map((img) => img.getAttribute('src') ?? '')
+			.filter((src) => src.startsWith('https://gg.asuracomic.net'))
+	}`)
 	if err != nil {
-		return fmt.Errorf("opening image page: %w", browser.HandleError(err))
+		return fmt.Errorf("extracting chapter image URLs: %w", browser.HandleError(err))
 	}
 
-	for _, e := range imageElements {
-		imgURL, err := e.Attribute("src")
-		if err != nil {
-			errors = append(errors, fmt.Errorf("getting image URL: %w", err))
-		}
-
-		if imgURL == nil {
-			continue
-		}
-
-		// skip images that are not hosted on https://gg.asuracomic.net
-		if strings.HasPrefix(*imgURL, "https://gg.asuracomic.net") {
-			imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: *imgURL})
-		}
+	if err := raw.Value.Unmarshal(&imageURLs); err != nil {
+		return fmt.Errorf("decoding chapter image URLs: %w", err)
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
-	}
-
-	if len(imageInfos) == 0 {
+	if len(imageURLs) == 0 {
 		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
+	}
+
+	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
+	for _, imageURL := range imageURLs {
+		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
 	}
 
 	chapter.ImageInfo = imageInfos
