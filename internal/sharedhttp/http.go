@@ -39,19 +39,19 @@ func CheckStatusCode(statusCode int) error {
 		return retry.Unrecoverable(fmt.Errorf("too many requests: status code %d", statusCode))
 
 	case http.StatusUnauthorized, http.StatusForbidden:
-		return retry.Unrecoverable(fmt.Errorf("unrecoverable error: status code %d", statusCode))
+		return retry.Unrecoverable(fmt.Errorf("authentication error: status code %d", statusCode))
 
 	case http.StatusMethodNotAllowed:
 		return retry.Unrecoverable(fmt.Errorf("method not allowed: status code %d", statusCode))
 
 	case http.StatusNotFound:
-		return ErrNotFound
+		return retry.Unrecoverable(ErrNotFound)
 
 	case http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusInternalServerError:
-		return fmt.Errorf("server error encountered: status code %d - retrying", statusCode)
+		return fmt.Errorf("server error encountered: status code %d", statusCode)
 
 	default:
-		return retry.Unrecoverable(fmt.Errorf("unexpected error: status code %d", statusCode))
+		return retry.Unrecoverable(fmt.Errorf("unexpected status code: %d", statusCode))
 	}
 
 	return nil
@@ -65,6 +65,10 @@ func ExecRequest(client http.Client, req *http.Request) (http.Response, error) {
 
 	if err := CheckStatusCode(resp.StatusCode); err != nil {
 		_ = resp.Body.Close()
+		if !retry.IsRecoverable(err) {
+			return http.Response{}, err
+		}
+
 		return http.Response{}, fmt.Errorf("checking status code: %w", err)
 	}
 

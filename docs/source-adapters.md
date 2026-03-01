@@ -32,3 +32,9 @@ Adapters live in `internal/source/` and all implement `domain.Source`.
 - Some adapters mark manga as long-strip/manhwa (`IsManhwa = true`).
 - Archive builder uses this flag to skip likely non-page assets (wide images).
 
+## Shared HTTP Retry Policy
+
+- Applies to source adapter requests and image downloads.
+- Attempts: 3 total (2 retries), delay `1s`, max jitter `250ms`.
+- Retries only transient failures: transport errors and `500/502/503/504`.
+- Fails fast for `404/429/401/403/405` and other unexpected status codes.

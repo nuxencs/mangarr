@@ -161,7 +161,7 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobu
 	retryErr := retry.Do(func() error {
 		resp, err := sharedhttp.ExecRequest(*m.Client, req)
 		if err != nil {
-			return fmt.Errorf("executing request %s: %w", req.URL, err)
+			return err
 		}
 		defer resp.Body.Close()
 
@@ -176,9 +176,7 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobu
 
 		return nil
 	},
-		retry.Delay(time.Second*3),
-		retry.Attempts(3),
-		retry.MaxJitter(time.Second*1),
+		sharedhttp.RetryOptions(ctx)...,
 	)
 	if retryErr != nil {
 		return &protobuf.Response{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
