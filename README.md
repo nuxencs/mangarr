@@ -54,6 +54,14 @@ docker pull ghcr.io/nuxencs/mangarr:latest
 
 Or use Docker Compose - see the [Docker Compose Setup](#docker-compose-setup) section.
 
+## Developer Docs
+
+Maintainer-oriented docs live in [`docs/`](./docs/README.md):
+
+- [Architecture](./docs/architecture.md)
+- [Development](./docs/development.md)
+- [Source Adapters](./docs/source-adapters.md)
+
 ## Usage
 
 ### Quick Start - Download Command
