@@ -392,10 +392,10 @@ func (c *AppConfig) UpdateConfig() error {
 func (c *AppConfig) processLines(lines []string) []string {
 	// keep track of not found values to append at the bottom
 	var (
-		foundLineLogLevel          = false
-		foundLineLogPath           = false
-		foundLinePprofEnabled      = false
-		foundLinePprofAddress      = false
+		foundLineLogLevel     = false
+		foundLineLogPath      = false
+		foundLinePprofEnabled = false
+		foundLinePprofAddress = false
 	)
 
 	for i, line := range lines {
