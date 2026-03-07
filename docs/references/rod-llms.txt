@@ -1,0 +1,5 @@
+Rod references for mangarr agents.
+
+- Browser-backed sources are operationally expensive; use Rod only where static HTTP is insufficient.
+- Share browser lifecycle through `internal/browser/`.
+- Document runtime/browser requirements when touching adapter behavior.

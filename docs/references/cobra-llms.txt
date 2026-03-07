@@ -1,0 +1,5 @@
+Cobra references for mangarr agents.
+
+- Use Cobra patterns already present in `cmd/`.
+- Keep command wiring explicit; avoid magical flag indirection.
+- Update help text and README examples together when CLI flags change.

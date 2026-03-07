@@ -1,0 +1,5 @@
+GitHub Actions references for mangarr agents.
+
+- Current CI ignores markdown-only changes; document that limitation when discussing repo health.
+- Build and Docker publishing are the primary automated release surfaces.
+- If adding doc governance checks later, keep them fast and repo-specific.
