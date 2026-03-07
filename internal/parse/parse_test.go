@@ -8,38 +8,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestChapterSelection(t *testing.T) {
-	// Create a test fixture with available chapters
-	availableChapters := map[float32]domain.Chapter{
-		1.0:  {},
-		1.5:  {},
-		2.0:  {},
-		3.0:  {},
-		4.0:  {},
-		5.0:  {},
-		10.0: {},
-		10.5: {},
+func chapterNumber(input string) domain.ChapterNumber {
+	return domain.MustParseChapterNumber(input)
+}
+
+func chapterMap(inputs ...string) map[domain.ChapterNumber]domain.Chapter {
+	chapters := make(map[domain.ChapterNumber]domain.Chapter, len(inputs))
+	for _, input := range inputs {
+		number := chapterNumber(input)
+		chapters[number] = domain.Chapter{Number: number}
 	}
+
+	return chapters
+}
+
+func TestChapterSelection(t *testing.T) {
+	availableChapters := chapterMap("1", "1.5", "2", "3", "4", "5", "10", "10.5", "1.01", "1.1")
 
 	type args struct {
 		input     string
-		available map[float32]domain.Chapter
+		available map[domain.ChapterNumber]domain.Chapter
 	}
+
 	tests := []struct {
 		name    string
 		args    args
-		want    []float32
+		want    []domain.ChapterNumber
 		wantErr bool
 	}{
-		// Single chapter inputs
 		{
 			name: "single_chapter",
 			args: args{
 				input:     "3.0",
 				available: availableChapters,
 			},
-			want:    []float32{3.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("3")},
 		},
 		{
 			name: "single_chapter_with_decimal",
@@ -47,8 +50,7 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.5",
 				available: availableChapters,
 			},
-			want:    []float32{1.5},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("1.5")},
 		},
 		{
 			name: "multiple_single_chapters",
@@ -56,19 +58,15 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0,3.0,5.0",
 				available: availableChapters,
 			},
-			want:    []float32{1.0, 3.0, 5.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("1"), chapterNumber("3"), chapterNumber("5")},
 		},
-
-		// Range inputs
 		{
 			name: "simple_range",
 			args: args{
 				input:     "2.0-4.0",
 				available: availableChapters,
 			},
-			want:    []float32{2.0, 3.0, 4.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("2"), chapterNumber("3"), chapterNumber("4")},
 		},
 		{
 			name: "range_with_decimal",
@@ -76,8 +74,13 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0-2.0",
 				available: availableChapters,
 			},
-			want:    []float32{1.0, 1.5, 2.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{
+				chapterNumber("1"),
+				chapterNumber("1.01"),
+				chapterNumber("1.1"),
+				chapterNumber("1.5"),
+				chapterNumber("2"),
+			},
 		},
 		{
 			name: "range_including_unavailable_chapters",
@@ -85,19 +88,15 @@ func TestChapterSelection(t *testing.T) {
 				input:     "4.0-7.0",
 				available: availableChapters,
 			},
-			want:    []float32{4.0, 5.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("4"), chapterNumber("5")},
 		},
-
-		// Mixed inputs
 		{
 			name: "single_chapters_and_range",
 			args: args{
 				input:     "1.0,3.0-5.0",
 				available: availableChapters,
 			},
-			want:    []float32{1.0, 3.0, 4.0, 5.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("1"), chapterNumber("3"), chapterNumber("4"), chapterNumber("5")},
 		},
 		{
 			name: "multiple_ranges",
@@ -105,8 +104,15 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0-2.0,4.0-5.0",
 				available: availableChapters,
 			},
-			want:    []float32{1.0, 1.5, 2.0, 4.0, 5.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{
+				chapterNumber("1"),
+				chapterNumber("1.01"),
+				chapterNumber("1.1"),
+				chapterNumber("1.5"),
+				chapterNumber("2"),
+				chapterNumber("4"),
+				chapterNumber("5"),
+			},
 		},
 		{
 			name: "complex_mix_with_whitespace",
@@ -114,19 +120,15 @@ func TestChapterSelection(t *testing.T) {
 				input:     " 1.0, 3.0 - 4.0 , 10.0-10.5",
 				available: availableChapters,
 			},
-			want:    []float32{1.0, 3.0, 4.0, 10.0, 10.5},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("1"), chapterNumber("3"), chapterNumber("4"), chapterNumber("10"), chapterNumber("10.5")},
 		},
-
-		// Edge cases
 		{
 			name: "empty_input",
 			args: args{
 				input:     "",
 				available: availableChapters,
 			},
-			want:    []float32{},
-			wantErr: false,
+			want: []domain.ChapterNumber{},
 		},
 		{
 			name: "only_whitespace",
@@ -134,8 +136,7 @@ func TestChapterSelection(t *testing.T) {
 				input:     "   ",
 				available: availableChapters,
 			},
-			want:    []float32{},
-			wantErr: false,
+			want: []domain.ChapterNumber{},
 		},
 		{
 			name: "empty_segments",
@@ -143,8 +144,7 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0,,3.0",
 				available: availableChapters,
 			},
-			want:    []float32{1.0, 3.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("1"), chapterNumber("3")},
 		},
 		{
 			name: "duplicates",
@@ -152,27 +152,22 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0,1.0,2.0-3.0,3.0",
 				available: availableChapters,
 			},
-			want:    []float32{1.0, 2.0, 3.0},
-			wantErr: false,
+			want: []domain.ChapterNumber{chapterNumber("1"), chapterNumber("2"), chapterNumber("3")},
 		},
 		{
 			name: "empty_available_chapters",
 			args: args{
 				input:     "1.0-5.0",
-				available: map[float32]domain.Chapter{},
+				available: map[domain.ChapterNumber]domain.Chapter{},
 			},
-			want:    []float32{},
-			wantErr: false,
+			want: []domain.ChapterNumber{},
 		},
-
-		// Error cases
 		{
 			name: "invalid_chapter_format",
 			args: args{
 				input:     "abc",
 				available: availableChapters,
 			},
-			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -181,7 +176,6 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0-2.0-3.0",
 				available: availableChapters,
 			},
-			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -190,7 +184,6 @@ func TestChapterSelection(t *testing.T) {
 				input:     "abc-2.0",
 				available: availableChapters,
 			},
-			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -199,7 +192,6 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0-xyz",
 				available: availableChapters,
 			},
-			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -208,7 +200,6 @@ func TestChapterSelection(t *testing.T) {
 				input:     "5.0-1.0",
 				available: availableChapters,
 			},
-			want:    nil,
 			wantErr: true,
 		},
 		{
@@ -217,7 +208,6 @@ func TestChapterSelection(t *testing.T) {
 				input:     "1.0,abc,3.0",
 				available: availableChapters,
 			},
-			want:    nil,
 			wantErr: true,
 		},
 	}
@@ -227,10 +217,11 @@ func TestChapterSelection(t *testing.T) {
 			got, err := ChapterSelection(tt.args.input, tt.args.available)
 			if tt.wantErr {
 				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				return
 			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -239,31 +230,28 @@ func TestParseRange(t *testing.T) {
 	tests := []struct {
 		name       string
 		input      string
-		wantStart  float32
-		wantEnd    float32
+		wantStart  domain.ChapterNumber
+		wantEnd    domain.ChapterNumber
 		wantErr    bool
 		errMessage string
 	}{
 		{
 			name:      "simple_range",
 			input:     "1-3",
-			wantStart: 1.0,
-			wantEnd:   3.0,
-			wantErr:   false,
+			wantStart: chapterNumber("1"),
+			wantEnd:   chapterNumber("3"),
 		},
 		{
 			name:      "range_with_decimals",
 			input:     "1.5-3.7",
-			wantStart: 1.5,
-			wantEnd:   3.7,
-			wantErr:   false,
+			wantStart: chapterNumber("1.5"),
+			wantEnd:   chapterNumber("3.7"),
 		},
 		{
 			name:      "range_with_whitespace",
 			input:     " 1 - 3 ",
-			wantStart: 1.0,
-			wantEnd:   3.0,
-			wantErr:   false,
+			wantStart: chapterNumber("1"),
+			wantEnd:   chapterNumber("3"),
 		},
 		{
 			name:       "invalid_range_format",
@@ -300,11 +288,12 @@ func TestParseRange(t *testing.T) {
 				if tt.errMessage != "" {
 					assert.Contains(t, err.Error(), tt.errMessage)
 				}
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.wantStart, start)
-				assert.Equal(t, tt.wantEnd, end)
+				return
 			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantStart, start)
+			assert.Equal(t, tt.wantEnd, end)
 		})
 	}
 }
@@ -313,27 +302,24 @@ func TestParseChapter(t *testing.T) {
 	tests := []struct {
 		name      string
 		input     string
-		want      float32
+		want      domain.ChapterNumber
 		wantErr   bool
 		errPrefix string
 	}{
 		{
-			name:    "integer",
-			input:   "5",
-			want:    5.0,
-			wantErr: false,
+			name:  "integer",
+			input: "5",
+			want:  chapterNumber("5"),
 		},
 		{
-			name:    "decimal",
-			input:   "3.5",
-			want:    3.5,
-			wantErr: false,
+			name:  "decimal",
+			input: "3.5",
+			want:  chapterNumber("3.5"),
 		},
 		{
-			name:    "with_whitespace",
-			input:   " 2.5 ",
-			want:    2.5,
-			wantErr: false,
+			name:  "with_whitespace",
+			input: " 2.5 ",
+			want:  chapterNumber("2.5"),
 		},
 		{
 			name:      "non_numeric_input",
@@ -358,18 +344,26 @@ func TestParseChapter(t *testing.T) {
 				if tt.errPrefix != "" {
 					assert.Contains(t, err.Error(), tt.errPrefix)
 				}
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.want, got)
+				return
 			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestMinMaxChapterNumbers(t *testing.T) {
+	min, max, err := MinMaxChapterNumbers(chapterMap("10.5", "1", "1.01", "5"))
+	assert.NoError(t, err)
+	assert.Equal(t, chapterNumber("1"), min)
+	assert.Equal(t, chapterNumber("10.5"), max)
 }
 
 func TestFormatChapterList(t *testing.T) {
 	cases := []struct {
 		name     string
-		chapters []float32
+		chapters []domain.ChapterNumber
 		expected string
 	}{
 		{
@@ -379,38 +373,50 @@ func TestFormatChapterList(t *testing.T) {
 		},
 		{
 			name:     "single entry",
-			chapters: []float32{3},
+			chapters: []domain.ChapterNumber{chapterNumber("3")},
 			expected: "3",
 		},
 		{
 			name:     "unordered list",
-			chapters: []float32{5, 1, 3},
+			chapters: []domain.ChapterNumber{chapterNumber("5"), chapterNumber("1"), chapterNumber("3")},
 			expected: "1, 3, 5",
 		},
 		{
-			name:     "decimal chapters",
-			chapters: []float32{1.5, 1, 2, 3.5, 3},
+			name: "decimal chapters",
+			chapters: []domain.ChapterNumber{
+				chapterNumber("1.5"),
+				chapterNumber("1"),
+				chapterNumber("2"),
+				chapterNumber("3.5"),
+				chapterNumber("3"),
+			},
 			expected: "1, 1.5, 2-3, 3.5",
 		},
 		{
-			name:     "duplicates",
-			chapters: []float32{1, 1, 2, 3, 3},
+			name: "duplicates",
+			chapters: []domain.ChapterNumber{
+				chapterNumber("1"),
+				chapterNumber("1"),
+				chapterNumber("2"),
+				chapterNumber("3"),
+				chapterNumber("3"),
+			},
 			expected: "1-3",
 		},
 		{
 			name:     "non consecutive",
-			chapters: []float32{1, 3, 5},
+			chapters: []domain.ChapterNumber{chapterNumber("1"), chapterNumber("3"), chapterNumber("5")},
 			expected: "1, 3, 5",
 		},
 		{
 			name:     "single gaps",
-			chapters: []float32{1, 2, 4, 5, 7},
+			chapters: []domain.ChapterNumber{chapterNumber("1"), chapterNumber("2"), chapterNumber("4"), chapterNumber("5"), chapterNumber("7")},
 			expected: "1-2, 4-5, 7",
 		},
 		{
-			name:     "floats with epsilon",
-			chapters: []float32{1.00001, 2.00001, 3.00001},
-			expected: "1.00001-3.00001",
+			name:     "decimal ordering preserves scale",
+			chapters: []domain.ChapterNumber{chapterNumber("1.1"), chapterNumber("1.01"), chapterNumber("2")},
+			expected: "1.01, 1.1, 2",
 		},
 	}
 

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -81,7 +80,7 @@ func (m *mangaplus) GetManga(ctx context.Context) (domain.Manga, error) {
 	}
 
 	chaptersGroup := protoResp.GetSuccess().GetTitleDetailView().GetChapterListGroup()
-	c := make(map[float32]domain.Chapter)
+	c := make(map[domain.ChapterNumber]domain.Chapter)
 
 	for _, chapters := range chaptersGroup {
 		err := m.addChapters(c, chapters.GetFirstChapterList(), chapters.GetLastChapterList())
@@ -185,7 +184,7 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, path string) (*protobu
 	return &protoResp, nil
 }
 
-func (m *mangaplus) addChapters(chapters map[float32]domain.Chapter, chapterLists ...[]*protobuf.Chapter) error {
+func (m *mangaplus) addChapters(chapters map[domain.ChapterNumber]domain.Chapter, chapterLists ...[]*protobuf.Chapter) error {
 	for _, chapterList := range chapterLists {
 		for _, chapter := range chapterList {
 			chapterName := chapter.GetName()
@@ -197,14 +196,14 @@ func (m *mangaplus) addChapters(chapters map[float32]domain.Chapter, chapterList
 
 			name := strings.Trim(chapterName, "#")
 
-			number, err := strconv.ParseFloat(name, 32)
+			number, err := domain.ParseChapterNumber(name)
 			if err != nil {
 				return fmt.Errorf("parsing chapter number from %s: %w", name, err)
 			}
 
-			chapters[float32(number)] = domain.Chapter{
+			chapters[number] = domain.Chapter{
 				ID:     fmt.Sprintf("%d", chapter.GetChapterId()),
-				Number: float32(number),
+				Number: number,
 				Title:  chapter.GetSubTitle(),
 			}
 		}

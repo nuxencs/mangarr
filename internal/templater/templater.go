@@ -1,13 +1,11 @@
 package templater
 
 import (
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"mangarr/internal/domain"
-	"mangarr/internal/utils"
 )
 
 var templatePattern = regexp.MustCompile(`{((\w+?)(:.*?)?)}`)
@@ -26,11 +24,11 @@ func New(manga domain.Manga, chapter domain.Chapter) *Templater {
 
 func (t *Templater) handleNum(options string) string {
 	if options == "" {
-		return fmt.Sprintf("%g", t.Chapter.Number)
+		return t.Chapter.Number.String()
 	}
 
 	length, _ := strconv.ParseInt(strings.ReplaceAll(options, ":", ""), 10, 32)
-	return utils.PadFloat(t.Chapter.Number, int(length))
+	return t.Chapter.Number.Pad(int(length))
 }
 
 func (t *Templater) handleMangaTitle(options string) string {

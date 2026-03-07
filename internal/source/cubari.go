@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -101,16 +100,14 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 
 	manga := domain.Manga{
 		Title:    sanitize.Filename(title),
-		Chapters: make(map[float32]domain.Chapter),
+		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 	}
 
 	for num, chapter := range cubariResp.Chapters {
-		chapterNum64, err := strconv.ParseFloat(num, 32)
+		chapterNum, err := domain.ParseChapterNumber(num)
 		if err != nil {
 			return domain.Manga{}, fmt.Errorf("parsing chapter number from %s: %w", num, err)
 		}
-
-		chapterNum := float32(chapterNum64)
 		var chapterData cubariChapter
 		if err := json.Unmarshal(chapter, &chapterData); err != nil {
 			return domain.Manga{}, fmt.Errorf("decoding chapter %s: %w", num, err)

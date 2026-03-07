@@ -90,16 +90,16 @@ type comixChaptersResponse struct {
 type comixChapterResponse struct {
 	Status int `json:"status"`
 	Result struct {
-		ChapterID         int     `json:"chapter_id"`
-		MangaID           int     `json:"manga_id"`
-		ScanlationGroupID int     `json:"scanlation_group_id"`
-		Number            float32 `json:"number"`
-		Name              string  `json:"name"`
-		Language          string  `json:"language"`
-		Volume            int     `json:"volume"`
-		Votes             int     `json:"votes"`
-		CreatedAt         int     `json:"created_at"`
-		UpdatedAt         int     `json:"updated_at"`
+		ChapterID         int                  `json:"chapter_id"`
+		MangaID           int                  `json:"manga_id"`
+		ScanlationGroupID int                  `json:"scanlation_group_id"`
+		Number            domain.ChapterNumber `json:"number"`
+		Name              string               `json:"name"`
+		Language          string               `json:"language"`
+		Volume            int                  `json:"volume"`
+		Votes             int                  `json:"votes"`
+		CreatedAt         int                  `json:"created_at"`
+		UpdatedAt         int                  `json:"updated_at"`
 		ScanlationGroup   struct {
 			ScanlationGroupID int    `json:"scanlation_group_id"`
 			Name              string `json:"name"`
@@ -112,16 +112,16 @@ type comixChapterResponse struct {
 }
 
 type comixChapter struct {
-	ChapterID         int     `json:"chapter_id"`
-	MangaID           int     `json:"manga_id"`
-	ScanlationGroupID int     `json:"scanlation_group_id"`
-	Number            float32 `json:"number"`
-	Name              string  `json:"name"`
-	Language          string  `json:"language"`
-	Volume            int     `json:"volume"`
-	Votes             int     `json:"votes"`
-	CreatedAt         int     `json:"created_at"`
-	UpdatedAt         int     `json:"updated_at"`
+	ChapterID         int                  `json:"chapter_id"`
+	MangaID           int                  `json:"manga_id"`
+	ScanlationGroupID int                  `json:"scanlation_group_id"`
+	Number            domain.ChapterNumber `json:"number"`
+	Name              string               `json:"name"`
+	Language          string               `json:"language"`
+	Volume            int                  `json:"volume"`
+	Votes             int                  `json:"votes"`
+	CreatedAt         int                  `json:"created_at"`
+	UpdatedAt         int                  `json:"updated_at"`
 	ScanlationGroup   struct {
 		ScanlationGroupID int    `json:"scanlation_group_id"`
 		Name              string `json:"name"`
@@ -217,7 +217,7 @@ func (c *comix) GetManga(ctx context.Context) (domain.Manga, error) {
 	manga = domain.Manga{
 		ID:       mangaID,
 		Title:    sanitize.Filename(mangaResp.Result.Title),
-		Chapters: make(map[float32]domain.Chapter),
+		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 	}
 
 	return manga, nil
@@ -241,7 +241,7 @@ func (c *comix) GetChapters(ctx context.Context, manga domain.Manga) error {
 		return fmt.Errorf("parsing URL %s: %w", path, err)
 	}
 
-	processedChapters := make(map[float32]bool)
+	processedChapters := make(map[domain.ChapterNumber]bool)
 
 	for {
 		params := url.Values{

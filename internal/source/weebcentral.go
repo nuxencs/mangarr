@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -78,7 +77,7 @@ func (w *weebcentral) GetManga(_ context.Context) (domain.Manga, error) {
 	c.OnHTML("h1.hidden", func(e *colly.HTMLElement) {
 		manga = domain.Manga{
 			Title:    sanitize.Filename(e.Text),
-			Chapters: make(map[float32]domain.Chapter),
+			Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 		}
 	})
 
@@ -174,7 +173,7 @@ func (w *weebcentral) GetImageURLs(_ context.Context, chapter *domain.Chapter) e
 	}
 
 	if len(imageURLs) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
+		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
 	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
@@ -187,18 +186,18 @@ func (w *weebcentral) GetImageURLs(_ context.Context, chapter *domain.Chapter) e
 }
 
 // getChapterNumber gets the chapter number from the scraped chapter name
-func (w *weebcentral) getChapterNumber(name string) (float32, error) {
+func (w *weebcentral) getChapterNumber(name string) (domain.ChapterNumber, error) {
 	// FindSubmatch returns an array where the first element is the full match, and the rest are submatches.
 	matches := weebcentralChapterNumberPattern.FindStringSubmatch(name)
 
 	if len(matches) <= 1 {
-		return 0, fmt.Errorf("finding matches in %s", name)
+		return domain.ChapterNumber{}, fmt.Errorf("finding matches in %s", name)
 	}
 
-	number, err := strconv.ParseFloat(matches[1], 32)
+	number, err := domain.ParseChapterNumber(matches[1])
 	if err != nil {
-		return 0, fmt.Errorf("parsing chapter number from %s: %w", name, err)
+		return domain.ChapterNumber{}, fmt.Errorf("parsing chapter number from %s: %w", name, err)
 	}
 
-	return float32(number), nil
+	return number, nil
 }

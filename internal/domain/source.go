@@ -16,14 +16,14 @@ type Manga struct {
 	ID       string
 	URL      string
 	Title    string
-	Chapters map[float32]Chapter
+	Chapters map[ChapterNumber]Chapter
 	IsManhwa bool
 }
 
 type Chapter struct {
 	ID        string
 	URL       string
-	Number    float32
+	Number    ChapterNumber
 	Title     string
 	ImageInfo []ImageInfo
 }
