@@ -5,13 +5,25 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"unicode"
 )
 
 type ChapterNumber struct {
 	Whole    int
 	Fraction int
 	Scale    int
+}
+
+var pow10Table = [...]int{
+	1,
+	10,
+	100,
+	1_000,
+	10_000,
+	100_000,
+	1_000_000,
+	10_000_000,
+	100_000_000,
+	1_000_000_000,
 }
 
 func ParseChapterNumber(input string) (ChapterNumber, error) {
@@ -170,8 +182,8 @@ func (c *ChapterNumber) UnmarshalJSON(data []byte) error {
 }
 
 func digitsOnly(s string) bool {
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
+	for i := range len(s) {
+		if s[i] < '0' || s[i] > '9' {
 			return false
 		}
 	}
@@ -180,8 +192,12 @@ func digitsOnly(s string) bool {
 }
 
 func pow10(exp int) int {
-	value := 1
-	for range exp {
+	if exp < len(pow10Table) {
+		return pow10Table[exp]
+	}
+
+	value := pow10Table[len(pow10Table)-1]
+	for i := len(pow10Table) - 1; i < exp; i++ {
 		value *= 10
 	}
 

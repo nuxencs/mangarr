@@ -75,7 +75,7 @@ func parseRange(s string) (domain.ChapterNumber, domain.ChapterNumber, error) {
 
 // parseChapter converts a trimmed string to ChapterNumber.
 func parseChapter(s string) (domain.ChapterNumber, error) {
-	number, err := domain.ParseChapterNumber(strings.TrimSpace(s))
+	number, err := domain.ParseChapterNumber(s)
 	if err != nil {
 		return domain.ChapterNumber{}, err
 	}
