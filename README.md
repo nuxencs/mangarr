@@ -54,13 +54,17 @@ docker pull ghcr.io/nuxencs/mangarr:latest
 
 Or use Docker Compose - see the [Docker Compose Setup](#docker-compose-setup) section.
 
-## Developer Docs
+## Knowledge Base
 
-Maintainer-oriented docs live in [`docs/`](./docs/README.md):
+Maintainer docs use a progressive-disclosure layout:
 
-- [Architecture](./docs/architecture.md)
-- [Development](./docs/development.md)
-- [Source Adapters](./docs/source-adapters.md)
+- [Architecture](./ARCHITECTURE.md) - top-level domain and package map
+- [Design Guide](./docs/DESIGN.md) - design-doc entry point and core beliefs
+- [Plans Guide](./docs/PLANS.md) - active/completed execution plans + tech debt
+- [Product Sense](./docs/PRODUCT_SENSE.md) - user priorities and tradeoffs
+- [Quality Score](./docs/QUALITY_SCORE.md) - current grades by domain/layer
+- [Reliability](./docs/RELIABILITY.md) - failure modes and verification
+- [Security](./docs/SECURITY.md) - trust boundaries and safe defaults
 
 ## Usage
 

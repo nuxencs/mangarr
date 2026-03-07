@@ -1,0 +1,5 @@
+Go references for mangarr agents.
+
+- Prefer official Go docs for language/toolchain behavior.
+- Check `go.mod` for the pinned toolchain before suggesting syntax or stdlib APIs.
+- Use repo commands documented in `docs/RELIABILITY.md` and `AGENTS.md`.

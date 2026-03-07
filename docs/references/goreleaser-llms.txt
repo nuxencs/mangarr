@@ -1,0 +1,5 @@
+GoReleaser references for mangarr agents.
+
+- Packaging flows through `.goreleaser.yaml` and `.github/workflows/release.yml`.
+- Keep release docs, workflow behavior, and built artifacts aligned.
+- Avoid changing artifact naming or publish triggers without updating maintainer docs.
