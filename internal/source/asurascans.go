@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"mangarr/internal/browser"
@@ -58,7 +57,7 @@ func (a *asurascans) ValidateInput() error {
 
 func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 	manga := domain.Manga{
-		Chapters: make(map[float32]domain.Chapter),
+		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 		IsManhwa: true,
 	}
 
@@ -172,7 +171,7 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	}
 
 	if len(imageURLs) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
+		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
 	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
@@ -184,19 +183,19 @@ func (a *asurascans) GetImageURLs(_ context.Context, chapter *domain.Chapter) er
 	return nil
 }
 
-func (a *asurascans) separateChapterNum(chapterLine, chapterTitleLine string) (float32, error) {
+func (a *asurascans) separateChapterNum(chapterLine, chapterTitleLine string) (domain.ChapterNumber, error) {
 	if len(chapterLine) == 0 {
-		return 0, fmt.Errorf("chapter line is empty")
+		return domain.ChapterNumber{}, fmt.Errorf("chapter line is empty")
 	}
 
 	trimmed := strings.TrimSuffix(chapterLine, chapterTitleLine)
 	trimmed = strings.TrimSuffix(trimmed, "\n")
 	trimmed = strings.TrimPrefix(trimmed, "Chapter ")
 
-	chapterNumber, err := strconv.ParseFloat(trimmed, 32)
+	chapterNumber, err := domain.ParseChapterNumber(trimmed)
 	if err != nil {
-		return 0, fmt.Errorf("parsing chapter number from %s: %w", trimmed, err)
+		return domain.ChapterNumber{}, fmt.Errorf("parsing chapter number from %s: %w", trimmed, err)
 	}
 
-	return float32(chapterNumber), nil
+	return chapterNumber, nil
 }

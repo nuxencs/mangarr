@@ -38,7 +38,7 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 	defer os.RemoveAll(tmpDir)
 
 	chapterLog := log.With().
-		Float32("chapter_number", chapter.Number).
+		Str("chapter_number", chapter.Number.String()).
 		Str("chapter_title", chapter.Title).
 		Str("chapter_id", chapter.ID).
 		Str("chapter_url", truncateLink(chapter.URL)).

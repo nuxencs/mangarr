@@ -1,19 +1,16 @@
 package parse
 
 import (
-	"cmp"
 	"fmt"
-	"math"
 	"slices"
-	"strconv"
 	"strings"
 
 	"mangarr/internal/domain"
 )
 
 // ChapterSelection parses a comma-separated list that may contain single chapters or ranges (e.g. "1,2-4,5.5").
-func ChapterSelection(input string, available map[float32]domain.Chapter) ([]float32, error) {
-	uniq := make(map[float32]struct{})
+func ChapterSelection(input string, available map[domain.ChapterNumber]domain.Chapter) ([]domain.ChapterNumber, error) {
+	uniq := make(map[domain.ChapterNumber]struct{})
 
 	for raw := range strings.SplitSeq(input, ",") {
 		part := strings.TrimSpace(raw)
@@ -28,7 +25,7 @@ func ChapterSelection(input string, available map[float32]domain.Chapter) ([]flo
 				return nil, err
 			}
 			for ch := range available {
-				if ch >= start && ch <= end {
+				if ch.Compare(start) >= 0 && ch.Compare(end) <= 0 {
 					uniq[ch] = struct{}{}
 				}
 			}
@@ -44,67 +41,73 @@ func ChapterSelection(input string, available map[float32]domain.Chapter) ([]flo
 	}
 
 	// Convert map → slice and sort for stable output.
-	out := make([]float32, 0, len(uniq))
+	out := make([]domain.ChapterNumber, 0, len(uniq))
 	for ch := range uniq {
 		out = append(out, ch)
 	}
-	slices.Sort(out)
+	slices.SortFunc(out, func(a, b domain.ChapterNumber) int {
+		return a.Compare(b)
+	})
 
 	return out, nil
 }
 
-const floatEqualityEpsilon = 1e-4
-
 // parseRange expects the form "start-end".
-func parseRange(s string) (float32, float32, error) {
+func parseRange(s string) (domain.ChapterNumber, domain.ChapterNumber, error) {
 	parts := strings.Split(s, "-")
 	if len(parts) != 2 {
-		return 0, 0, fmt.Errorf("invalid range %q", s)
+		return domain.ChapterNumber{}, domain.ChapterNumber{}, fmt.Errorf("invalid range %q", s)
 	}
 
 	start, err := parseChapter(parts[0])
 	if err != nil {
-		return 0, 0, fmt.Errorf("range start: %w", err)
+		return domain.ChapterNumber{}, domain.ChapterNumber{}, fmt.Errorf("range start: %w", err)
 	}
 	end, err := parseChapter(parts[1])
 	if err != nil {
-		return 0, 0, fmt.Errorf("range end: %w", err)
+		return domain.ChapterNumber{}, domain.ChapterNumber{}, fmt.Errorf("range end: %w", err)
 	}
-	if start > end {
-		return 0, 0, fmt.Errorf("start (%v) > end (%v)", start, end)
+	if start.Compare(end) > 0 {
+		return domain.ChapterNumber{}, domain.ChapterNumber{}, fmt.Errorf("start (%v) > end (%v)", start, end)
 	}
 	return start, end, nil
 }
 
-// parseChapter converts a trimmed string to float32.
-func parseChapter(s string) (float32, error) {
-	f, err := strconv.ParseFloat(strings.TrimSpace(s), 32)
+// parseChapter converts a trimmed string to ChapterNumber.
+func parseChapter(s string) (domain.ChapterNumber, error) {
+	number, err := domain.ParseChapterNumber(strings.TrimSpace(s))
 	if err != nil {
-		return 0, fmt.Errorf("invalid chapter %q: %w", s, err)
+		return domain.ChapterNumber{}, err
 	}
-	return float32(f), nil
+
+	return number, nil
 }
 
-// MinMaxKeys returns the lowest and highest keys from a map that has keys that can be ordered
-func MinMaxKeys[K cmp.Ordered, V any](m map[K]V) (min K, max K, err error) {
-	if len(m) == 0 {
-		return min, max, fmt.Errorf("map is empty")
+func MinMaxChapterNumbers(chapters map[domain.ChapterNumber]domain.Chapter) (domain.ChapterNumber, domain.ChapterNumber, error) {
+	if len(chapters) == 0 {
+		return domain.ChapterNumber{}, domain.ChapterNumber{}, fmt.Errorf("map is empty")
 	}
 
-	first := true
-	for k := range m {
+	var (
+		min   domain.ChapterNumber
+		max   domain.ChapterNumber
+		first = true
+	)
+
+	for number := range chapters {
 		if first {
-			min, max = k, k
+			min = number
+			max = number
 			first = false
 			continue
 		}
 
-		if k < min {
-			min = k
+		if number.Less(min) {
+			min = number
 		}
 
-		if k > max {
-			max = k
+		if max.Less(number) {
+			max = number
 		}
 	}
 
@@ -113,13 +116,15 @@ func MinMaxKeys[K cmp.Ordered, V any](m map[K]V) (min K, max K, err error) {
 
 // FormatChapterList sorts the provided chapters and returns a string displaying
 // consecutive numbers as ranges, e.g. "1-3, 5, 7.5".
-func FormatChapterList(chapters []float32) string {
+func FormatChapterList(chapters []domain.ChapterNumber) string {
 	if len(chapters) == 0 {
 		return ""
 	}
 
 	sorted := slices.Clone(chapters)
-	slices.Sort(sorted)
+	slices.SortFunc(sorted, func(a, b domain.ChapterNumber) int {
+		return a.Compare(b)
+	})
 
 	var parts []string
 	start := sorted[0]
@@ -142,26 +147,22 @@ func FormatChapterList(chapters []float32) string {
 	return strings.Join(parts, ", ")
 }
 
-func formatRange(start, end float32) string {
-	if almostEqual(start, end) {
+func formatRange(start, end domain.ChapterNumber) string {
+	if start.Equal(end) {
 		return formatChapterNumber(start)
 	}
 
 	return fmt.Sprintf("%s-%s", formatChapterNumber(start), formatChapterNumber(end))
 }
 
-func formatChapterNumber(num float32) string {
-	return fmt.Sprintf("%g", num)
+func formatChapterNumber(num domain.ChapterNumber) string {
+	return num.String()
 }
 
-func isConsecutive(prev, current float32) bool {
-	if almostEqual(prev, current) {
+func isConsecutive(prev, current domain.ChapterNumber) bool {
+	if prev.Equal(current) {
 		return true
 	}
 
-	return almostEqual(current, prev+1)
-}
-
-func almostEqual(a, b float32) bool {
-	return math.Abs(float64(a-b)) <= floatEqualityEpsilon
+	return !prev.HasFraction() && !current.HasFraction() && current.Whole == prev.Whole+1
 }

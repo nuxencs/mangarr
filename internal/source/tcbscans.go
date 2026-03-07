@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -70,7 +69,7 @@ func (t *tcbscans) GetManga(_ context.Context) (domain.Manga, error) {
 		mangas[name] = domain.Manga{
 			URL:      mangaURL,
 			Title:    sanitize.Filename(name),
-			Chapters: make(map[float32]domain.Chapter),
+			Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 		}
 	})
 
@@ -174,7 +173,7 @@ func (t *tcbscans) GetImageURLs(_ context.Context, chapter *domain.Chapter) erro
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
+		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
 	chapter.ImageInfo = imageInfos
@@ -182,18 +181,18 @@ func (t *tcbscans) GetImageURLs(_ context.Context, chapter *domain.Chapter) erro
 }
 
 // getChapterNumber gets the chapter number from the scraped chapter name
-func (t *tcbscans) getChapterNumber(name string) (float32, error) {
+func (t *tcbscans) getChapterNumber(name string) (domain.ChapterNumber, error) {
 	// FindSubmatch returns an array where the first element is the full match, and the rest are submatches.
 	matches := chapterNumberPattern.FindStringSubmatch(name)
 
 	if len(matches) <= 1 {
-		return 0, fmt.Errorf("finding matches in %s", name)
+		return domain.ChapterNumber{}, fmt.Errorf("finding matches in %s", name)
 	}
 
-	number, err := strconv.ParseFloat(matches[1], 32)
+	number, err := domain.ParseChapterNumber(matches[1])
 	if err != nil {
-		return 0, fmt.Errorf("parsing chapter number from %s: %w", name, err)
+		return domain.ChapterNumber{}, fmt.Errorf("parsing chapter number from %s: %w", name, err)
 	}
 
-	return float32(number), nil
+	return number, nil
 }

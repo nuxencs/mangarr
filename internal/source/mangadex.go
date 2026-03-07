@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 
 	"mangarr/internal/domain"
@@ -158,7 +157,7 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 
 	return domain.Manga{
 		Title:    sanitize.Filename(title),
-		Chapters: make(map[float32]domain.Chapter),
+		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 		IsManhwa: isManhwa,
 	}, nil
 }
@@ -332,11 +331,10 @@ func (m *mangadex) processChapter(data mangadexChaptersData, manga *domain.Manga
 		chapter = "0"
 	}
 
-	chapterNum64, err := strconv.ParseFloat(chapter, 32)
+	chapterNum, err := domain.ParseChapterNumber(chapter)
 	if err != nil {
 		return fmt.Errorf("parsing chapter number from %s: %w", chapter, err)
 	}
-	chapterNum := float32(chapterNum64)
 
 	var title string
 	if data.Attributes.Title != nil {

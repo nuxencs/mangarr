@@ -83,9 +83,9 @@ var downloadCmd = &cobra.Command{
 			return
 		}
 
-		var selectedChapterNumbers []float32
+		var selectedChapterNumbers []domain.ChapterNumber
 
-		firstChapterNr, latestChapterNr, err := parse.MinMaxKeys(selectedManga.Chapters)
+		firstChapterNr, latestChapterNr, err := parse.MinMaxChapterNumbers(selectedManga.Chapters)
 		if err != nil {
 			log.Error().Err(err).Msgf("Failed to parse chapter number for %s", selectedManga.Title)
 			return
@@ -93,9 +93,9 @@ var downloadCmd = &cobra.Command{
 
 		switch {
 		case first:
-			selectedChapterNumbers = []float32{firstChapterNr}
+			selectedChapterNumbers = []domain.ChapterNumber{firstChapterNr}
 		case latest:
-			selectedChapterNumbers = []float32{latestChapterNr}
+			selectedChapterNumbers = []domain.ChapterNumber{latestChapterNr}
 		case downloadAll:
 			selectedChapterNumbers = sortedChapterNumbers(selectedManga.Chapters)
 		default:
@@ -124,7 +124,7 @@ var downloadCmd = &cobra.Command{
 
 		type chapterResult struct {
 			name          string
-			chapterNumber float32
+			chapterNumber domain.ChapterNumber
 			status        string
 			err           error
 		}
@@ -141,7 +141,7 @@ var downloadCmd = &cobra.Command{
 
 				result := chapterResult{
 					chapterNumber: chapterNumber,
-					name:          fmt.Sprintf("Chapter %g", chapterNumber),
+					name:          fmt.Sprintf("Chapter %s", chapterNumber),
 					status:        chapterStatusFailed,
 				}
 				shouldDelay := true
@@ -157,8 +157,8 @@ var downloadCmd = &cobra.Command{
 
 				selectedChapter, ok := selectedManga.Chapters[chapterNumber]
 				if !ok {
-					result.err = fmt.Errorf("chapter %g not found", chapterNumber)
-					log.Error().Err(result.err).Msgf("Failed to find chapter with number %g", chapterNumber)
+					result.err = fmt.Errorf("chapter %s not found", chapterNumber)
+					log.Error().Err(result.err).Msgf("Failed to find chapter with number %s", chapterNumber)
 					return
 				}
 
@@ -179,7 +179,7 @@ var downloadCmd = &cobra.Command{
 
 				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
 					result.err = err
-					log.Error().Err(err).Msgf("Failed to get image URLs for chapter %g", selectedChapter.Number)
+					log.Error().Err(err).Msgf("Failed to get image URLs for chapter %s", selectedChapter.Number)
 					return
 				}
 
@@ -201,8 +201,8 @@ var downloadCmd = &cobra.Command{
 
 		if len(selectedChapterNumbers) > 1 {
 			downloaded := 0
-			var skipped []float32
-			var failed []float32
+			var skipped []domain.ChapterNumber
+			var failed []domain.ChapterNumber
 
 			for res := range results {
 				switch res.status {
@@ -239,13 +239,15 @@ var downloadCmd = &cobra.Command{
 
 const chapterDelay = 2 * time.Second
 
-func sortedChapterNumbers(chapters map[float32]domain.Chapter) []float32 {
-	numbers := make([]float32, 0, len(chapters))
+func sortedChapterNumbers(chapters map[domain.ChapterNumber]domain.Chapter) []domain.ChapterNumber {
+	numbers := make([]domain.ChapterNumber, 0, len(chapters))
 	for number := range chapters {
 		numbers = append(numbers, number)
 	}
 
-	slices.Sort(numbers)
+	slices.SortFunc(numbers, func(a, b domain.ChapterNumber) int {
+		return a.Compare(b)
+	})
 
 	return numbers
 }

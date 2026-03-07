@@ -109,20 +109,15 @@ var monitorCmd = &cobra.Command{
 								return
 							}
 
-							_, latestChapterNr, err := parse.MinMaxKeys(selectedManga.Chapters)
+							_, latestChapterNr, err := parse.MinMaxChapterNumbers(selectedManga.Chapters)
 							if err != nil {
 								mLog.Error().Err(err).Msg("error getting latest chapter number")
 								return
 							}
 
-							if latestChapterNr == 0 {
-								mLog.Error().Msg("error finding latest chapter")
-								return
-							}
-
 							selectedChapter, ok := selectedManga.Chapters[latestChapterNr]
 							if !ok {
-								mLog.Error().Err(err).Msgf("error finding chapter with number %g", latestChapterNr)
+								mLog.Error().Msgf("error finding chapter with number %s", latestChapterNr)
 								return
 							}
 
@@ -144,7 +139,7 @@ var monitorCmd = &cobra.Command{
 							}
 
 							if err := mangaSource.GetImageURLs(runCtx, &selectedChapter); err != nil {
-								mLog.Error().Err(err).Msgf("error getting image urls for chapter %g", selectedChapter.Number)
+								mLog.Error().Err(err).Msgf("error getting image urls for chapter %s", selectedChapter.Number)
 								return
 							}
 

@@ -123,7 +123,7 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 	var errors []error
 
 	manga := domain.Manga{
-		Chapters: make(map[float32]domain.Chapter),
+		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 		IsManhwa: true,
 	}
 
@@ -161,12 +161,10 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 	manga.Title = sanitize.Filename(responseData.Props.PageProps.Series.Title)
 
 	for _, responseChapter := range responseData.Props.PageProps.Chapters {
-		chapterNumF64, err := strconv.ParseFloat(responseChapter.Chapter, 32)
+		chapterNum, err := domain.ParseChapterNumber(responseChapter.Chapter)
 		if err != nil {
 			return domain.Manga{}, fmt.Errorf("parsing chapter number %s: %w", responseChapter.Chapter, err)
 		}
-
-		chapterNum := float32(chapterNumF64)
 
 		path, err := url.JoinPath(flamecomicsURL, "series", fmt.Sprintf("%d", responseChapter.SeriesID), responseChapter.Token)
 		if err != nil {
@@ -256,7 +254,7 @@ func (f *flamecomics) GetImageURLs(_ context.Context, chapter *domain.Chapter) e
 	}
 
 	if len(imageURLs) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %g", chapter.Number)
+		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
 	chapter.ImageInfo = imageURLs
