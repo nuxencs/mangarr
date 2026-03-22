@@ -1,6 +1,6 @@
 # Source Adapters
 
-Verified against `internal/source/` on 2026-03-07.
+Verified against `internal/source/` on 2026-03-22.
 
 All adapters implement `domain.Source`.
 
@@ -12,7 +12,7 @@ All adapters implement `domain.Source`.
 | `mangadex` | manga UUID | `-g` optional, `-l` optional | valid manga UUID | API-based |
 | `mangaplus` | numeric title ID | none | strict numeric regex | protobuf API |
 | `flamecomics` | full series URL | none | `https://flamecomics.xyz` prefix | HTML + embedded JSON |
-| `asurascans` | full series URL | none | `https://asuracomic.net` prefix | browser automation |
+| `asurascans` | full series URL | none | `https://asurascans.com/comics/...` | server-rendered HTML |
 | `cubari` | gist URL | `-g` required | valid URL + non-empty group | images resolved in payload |
 | `weebcentral` | full series URL | none | `https://weebcentral.com` prefix | scraper + browser extraction |
 | `comix` | full title URL | `-g` optional | `https://comix.to/title` prefix | API-based |
@@ -28,6 +28,6 @@ All adapters implement `domain.Source`.
 ## Shared Behavior
 
 - unknown source values fail fast in source selection
-- `asurascans` and `weebcentral` share browser lifecycle via `internal/browser.Manager`
+- `weebcentral` uses `internal/browser.Manager`
 - retry policy comes from `internal/sharedhttp/`
 - manhwa/long-strip handling flows through `selectedManga.IsManhwa`

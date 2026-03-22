@@ -55,7 +55,7 @@ var downloadCmd = &cobra.Command{
 		case "flamecomics":
 			s = source.NewFlamecomics(manga)
 		case "asurascans":
-			s = source.NewAsurascans(manga, bm)
+			s = source.NewAsurascans(manga)
 		case "cubari":
 			s = source.NewCubari(manga, group)
 		case "weebcentral":
