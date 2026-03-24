@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-Verified against code on 2026-03-07.
+Verified against code on 2026-03-22.
 
 ## Purpose
 
@@ -66,7 +66,6 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
   - retries transport failures and `500/502/503/504`
   - fails fast on `404/429/401/403/405`
 - Browser-backed sources:
-  - `asurascans`
   - `weebcentral`
   - shared lifecycle in `internal/browser/`
 
