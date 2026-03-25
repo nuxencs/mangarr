@@ -30,6 +30,7 @@ func TestAsurascansGetMangaParsesCurrentSeriesURL(t *testing.T) {
 				<html>
 					<body>
 						<h1>Solo Max-Level Newbie</h1>
+						<astro-island component-url="/_astro/ChapterListReact.xxx.js" props="{&quot;chapters&quot;:[1,[[0,{&quot;number&quot;:[0,249],&quot;is_locked&quot;:[0,false]}],[0,{&quot;number&quot;:[0,248],&quot;is_locked&quot;:[0,false]}]]]}" ssr>
 						<a href="`+currentChapter1+`">
 							<span>Chapter 249</span>
 							<span>Tangled Threads (2)</span>
@@ -40,6 +41,7 @@ func TestAsurascansGetMangaParsesCurrentSeriesURL(t *testing.T) {
 							<span>Tangled Threads (1)</span>
 							<span>two weeks ago</span>
 						</a>
+						</astro-island>
 					</body>
 				</html>
 			`)
@@ -66,6 +68,58 @@ func TestAsurascansGetMangaParsesCurrentSeriesURL(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "Tangled Threads (1)", ch248.Title)
 	require.Equal(t, server.URL+currentChapter2, ch248.URL)
+}
+
+func TestAsurascansGetMangaSkipsLockedChapters(t *testing.T) {
+	t.Parallel()
+
+	const (
+		currentSeries  = "/comics/pick-me-up-infinite-gacha-f6174291"
+		lockedChapter  = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/194"
+		regularChapter = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/193"
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case currentSeries:
+			fmt.Fprint(w, `
+				<html>
+					<body>
+						<h1>Pick Me Up, Infinite Gacha</h1>
+						<astro-island component-url="/_astro/ChapterListReact.xxx.js" props="{&quot;chapters&quot;:[1,[[0,{&quot;number&quot;:[0,194],&quot;is_locked&quot;:[0,true]}],[0,{&quot;number&quot;:[0,193],&quot;is_locked&quot;:[0,false]}]]]}" ssr>
+						<a href="`+lockedChapter+`">
+							<span>Chapter 194</span>
+							<span>Early Access Title</span>
+							<span>1 hour ago</span>
+						</a>
+						<a href="`+regularChapter+`">
+							<span>Chapter 193</span>
+							<span>Regular Title</span>
+							<span>last week</span>
+						</a>
+						</astro-island>
+					</body>
+				</html>
+			`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	src := newTestAsurascans(server.URL+currentSeries, server.URL)
+
+	manga, err := src.GetManga(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, "Pick Me Up, Infinite Gacha", manga.Title)
+	require.Len(t, manga.Chapters, 1)
+
+	_, hasLocked := manga.Chapters[domain.MustParseChapterNumber("194")]
+	require.False(t, hasLocked, "locked chapter 194 should be filtered out")
+
+	ch193, ok := manga.Chapters[domain.MustParseChapterNumber("193")]
+	require.True(t, ok)
+	require.Equal(t, "Regular Title", ch193.Title)
 }
 
 func TestAsurascansGetImageURLsExtractsChapterAssets(t *testing.T) {
