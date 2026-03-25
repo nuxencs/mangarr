@@ -1,18 +1,22 @@
 package source
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"time"
 
-	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
+	"mangarr/internal/sharedhttp"
 
-	"github.com/go-rod/stealth"
+	"github.com/PuerkitoBio/goquery"
+	"github.com/avast/retry-go"
 	"github.com/gocolly/colly"
 	"github.com/gocolly/colly/extensions"
 )
@@ -25,11 +29,12 @@ var weebcentralChapterNumberPattern = regexp.MustCompile(`(?:Chapter|Ch.) ?(\d+(
 
 type weebcentral struct {
 	MangaURL  string
-	Browser   *browser.Manager
 	Collector colly.Collector
+	Client    http.Client
+	BaseURL   string
 }
 
-func NewWeebCentral(mangaURL string, bm *browser.Manager) domain.Source {
+func NewWeebCentral(mangaURL string) domain.Source {
 	collector := colly.NewCollector(
 		colly.AllowURLRevisit(),
 	)
@@ -39,8 +44,12 @@ func NewWeebCentral(mangaURL string, bm *browser.Manager) domain.Source {
 
 	return &weebcentral{
 		Collector: *collector,
-		Browser:   bm,
 		MangaURL:  mangaURL,
+		BaseURL:   weebcentralURL,
+		Client: http.Client{
+			Timeout:   120 * time.Second,
+			Transport: sharedhttp.Transport,
+		},
 	}
 }
 
@@ -139,37 +148,20 @@ func (w *weebcentral) GetChapters(_ context.Context, manga domain.Manga) error {
 }
 
 // GetImageURLs gets all image urls for a chapter
-func (w *weebcentral) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
-	var imageURLs []string
-
-	page := stealth.MustPage(w.Browser.Get())
-	defer page.MustClose()
-
-	pageWithTimeout := page.Timeout(browser.Timeout)
-
-	if err := pageWithTimeout.Navigate(chapter.URL); err != nil {
-		return fmt.Errorf("navigating to image page: %w", browser.HandleError(err))
-	}
-
-	if err := pageWithTimeout.WaitLoad(); err != nil {
-		return fmt.Errorf("waiting for image page load: %w", browser.HandleError(err))
-	}
-
-	if err := pageWithTimeout.WaitElementsMoreThan("img.maw-w-full", 0); err != nil {
-		return fmt.Errorf("waiting for chapter images: %w", browser.HandleError(err))
-	}
-
-	raw, err := pageWithTimeout.Eval(`() => {
-		return Array.from(document.querySelectorAll("img.maw-w-full"))
-			.map((img) => img.getAttribute("src") ?? "")
-			.filter((src) => src !== "")
-	}`)
+func (w *weebcentral) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+	imageURL, err := w.chapterImagesURL(chapter.URL)
 	if err != nil {
-		return fmt.Errorf("extracting chapter image URLs: %w", browser.HandleError(err))
+		return fmt.Errorf("building chapter images URL from %s: %w", chapter.URL, err)
 	}
 
-	if err := raw.Value.Unmarshal(&imageURLs); err != nil {
-		return fmt.Errorf("decoding chapter image URLs: %w", err)
+	body, err := w.fetch(ctx, imageURL)
+	if err != nil {
+		return fmt.Errorf("fetching chapter images %s: %w", imageURL, err)
+	}
+
+	imageURLs, err := w.extractImageURLs(body)
+	if err != nil {
+		return fmt.Errorf("extracting chapter image URLs from %s: %w", imageURL, err)
 	}
 
 	if len(imageURLs) == 0 {
@@ -183,6 +175,90 @@ func (w *weebcentral) GetImageURLs(_ context.Context, chapter *domain.Chapter) e
 
 	chapter.ImageInfo = imageInfos
 	return nil
+}
+
+func (w *weebcentral) chapterImagesURL(chapterURL string) (string, error) {
+	parsed, err := url.Parse(chapterURL)
+	if err != nil {
+		return "", err
+	}
+
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+
+	imageURL, err := url.JoinPath(parsed.String(), "images")
+	if err != nil {
+		return "", err
+	}
+
+	u, err := url.Parse(imageURL)
+	if err != nil {
+		return "", err
+	}
+
+	params := u.Query()
+	params.Set("is_prev", "False")
+	params.Set("current_page", "1")
+	params.Set("reading_style", "long_strip")
+	u.RawQuery = params.Encode()
+
+	return u.String(), nil
+}
+
+func (w *weebcentral) fetch(ctx context.Context, rawURL string) ([]byte, error) {
+	var body []byte
+
+	err := retry.Do(func() error {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		if err != nil {
+			return fmt.Errorf("creating request for %s: %w", rawURL, err)
+		}
+
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; mangarr/1.0; +https://github.com/nuxencs/mangarr)")
+		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+
+		resp, err := sharedhttp.ExecRequest(w.Client, req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		body, err = io.ReadAll(resp.Body)
+		if err != nil {
+			return fmt.Errorf("reading response body from %s: %w", rawURL, err)
+		}
+
+		return nil
+	}, sharedhttp.RetryOptions(ctx)...)
+	if err != nil {
+		return nil, err
+	}
+
+	return body, nil
+}
+
+func (w *weebcentral) extractImageURLs(body []byte) ([]string, error) {
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	imageURLs := make([]string, 0)
+	doc.Find("img[src]").Each(func(_ int, selection *goquery.Selection) {
+		src := strings.TrimSpace(selection.AttrOr("src", ""))
+		if len(src) == 0 {
+			return
+		}
+
+		resolvedURL, err := resolveAgainstBase(w.BaseURL, src)
+		if err != nil {
+			return
+		}
+
+		imageURLs = append(imageURLs, resolvedURL)
+	})
+
+	return dedupeStrings(imageURLs), nil
 }
 
 // getChapterNumber gets the chapter number from the scraped chapter name

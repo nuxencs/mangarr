@@ -29,7 +29,7 @@ Mangarr currently supports downloading from **8 different manga sources**:
 | [Flame Comics](https://flamecomics.xyz/) | `flamecomics` | Requires full manga URL |
 | [Asura Scans](https://asurascans.com/) | `asurascans` | Requires a current `https://asurascans.com/comics/...` series URL |
 | [Cubari](https://cubari.moe/) | `cubari` | Requires gist URL and group identifier |
-| [Weeb Central](https://weebcentral.com/) | `weebcentral` | Requires manga identifier, uses browser automation |
+| [Weeb Central](https://weebcentral.com/) | `weebcentral` | Requires manga identifier, uses direct HTML image extraction |
 | [Comix](https://comix-online.org/) | `comix` | Requires manga identifier and group |
 
 ## Installation

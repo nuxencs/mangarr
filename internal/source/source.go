@@ -3,11 +3,10 @@ package source
 import (
 	"fmt"
 
-	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 )
 
-func Select(monitoredManga domain.MonitoredManga, bm *browser.Manager) (domain.Source, error) {
+func Select(monitoredManga domain.MonitoredManga) (domain.Source, error) {
 	switch monitoredManga.Source {
 	case "tcbscans":
 		return NewTCBScans(monitoredManga.Manga), nil
@@ -22,7 +21,7 @@ func Select(monitoredManga domain.MonitoredManga, bm *browser.Manager) (domain.S
 	case "cubari":
 		return NewCubari(monitoredManga.Manga, monitoredManga.Group), nil
 	case "weebcentral":
-		return NewWeebCentral(monitoredManga.Manga, bm), nil
+		return NewWeebCentral(monitoredManga.Manga), nil
 	case "comix":
 		return NewComix(monitoredManga.Manga, monitoredManga.Group), nil
 	}
