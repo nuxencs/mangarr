@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"mangarr/internal/browser"
 	"mangarr/internal/domain"
 	"mangarr/internal/download"
 	"mangarr/internal/files"
@@ -42,9 +41,6 @@ var downloadCmd = &cobra.Command{
 
 		var s domain.Source
 
-		bm := browser.NewManager()
-		defer bm.Close()
-
 		switch mangaSource {
 		case "tcbscans":
 			s = source.NewTCBScans(manga)
@@ -59,7 +55,7 @@ var downloadCmd = &cobra.Command{
 		case "cubari":
 			s = source.NewCubari(manga, group)
 		case "weebcentral":
-			s = source.NewWeebCentral(manga, bm)
+			s = source.NewWeebCentral(manga)
 		case "comix":
 			s = source.NewComix(manga, group)
 		default:
