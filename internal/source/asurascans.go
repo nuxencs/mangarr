@@ -24,6 +24,7 @@ import (
 const asurascansBaseURL = "https://asurascans.com"
 
 var asurascansChapterAssetPattern = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters/[^"&<]+`)
+var asurascansLockedChapterPattern = regexp.MustCompile(`"number":\[0,(\d+(?:\.\d+)?)\][^}]*"is_locked":\[0,true\]`)
 
 type asurascans struct {
 	MangaURL  string
@@ -106,6 +107,24 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 		}
 	})
 
+	lockedChapters := make(map[domain.ChapterNumber]struct{})
+
+	c.OnHTML("astro-island", func(e *colly.HTMLElement) {
+		componentURL := e.Attr("component-url")
+		if !strings.Contains(componentURL, "ChapterList") {
+			return
+		}
+
+		props := html.UnescapeString(e.Attr("props"))
+		for _, match := range asurascansLockedChapterPattern.FindAllStringSubmatch(props, -1) {
+			chapterNum, err := domain.ParseChapterNumber(match[1])
+			if err != nil {
+				continue
+			}
+			lockedChapters[chapterNum] = struct{}{}
+		}
+	})
+
 	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
 		href := strings.TrimSpace(e.Attr("href"))
 		if !strings.HasPrefix(href, "/comics/") || !strings.Contains(href, "/chapter/") {
@@ -136,6 +155,10 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 
 	if len(errors) > 0 {
 		return domain.Manga{}, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
+	}
+
+	for num := range lockedChapters {
+		delete(manga.Chapters, num)
 	}
 
 	if len(manga.Title) == 0 {
