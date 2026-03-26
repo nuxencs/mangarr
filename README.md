@@ -325,9 +325,9 @@ docker-compose up -d
 - **Manga URL**: Gist URL for the manga
 - **Group**: Group identifier (e.g., `/r/OnePunchMan`)
 
-### Browser-Based Sources (Weeb Central)
+### Runtime Dependencies
 
-Some sources use browser automation to bypass Cloudflare protection. These may take slightly longer to process.
+Current sources use direct HTTP/HTML extraction. The published Docker image does not require Chromium.
 
 ## How It Works
 

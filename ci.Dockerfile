@@ -30,7 +30,7 @@ RUN --network=none --mount=target=. \
 
 # build runner
 FROM alpine:latest AS runner
-RUN apk add --no-cache ca-certificates curl tzdata jq chromium tini
+RUN apk add --no-cache ca-certificates curl tzdata jq tini
 
 LABEL org.opencontainers.image.source="https://github.com/nuxencs/mangarr" \
     org.opencontainers.image.licenses="MIT" \

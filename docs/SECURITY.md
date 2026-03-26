@@ -1,29 +1,29 @@
 # SECURITY.md
 
-Verified on 2026-03-07.
+Verified on 2026-03-26.
 
 ## Trust Boundaries
 
 - untrusted remote HTML/API responses from manga sources
 - local filesystem writes for archives and optional logs
-- optional browser automation against third-party sites
+- outbound HTTP access to third-party manga sources
 - GitHub release and container publishing pipeline
 
 ## Current Posture
 
 - no multi-user server surface
 - no database or credential store in repo code
-- primary security risks come from third-party content, browser automation, and supply chain dependencies
+- primary security risks come from third-party content and supply chain dependencies
 
 ## Safe Defaults
 
 - validate source inputs before network work
 - keep archive output under explicit user-selected directories
-- prefer shared HTTP/browser code paths over ad hoc adapter-local clients
+- prefer shared HTTP code paths over ad hoc adapter-local clients
 - document new dependencies before adoption
 
 ## Gaps
 
 - no documented vuln-scanning routine beyond normal dependency hygiene
-- no sandboxing around browser-backed adapters
+- no dedicated egress allowlist or source isolation controls
 - no CI checks focused specifically on dependency or docs-governance risk

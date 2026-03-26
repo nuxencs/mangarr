@@ -1,12 +1,12 @@
 # RELIABILITY.md
 
-Verified on 2026-03-07.
+Verified on 2026-03-26.
 
 ## Main Failure Modes
 
 - upstream HTML/API changes break adapters
 - remote rate limits or transient outages
-- browser automation runtime issues
+- source-specific transport or anti-bot changes
 - invalid local config or download path
 - partial chapter download failures
 
