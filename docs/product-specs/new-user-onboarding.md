@@ -1,6 +1,6 @@
 # New User Onboarding
 
-Verified against `README.md` on 2026-03-07.
+Verified against `README.md` on 2026-03-26.
 
 ## User Goal
 
@@ -18,7 +18,7 @@ Get one manga chapter downloaded quickly, with minimal setup and no code reading
 
 - source identifiers vary widely by provider
 - some sources need full URLs, some IDs, some titles
-- browser-backed sources add runtime dependency complexity
+- source-specific identifier requirements still add setup friction
 
 ## Acceptance Bar
 

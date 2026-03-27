@@ -1,6 +1,6 @@
 # Monitoring Operator
 
-Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-03-07.
+Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-03-26.
 
 ## User Goal
 
@@ -18,4 +18,4 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - config behavior is documented and matches runtime
 - monitor logs remain actionable for source failures
 - failure handling does not corrupt already-downloaded archives
-- browser-backed source requirements are documented
+- source-specific runtime requirements stay documented when they appear
