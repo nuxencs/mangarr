@@ -22,6 +22,7 @@ const (
 	comixResultLimit = 100
 
 	comixOfficialGroupID = "9275"
+	comixDeprecatedError = "Comix is deprecated because chapter pages now require a browser-generated token"
 )
 
 type comix struct {
@@ -154,15 +155,7 @@ func (c *comix) String() string {
 }
 
 func (c *comix) ValidateInput() error {
-	if !strings.HasPrefix(c.MangaURL, "https://comix.to/title") {
-		return fmt.Errorf("the URL for Comix must start with https://comix.to/title")
-	}
-
-	if _, err := url.Parse(c.MangaURL); err != nil {
-		return fmt.Errorf("parsing URL %s: %w", c.MangaURL, err)
-	}
-
-	return nil
+	return fmt.Errorf(comixDeprecatedError)
 }
 
 func (c *comix) GetManga(ctx context.Context) (domain.Manga, error) {
