@@ -1,6 +1,6 @@
 # Source Adapters
 
-Verified against `internal/source/` on 2026-03-26.
+Verified against `internal/source/` on 2026-05-19.
 
 All adapters implement `domain.Source`.
 
@@ -16,6 +16,7 @@ All adapters implement `domain.Source`.
 | `cubari` | gist URL | `-g` required | valid URL + non-empty group | images resolved in payload |
 | `weebcentral` | full series URL | none | `https://weebcentral.com` prefix | scraper + chapter image fragment fetch |
 | `comix` | full title URL | `-g` optional | `https://comix.to/title` prefix | API-based |
+| `atsumaru` | full manga URL | `-g` required | `https://atsu.moe/manga/...` prefix + non-empty scan ID | API-based |
 
 ## Rules
 
@@ -30,5 +31,6 @@ All adapters implement `domain.Source`.
 - unknown source values fail fast in source selection
 - `asurascans` removes chapters marked `is_locked=true` before returning the chapter map
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
+- `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
 - retry policy comes from `internal/sharedhttp/`
 - manhwa/long-strip handling flows through `selectedManga.IsManhwa`

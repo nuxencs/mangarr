@@ -58,6 +58,8 @@ var downloadCmd = &cobra.Command{
 			s = source.NewWeebCentral(manga)
 		case "comix":
 			s = source.NewComix(manga, group)
+		case "atsumaru":
+			s = source.NewAtsumaru(manga, group)
 		default:
 			log.Error().Msgf("Invalid source: %s", mangaSource)
 			return
