@@ -1,6 +1,6 @@
 # Usage Reference
 
-Verified against CLI help and config/runtime code on 2026-03-27.
+Verified against CLI help and config/runtime code on 2026-05-19.
 
 Use this doc when the root README is not enough and you need command, config, or operator detail.
 
@@ -50,6 +50,9 @@ mangarr download -d ./downloads -s cubari -m "https://git.io/OPM" -g "/r/OnePunc
 
 # Latest chapter from Asura Scans
 mangarr download -d ./downloads -s asurascans -m "https://asurascans.com/comics/solo-max-level-newbie-7f873ca6" -L
+
+# Latest chapter from Atsumaru
+mangarr download -d ./downloads -s atsumaru -m "https://atsu.moe/manga/Q5Mqy" -g "cmgzlsevifjhtm191rqugvee3" -L
 ```
 
 ### `monitor`
@@ -142,6 +145,7 @@ mangarr version
 | [Cubari](https://cubari.moe/) | `cubari` | gist URL | required `-g` group such as `/r/OnePunchMan` |
 | [Weeb Central](https://weebcentral.com/) | `weebcentral` | full series URL | none |
 | [Comix](https://comix.to/) | `comix` | full `https://comix.to/title/...` URL | optional `-g` group; default is official releases |
+| [Atsumaru](https://atsu.moe/) | `atsumaru` | full `https://atsu.moe/manga/...` URL | required `-g` scan ID |
 
 For implementation-level source behavior and validation rules, see [design-docs/source-adapters.md](./design-docs/source-adapters.md).
 

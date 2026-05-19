@@ -24,6 +24,8 @@ func Select(monitoredManga domain.MonitoredManga) (domain.Source, error) {
 		return NewWeebCentral(monitoredManga.Manga), nil
 	case "comix":
 		return NewComix(monitoredManga.Manga, monitoredManga.Group), nil
+	case "atsumaru":
+		return NewAtsumaru(monitoredManga.Manga, monitoredManga.Group), nil
 	}
 
 	return nil, fmt.Errorf("unknown monitored manga source %s", monitoredManga.Source)
