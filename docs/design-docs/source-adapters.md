@@ -15,8 +15,13 @@ All adapters implement `domain.Source`.
 | `asurascans` | full series URL | none | `https://asurascans.com/comics/...` | server-rendered HTML; filters locked early-access chapters from discovery |
 | `cubari` | gist URL | `-g` required | valid URL + non-empty group | images resolved in payload |
 | `weebcentral` | full series URL | none | `https://weebcentral.com` prefix | scraper + chapter image fragment fetch |
-| `comix` | full title URL | `-g` optional | `https://comix.to/title` prefix | API-based |
 | `atsumaru` | full manga URL | `-g` required | `https://atsu.moe/manga/...` prefix + non-empty scan ID | API-based |
+
+Deprecated:
+
+| Identifier | Status | Reason |
+| --- | --- | --- |
+| `comix` | recognized but fails fast | chapter page access requires a browser-generated token from obfuscated site JavaScript |
 
 ## Rules
 
