@@ -1,6 +1,6 @@
 # Source Adapters
 
-Verified against `internal/source/` on 2026-05-19.
+Verified against `internal/source/` on 2026-05-24.
 
 All adapters implement `domain.Source`.
 
@@ -10,7 +10,7 @@ All adapters implement `domain.Source`.
 | --- | --- | --- | --- | --- |
 | `tcbscans` | manga title | none | non-empty title | HTML scraping |
 | `mangadex` | manga UUID | `-g` optional, `-l` optional | valid manga UUID | API-based |
-| `mangaplus` | numeric title ID | none | strict numeric regex | protobuf API |
+| `mangaplus` | numeric title ID | none | strict numeric regex | mobile protobuf API; lazily registers a deterministic device secret |
 | `flamecomics` | full series URL | none | `https://flamecomics.xyz` prefix | HTML + embedded JSON |
 | `asurascans` | full series URL | none | `https://asurascans.com/comics/...` | server-rendered HTML; filters locked early-access chapters from discovery |
 | `cubari` | gist URL | `-g` required | valid URL + non-empty group | images resolved in payload |
@@ -34,6 +34,7 @@ Deprecated:
 ## Shared Behavior
 
 - unknown source values fail fast in source selection
+- `mangaplus` uses the mobile API because the web protobuf endpoint rejects current unauthenticated access; chapter discovery reads the current `chapter_list_v2` field with legacy list fields kept as fallback
 - `asurascans` removes chapters marked `is_locked=true` before returning the chapter map
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
 - `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
