@@ -13,7 +13,7 @@ All adapters implement `domain.Source`.
 | `mangaplus` | numeric title ID | none | strict numeric regex | mobile protobuf API; lazily registers a deterministic device secret |
 | `flamecomics` | full series URL | none | `https://flamecomics.xyz` prefix | HTML + embedded JSON |
 | `asurascans` | full series URL | none | `https://asurascans.com/comics/...` | server-rendered HTML; filters locked early-access chapters from discovery |
-| `cubari` | gist URL | `-g` required | valid URL + non-empty group | images resolved in payload |
+| `cubari` | gist URL | `-g` required | valid URL + non-empty group | images listed in the payload, or fetched from the `/proxy/...` path the gist points at |
 | `weebcentral` | full series URL | none | `https://weebcentral.com` prefix | scraper + chapter image fragment fetch |
 | `atsumaru` | full manga URL | `-g` required | `https://atsu.moe/manga/...` prefix + non-empty scan ID | API-based |
 

@@ -16,9 +16,12 @@ import (
 	"github.com/avast/retry-go"
 )
 
+const cubariURL = "https://cubari.moe"
+
 type cubari struct {
 	MangaURL string
 	GroupID  string
+	BaseURL  string
 	Client   *http.Client
 }
 
@@ -43,6 +46,7 @@ func NewCubari(mangaURL, groupID string) domain.Source {
 	return &cubari{
 		MangaURL: mangaURL,
 		GroupID:  groupID,
+		BaseURL:  cubariURL,
 		Client:   &client,
 	}
 }
@@ -66,36 +70,13 @@ func (c *cubari) ValidateInput() error {
 func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 	var cubariResp cubariResponse
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.MangaURL, nil)
-	if err != nil {
-		return domain.Manga{}, fmt.Errorf("creating request: %w", err)
-	}
-
-	req.Header.Set("User-Agent", "mangarr")
-
-	retryErr := retry.Do(func() error {
-		resp, err := sharedhttp.ExecRequest(*c.Client, req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		err = json.NewDecoder(resp.Body).Decode(&cubariResp)
-		if err != nil {
-			return retry.Unrecoverable(fmt.Errorf("decoding response: %w", err))
-		}
-
-		return nil
-	},
-		sharedhttp.RetryOptions(ctx)...,
-	)
-	if retryErr != nil {
-		return domain.Manga{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
+	if err := c.fetchJSON(ctx, c.MangaURL, &cubariResp); err != nil {
+		return domain.Manga{}, err
 	}
 
 	title := cubariResp.Title
 	if len(title) == 0 {
-		return domain.Manga{}, fmt.Errorf("getting manga for URL %s", req.URL)
+		return domain.Manga{}, fmt.Errorf("getting manga for URL %s", c.MangaURL)
 	}
 
 	manga := domain.Manga{
@@ -118,8 +99,8 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 			continue
 		}
 
-		var imageURLs []string
-		if err := json.Unmarshal(rawURLs, &imageURLs); err != nil {
+		imageURLs, err := c.chapterImageURLs(ctx, rawURLs)
+		if err != nil {
 			return domain.Manga{}, fmt.Errorf("decoding chapter %s image URLs for group %s: %w", num, c.GroupID, err)
 		}
 		if len(imageURLs) == 0 {
@@ -143,6 +124,75 @@ func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
 	}
 
 	return manga, nil
+}
+
+// chapterImageURLs resolves a group entry, which Cubari gists write either as a
+// list of image URLs or as a proxy path that has to be fetched to get that list.
+func (c *cubari) chapterImageURLs(ctx context.Context, raw json.RawMessage) ([]string, error) {
+	var proxyPath string
+	if err := json.Unmarshal(raw, &proxyPath); err != nil {
+		var imageURLs []string
+		if err := json.Unmarshal(raw, &imageURLs); err != nil {
+			return nil, err
+		}
+
+		return imageURLs, nil
+	}
+
+	proxyURL, err := c.proxyURL(proxyPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var imageURLs []string
+	if err := c.fetchJSON(ctx, proxyURL, &imageURLs); err != nil {
+		return nil, err
+	}
+
+	return imageURLs, nil
+}
+
+func (c *cubari) proxyURL(path string) (string, error) {
+	if strings.HasPrefix(path, "http://") || strings.HasPrefix(path, "https://") {
+		return path, nil
+	}
+
+	proxyURL, err := url.JoinPath(c.BaseURL, path)
+	if err != nil {
+		return "", fmt.Errorf("building proxy URL for %s: %w", path, err)
+	}
+
+	return proxyURL, nil
+}
+
+func (c *cubari) fetchJSON(ctx context.Context, rawURL string, target any) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return fmt.Errorf("creating request: %w", err)
+	}
+
+	req.Header.Set("User-Agent", "mangarr")
+
+	retryErr := retry.Do(func() error {
+		resp, err := sharedhttp.ExecRequest(*c.Client, req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+			return retry.Unrecoverable(fmt.Errorf("decoding response: %w", err))
+		}
+
+		return nil
+	},
+		sharedhttp.RetryOptions(ctx)...,
+	)
+	if retryErr != nil {
+		return fmt.Errorf("executing request %s: %w", req.URL, retryErr)
+	}
+
+	return nil
 }
 
 func (c *cubari) GetChapters(_ context.Context, _ domain.Manga) error {
