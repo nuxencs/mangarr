@@ -24,3 +24,4 @@ go.work
 .idea/
 .vscode/
 dist/
+.DS_Store
