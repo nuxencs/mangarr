@@ -112,7 +112,12 @@ func (w *weebcentral) GetChapters(_ context.Context, manga domain.Manga) error {
 	})
 
 	c.OnHTML("a.flex", func(e *colly.HTMLElement) {
-		chapterURL := e.Attr("href")
+		chapterURL, err := resolveAgainstBase(w.BaseURL, e.Attr("href"))
+		if err != nil {
+			errors = append(errors, fmt.Errorf("resolving chapter URL: %w", err))
+			return
+		}
+
 		name := e.ChildText("span.grow")
 		number, err := w.getChapterNumber(name)
 		if err != nil {
