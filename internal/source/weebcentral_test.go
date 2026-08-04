@@ -53,6 +53,36 @@ func TestWeebCentralGetImageURLsExtractsChapterAssets(t *testing.T) {
 	require.Equal(t, server.URL+"/media/chapter-002.png", chapter.ImageInfo[1].ImageURL)
 }
 
+func TestWeebCentralResolvesRelativeChapterURLs(t *testing.T) {
+	t.Parallel()
+
+	const chapterPath = "/chapters/01RELATIVECHAPTER"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/series/series-id/full-chapter-list":
+			fmt.Fprintf(w, `<a class="flex" href="%s"><span class="grow">Chapter 356</span></a>`, chapterPath)
+		case chapterPath + "/images":
+			fmt.Fprint(w, `<img src="/media/chapter-356.png" />`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	src := newTestWeebCentral(server.URL+"/series/series-id", server.URL)
+	chapterNumber := domain.MustParseChapterNumber("356")
+	manga := domain.Manga{
+		Title:    "Blue Lock",
+		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
+	}
+
+	require.NoError(t, src.GetChapters(t.Context(), manga))
+	chapter := manga.Chapters[chapterNumber]
+	require.NoError(t, src.GetImageURLs(t.Context(), &chapter))
+	require.Equal(t, server.URL+"/media/chapter-356.png", chapter.ImageInfo[0].ImageURL)
+}
+
 func TestWeebCentralGetImageURLsErrorsWhenFragmentHasNoImages(t *testing.T) {
 	t.Parallel()
 
