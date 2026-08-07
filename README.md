@@ -47,6 +47,8 @@ mangarr download --help
 mangarr download -d ./downloads -s tcbscans -m "One Piece"
 ```
 
+The command returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
+
 If you want a different source, the value you pass to `-m` changes by provider. Use the table below.
 
 ## Monitor Mode

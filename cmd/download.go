@@ -22,9 +22,10 @@ import (
 )
 
 var downloadCmd = &cobra.Command{
-	Use:   "download",
-	Short: "Download a specified chapter",
-	Run: func(cmd *cobra.Command, _ []string) {
+	Use:          "download",
+	Short:        "Download a specified chapter",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		ctx := cmd.Context()
 
 		// init new logger
@@ -35,8 +36,7 @@ var downloadCmd = &cobra.Command{
 		}
 
 		if err := files.IsValidLocation(downloadDirectory); err != nil {
-			log.Error().Err(err).Msgf("Invalid download location")
-			return
+			return fmt.Errorf("invalid download location: %w", err)
 		}
 
 		var s domain.Source
@@ -61,32 +61,27 @@ var downloadCmd = &cobra.Command{
 		case "atsumaru":
 			s = source.NewAtsumaru(manga, group)
 		default:
-			log.Error().Msgf("Invalid source: %s", mangaSource)
-			return
+			return fmt.Errorf("invalid source %q", mangaSource)
 		}
 
 		if err := s.ValidateInput(); err != nil {
-			log.Error().Err(err).Msgf("Invalid input")
-			return
+			return fmt.Errorf("invalid input: %w", err)
 		}
 
 		selectedManga, err := s.GetManga(ctx)
 		if err != nil {
-			log.Error().Err(err).Msgf("Failed to get manga from %s", s)
-			return
+			return fmt.Errorf("getting manga from %s: %w", s, err)
 		}
 
 		if err := s.GetChapters(ctx, selectedManga); err != nil {
-			log.Error().Err(err).Msgf("Failed to get chapters for %s", selectedManga.Title)
-			return
+			return fmt.Errorf("getting chapters for %s: %w", selectedManga.Title, err)
 		}
 
 		var selectedChapterNumbers []domain.ChapterNumber
 
 		firstChapterNr, latestChapterNr, err := parse.MinMaxChapterNumbers(selectedManga.Chapters)
 		if err != nil {
-			log.Error().Err(err).Msgf("Failed to parse chapter number for %s", selectedManga.Title)
-			return
+			return fmt.Errorf("parsing chapter numbers for %s: %w", selectedManga.Title, err)
 		}
 
 		switch {
@@ -99,14 +94,12 @@ var downloadCmd = &cobra.Command{
 		default:
 			selectedChapterNumbers, err = parse.ChapterSelection(chapterNumbers, selectedManga.Chapters)
 			if err != nil {
-				log.Error().Err(err).Msgf("Failed to parse chapter selection for %s", selectedManga.Title)
-				return
+				return fmt.Errorf("parsing chapter selection for %s: %w", selectedManga.Title, err)
 			}
 		}
 
 		if len(selectedChapterNumbers) == 0 {
-			log.Error().Msgf("Failed to find matching chapters in range %s for %s", chapterNumbers, selectedManga.Title)
-			return
+			return fmt.Errorf("finding matching chapters in range %s for %s", chapterNumbers, selectedManga.Title)
 		}
 
 		overwrittenTitle := sanitize.Filename(overwrite)
@@ -121,10 +114,8 @@ var downloadCmd = &cobra.Command{
 		)
 
 		type chapterResult struct {
-			name          string
 			chapterNumber domain.ChapterNumber
 			status        string
-			err           error
 		}
 
 		results := make(chan chapterResult, len(selectedChapterNumbers))
@@ -139,7 +130,6 @@ var downloadCmd = &cobra.Command{
 
 				result := chapterResult{
 					chapterNumber: chapterNumber,
-					name:          fmt.Sprintf("Chapter %s", chapterNumber),
 					status:        chapterStatusFailed,
 				}
 				shouldDelay := true
@@ -155,14 +145,13 @@ var downloadCmd = &cobra.Command{
 
 				selectedChapter, ok := selectedManga.Chapters[chapterNumber]
 				if !ok {
-					result.err = fmt.Errorf("chapter %s not found", chapterNumber)
-					log.Error().Err(result.err).Msgf("Failed to find chapter with number %s", chapterNumber)
+					err := fmt.Errorf("chapter %s not found", chapterNumber)
+					log.Error().Err(err).Msgf("Failed to find chapter with number %s", chapterNumber)
 					return
 				}
 
 				t := templater.New(selectedManga, selectedChapter)
 				templatedName := t.ExecTemplate(naming)
-				result.name = templatedName
 
 				chapterFolder := sanitize.Filename(templatedName)
 				contentPath := filepath.Join(downloadDirectory, selectedManga.Title, chapterFolder+".cbz")
@@ -170,49 +159,44 @@ var downloadCmd = &cobra.Command{
 				if _, err := os.Stat(contentPath); err == nil {
 					log.Info().Msgf("Chapter has already been downloaded, skipping %q", templatedName)
 					result.status = chapterStatusSkipped
-					result.err = nil
 					shouldDelay = false
 					return
 				}
 
 				if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
-					result.err = err
 					log.Error().Err(err).Msgf("Failed to get image URLs for chapter %s", selectedChapter.Number)
 					return
 				}
 
 				log.Info().Msgf("Downloading %q", templatedName)
 				if err := download.Chapter(ctx, log, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
-					result.err = err
 					log.Error().Err(err).Msgf("Failed to download chapter %q", templatedName)
 					return
 				}
 
 				log.Info().Msgf("Finished downloading %q", templatedName)
 				result.status = chapterStatusDownloaded
-				result.err = nil
 			})
 		}
 
 		wg.Wait()
 		close(results)
 
-		if len(selectedChapterNumbers) > 1 {
-			downloaded := 0
-			var skipped []domain.ChapterNumber
-			var failed []domain.ChapterNumber
-
-			for res := range results {
-				switch res.status {
-				case chapterStatusDownloaded:
-					downloaded++
-				case chapterStatusSkipped:
-					skipped = append(skipped, res.chapterNumber)
-				case chapterStatusFailed:
-					failed = append(failed, res.chapterNumber)
-				}
+		downloaded := 0
+		var skipped []domain.ChapterNumber
+		var failed []domain.ChapterNumber
+		for result := range results {
+			switch result.status {
+			case chapterStatusDownloaded:
+				downloaded++
+			case chapterStatusSkipped:
+				skipped = append(skipped, result.chapterNumber)
+			case chapterStatusFailed:
+				failed = append(failed, result.chapterNumber)
 			}
+		}
 
+		if len(selectedChapterNumbers) > 1 {
 			log.Info().Msgf(
 				"Summary: downloaded=%d skipped=%d failed=%d",
 				downloaded,
@@ -226,12 +210,13 @@ var downloadCmd = &cobra.Command{
 			if len(failed) > 0 {
 				log.Info().Msgf("Failed chapters: %s", parse.FormatChapterList(failed))
 			}
-		} else {
-			for res := range results {
-				// drain channel if no summary required
-				_ = res
-			}
 		}
+
+		if len(failed) > 0 {
+			return fmt.Errorf("failed to download chapters: %s", parse.FormatChapterList(failed))
+		}
+
+		return nil
 	},
 }
 
