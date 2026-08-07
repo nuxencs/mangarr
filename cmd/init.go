@@ -31,7 +31,7 @@ func initRootFlags(root *cobra.Command, options *rootOptions) {
 		"config",
 		"c",
 		"",
-		"specifies the path to your config file",
+		"directory that contains config.yaml",
 	)
 }
 

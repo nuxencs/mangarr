@@ -1,6 +1,6 @@
 # SECURITY.md
 
-Verified on 2026-03-26.
+Verified on 2026-08-07.
 
 ## Trust Boundaries
 
@@ -21,9 +21,10 @@ Verified on 2026-03-26.
 - keep archive output under explicit user-selected directories
 - prefer shared HTTP code paths over ad hoc adapter-local clients
 - document new dependencies before adoption
+- scan reachable dependencies with `govulncheck` in CI
+- run the container as an unprivileged user with a pinned Alpine release line
 
 ## Gaps
 
-- no documented vuln-scanning routine beyond normal dependency hygiene
 - no dedicated egress allowlist or source isolation controls
-- no CI checks focused specifically on dependency or docs-governance risk
+- GitHub actions use version tags rather than immutable commit digests

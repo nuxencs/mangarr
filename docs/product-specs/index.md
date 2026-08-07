@@ -1,6 +1,6 @@
 # Product Specs Index
 
-Catalog verified on 2026-03-07.
+Catalog verified on 2026-08-07.
 
 ## Specs
 

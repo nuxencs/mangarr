@@ -1,6 +1,6 @@
 # DESIGN.md
 
-Verified against code on 2026-03-07.
+Verified against code on 2026-08-07.
 
 Use this file as the design-doc entry point. Start small, then drill down.
 

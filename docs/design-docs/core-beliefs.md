@@ -1,6 +1,6 @@
 # Core Beliefs
 
-Verified on 2026-03-07.
+Verified on 2026-08-07.
 
 ## Agent-First Principles
 

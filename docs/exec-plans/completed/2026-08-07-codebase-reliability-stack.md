@@ -174,3 +174,35 @@ production functions under `deadcode`.
 
 Notes/risks: Test-only parse helpers remain local to the packages that need concise
 fixture setup. They are not part of the production API.
+
+## Bucket 9 - Container and documentation alignment - ALIGNED
+
+Built: Pinned the builder to Go 1.26.5 and the runtime to Alpine 3.23, removed
+unused runtime packages, added safe Compose defaults, implemented the documented
+operating-system and binary config lookup order, and refreshed architecture,
+reliability, security, quality, operator, usage, and debt documentation.
+
+Serves goal/decision because: Release inputs now match the verified toolchain and
+supported runtime behavior, and users and maintainers have one current operating
+contract.
+
+Notes/risks: The local Docker daemon was unavailable. Registry manifest lookup
+confirmed both base image tags, and GitHub's multi-architecture build is the image
+build gate. Default bind-mount directories must be writable by the configured
+container UID and GID.
+
+## Final Verification
+
+- `go test ./...`
+- `go test -race ./...`
+- `go build ./...`
+- `go vet ./...`
+- `govulncheck ./...`
+- `deadcode ./...`
+- `go mod tidy -diff`
+- `docker compose config --quiet`
+- `yamllint .github .goreleaser.yaml config.yaml docker-compose.yml`
+- `goreleaser check`
+- Docker registry manifest lookup for both pinned base images
+- GitHub Actions checks passed for stack PRs #101 through #108 before final PR publication
+- Live discovery and latest-chapter page resolution passed for all nine source adapters on 2026-08-08

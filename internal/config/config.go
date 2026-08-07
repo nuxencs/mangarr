@@ -243,19 +243,47 @@ func resolveConfigFile(configPath string) (string, error) {
 		return filepath.Join(cleanPath, "config.yaml"), nil
 	}
 
-	locations := []string{
-		"./config.yaml",
-		"$HOME/.config/mangarr/config.yaml",
-		"$HOME/.mangarr/config.yaml",
+	var userConfigDir, homeDir, executablePath string
+	if path, err := os.UserConfigDir(); err == nil {
+		userConfigDir = path
 	}
-	for _, location := range locations {
-		expanded := os.ExpandEnv(location)
-		if _, err := os.Stat(expanded); err == nil {
-			return expanded, nil
-		}
+	if path, err := os.UserHomeDir(); err == nil {
+		homeDir = path
+	}
+	if path, err := os.Executable(); err == nil {
+		executablePath = path
 	}
 
-	return "", fmt.Errorf("could not find config file")
+	locations := defaultConfigLocations(userConfigDir, homeDir, executablePath)
+	if location, ok := firstExistingConfig(locations); ok {
+		return location, nil
+	}
+
+	return "", fmt.Errorf("could not find config file in default locations")
+}
+
+func firstExistingConfig(locations []string) (string, bool) {
+	for _, location := range locations {
+		info, err := os.Stat(location)
+		if err == nil && !info.IsDir() {
+			return location, true
+		}
+	}
+	return "", false
+}
+
+func defaultConfigLocations(userConfigDir, homeDir, executablePath string) []string {
+	locations := make([]string, 0, 3)
+	if userConfigDir != "" {
+		locations = append(locations, filepath.Join(userConfigDir, "mangarr", "config.yaml"))
+	}
+	if homeDir != "" {
+		locations = append(locations, filepath.Join(homeDir, ".mangarr", "config.yaml"))
+	}
+	if executablePath != "" {
+		locations = append(locations, filepath.Join(filepath.Dir(executablePath), "config.yaml"))
+	}
+	return locations
 }
 
 func (c *AppConfig) loadSnapshot() (*domain.Config, error) {
