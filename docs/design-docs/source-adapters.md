@@ -36,4 +36,6 @@ All adapters implement `domain.Source`.
 - `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
 - source-specific image transforms use `domain.ImageProcessor`; the downloader owns transport and output while the source adapter owns the transform
 - retry policy comes from `internal/sharedhttp/`
+- HTTP and Colly-backed requests inherit caller cancellation
+- fixture-backed parser flows cover every supported source
 - manhwa/long-strip handling flows through `selectedManga.IsManhwa`

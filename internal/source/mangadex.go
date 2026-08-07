@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"time"
 
 	"mangarr/internal/domain"
@@ -31,6 +32,7 @@ type mangadex struct {
 	GroupID  string
 	Language string
 	Client   *http.Client
+	BaseURL  string
 }
 
 type mangadexManga struct {
@@ -82,6 +84,7 @@ func NewMangadex(manga, group, language string) domain.Source {
 		GroupID:  group,
 		Language: language,
 		Client:   &client,
+		BaseURL:  mangadexURL,
 	}
 }
 
@@ -94,9 +97,11 @@ func (m *mangadex) ValidateInput() error {
 		return fmt.Errorf("parsing MangaDex manga id: %w", err)
 	}
 
-	// if _, err := uuid.Parse(m.GroupID); err != nil {
-	// 	 return fmt.Errorf("parsing Manga PLUS group id: %w", err)
-	// }
+	if m.GroupID != "" {
+		if _, err := uuid.Parse(m.GroupID); err != nil {
+			return fmt.Errorf("parsing MangaDex group id: %w", err)
+		}
+	}
 
 	if len(m.Language) == 0 {
 		m.Language = "en"
@@ -109,7 +114,7 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 	var mangaResp mangadexManga
 	var isManhwa bool
 
-	path, err := url.JoinPath(mangadexURL, "manga", m.MangaID)
+	path, err := url.JoinPath(m.BaseURL, "manga", m.MangaID)
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("building URL: %w", err)
 	}
@@ -168,7 +173,7 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 	var chapterCount int
 	var offset int
 
-	path, err := url.JoinPath(mangadexURL, "manga", m.MangaID, "feed")
+	path, err := url.JoinPath(m.BaseURL, "manga", m.MangaID, "feed")
 	if err != nil {
 		return fmt.Errorf("building URL: %w", err)
 	}
@@ -233,25 +238,30 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 			}
 		}
 
-		if len(manga.Chapters) == 0 {
-			return fmt.Errorf("getting chapters for manga ID %s", m.MangaID)
-		}
-
 		chapterCount += len(chapterResp.Data)
 
-		if chapterCount == chapterResp.Total {
-			return nil
+		if chapterCount >= chapterResp.Total {
+			break
+		}
+		if len(chapterResp.Data) == 0 {
+			return fmt.Errorf("getting chapters for manga ID %s: pagination stopped at offset %d of %d", m.MangaID, offset, chapterResp.Total)
 		}
 
 		offset += mangadexResultLimit
 	}
+
+	if len(manga.Chapters) == 0 {
+		return fmt.Errorf("getting chapters for manga ID %s", m.MangaID)
+	}
+
+	return nil
 }
 
 func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
 	var chapterResp mangadexChapter
 	var imageInfos []domain.ImageInfo
 
-	path, err := url.JoinPath(mangadexURL, "at-home/server", chapter.ID)
+	path, err := url.JoinPath(m.BaseURL, "at-home/server", chapter.ID)
 	if err != nil {
 		return fmt.Errorf("building URL: %w", err)
 	}
@@ -303,8 +313,22 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 }
 
 func (m *mangadex) getMangaTitle(titles map[string]string) string {
-	for _, title := range titles {
+	if title := titles[m.Language]; title != "" {
 		return title
+	}
+	if title := titles["en"]; title != "" {
+		return title
+	}
+
+	languages := make([]string, 0, len(titles))
+	for language := range titles {
+		languages = append(languages, language)
+	}
+	sort.Strings(languages)
+	for _, language := range languages {
+		if titles[language] != "" {
+			return titles[language]
+		}
 	}
 
 	return ""

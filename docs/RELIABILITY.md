@@ -18,6 +18,7 @@ Verified on 2026-03-26.
 - atomic archive publication after ZIP writers and files close successfully
 - optional `pprof` endpoint for runtime inspection
 - config reload without full process restart
+- fixture-backed regression flows for every source adapter
 
 ## Verification Expectations
 

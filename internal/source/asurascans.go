@@ -17,8 +17,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/avast/retry-go"
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
 )
 
 const asurascansBaseURL = "https://asurascans.com"
@@ -30,7 +30,7 @@ var (
 
 type asurascans struct {
 	MangaURL  string
-	Collector colly.Collector
+	Collector *colly.Collector
 	Client    http.Client
 	BaseURL   string
 }
@@ -44,7 +44,7 @@ func NewAsurascans(mangaURL string) domain.Source {
 
 	return &asurascans{
 		MangaURL:  mangaURL,
-		Collector: *collector,
+		Collector: collector,
 		BaseURL:   asurascansBaseURL,
 		Client: http.Client{
 			Timeout:   120 * time.Second,
@@ -78,7 +78,7 @@ func (a *asurascans) ValidateInput() error {
 	return nil
 }
 
-func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
+func (a *asurascans) GetManga(ctx context.Context) (domain.Manga, error) {
 	parsed, err := url.Parse(a.MangaURL)
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("parsing URL %s: %w", a.MangaURL, err)
@@ -93,6 +93,7 @@ func (a *asurascans) GetManga(_ context.Context) (domain.Manga, error) {
 
 	var errors []error
 	c := a.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))

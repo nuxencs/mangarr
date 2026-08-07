@@ -9,8 +9,8 @@ import (
 
 	"mangarr/internal/domain"
 
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -174,7 +174,7 @@ func newTestAsurascans(mangaURL, baseURL string) *asurascans {
 
 	return &asurascans{
 		MangaURL:  mangaURL,
-		Collector: *collector,
+		Collector: collector,
 		BaseURL:   baseURL,
 		Client:    *http.DefaultClient,
 	}
