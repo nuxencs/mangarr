@@ -8,7 +8,7 @@ Catalog verified on 2026-03-07.
 | --- | --- | --- | --- |
 | [core-beliefs.md](./core-beliefs.md) | active | reviewed against current repo goals | deciding tradeoffs, guardrails, cleanup bar |
 | [runtime-model.md](./runtime-model.md) | active | checked against `cmd/` and `internal/config/` | changing command orchestration or runtime behavior |
-| [source-adapters.md](./source-adapters.md) | active | checked against `internal/source/` | touching source inputs, selectors, browser usage |
+| [source-adapters.md](./source-adapters.md) | active | checked against `internal/source/` | touching source inputs, selectors, or transport |
 
 ## Verification Rules
 

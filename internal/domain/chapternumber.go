@@ -67,15 +67,6 @@ func ParseChapterNumber(input string) (ChapterNumber, error) {
 	}, nil
 }
 
-func MustParseChapterNumber(input string) ChapterNumber {
-	number, err := ParseChapterNumber(input)
-	if err != nil {
-		panic(err)
-	}
-
-	return number
-}
-
 func (c ChapterNumber) String() string {
 	whole := strconv.Itoa(c.Whole)
 	if !c.HasFraction() {

@@ -11,7 +11,7 @@ import (
 func TestExecTemplateUsesCanonicalChapterNumber(t *testing.T) {
 	tpl := New(
 		domain.Manga{Title: "Series"},
-		domain.Chapter{Number: domain.MustParseChapterNumber("1.50"), Title: "Pilot"},
+		domain.Chapter{Number: mustChapterNumber("1.50"), Title: "Pilot"},
 	)
 
 	assert.Equal(t, "Series Ch. 1.5 - Pilot", tpl.ExecTemplate("{manga:<.>} Ch. {num}{title: - <.>}"))
@@ -20,8 +20,16 @@ func TestExecTemplateUsesCanonicalChapterNumber(t *testing.T) {
 func TestExecTemplatePadsWholePart(t *testing.T) {
 	tpl := New(
 		domain.Manga{Title: "Series"},
-		domain.Chapter{Number: domain.MustParseChapterNumber("10.01")},
+		domain.Chapter{Number: mustChapterNumber("10.01")},
 	)
 
 	assert.Equal(t, "0010.01", tpl.ExecTemplate("{num:4}"))
+}
+
+func mustChapterNumber(input string) domain.ChapterNumber {
+	number, err := domain.ParseChapterNumber(input)
+	if err != nil {
+		panic(err)
+	}
+	return number
 }

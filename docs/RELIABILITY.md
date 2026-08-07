@@ -13,7 +13,7 @@ Verified on 2026-03-26.
 ## Existing Controls
 
 - shared retry policy in `internal/sharedhttp/`
-- bounded concurrency via semaphores
+- bounded chapter, source, and image concurrency
 - skip-on-existing archive behavior
 - atomic archive publication after ZIP writers and files close successfully
 - optional `pprof` endpoint for runtime inspection

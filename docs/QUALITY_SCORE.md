@@ -17,7 +17,7 @@ Baseline captured on 2026-03-07.
 | --- | --- | --- | --- |
 | CLI/orchestration | B | straightforward command layout | reduce some duplication between download and monitor selection flow |
 | Core helpers | B | cohesive small packages | more tests around edge cases and naming semantics |
-| Integration layer | C+ | shared retry/browser seams help | source drift remains dominant reliability risk |
+| Integration layer | C+ | shared retry and fixture seams help | source drift remains dominant reliability risk |
 | Output/observability | B- | logs and pprof exist | no formal health checklist or richer status summaries |
 
 ## Trend

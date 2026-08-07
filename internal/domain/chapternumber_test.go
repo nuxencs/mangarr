@@ -8,6 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func mustParseChapterNumber(input string) ChapterNumber {
+	number, err := ParseChapterNumber(input)
+	if err != nil {
+		panic(err)
+	}
+	return number
+}
+
 func TestParseChapterNumber(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -108,15 +116,15 @@ func TestChapterNumberPad(t *testing.T) {
 }
 
 func TestChapterNumberCompare(t *testing.T) {
-	one := MustParseChapterNumber("1")
-	onePointZeroOne := MustParseChapterNumber("1.01")
-	onePointOne := MustParseChapterNumber("1.1")
-	tenPointFive := MustParseChapterNumber("10.5")
+	one := mustParseChapterNumber("1")
+	onePointZeroOne := mustParseChapterNumber("1.01")
+	onePointOne := mustParseChapterNumber("1.1")
+	tenPointFive := mustParseChapterNumber("10.5")
 
 	assert.True(t, one.Less(onePointZeroOne))
 	assert.True(t, onePointZeroOne.Less(onePointOne))
 	assert.True(t, onePointOne.Less(tenPointFive))
-	assert.Equal(t, 0, MustParseChapterNumber("1.50").Compare(MustParseChapterNumber("1.5")))
+	assert.Equal(t, 0, mustParseChapterNumber("1.50").Compare(mustParseChapterNumber("1.5")))
 }
 
 func TestChapterNumberUnmarshalJSON(t *testing.T) {
