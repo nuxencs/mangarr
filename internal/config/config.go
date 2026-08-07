@@ -1,14 +1,14 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
+	"sync/atomic"
 	"time"
 
 	"mangarr/internal/domain"
@@ -18,7 +18,6 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/structs"
 	"github.com/knadh/koanf/v2"
-	"github.com/pkg/errors"
 )
 
 var configTemplate = `# config.yaml
@@ -164,7 +163,7 @@ logLevel: "DEBUG"
 #logMaxBackups = 3
 `
 
-func (c *AppConfig) writeConfig(configPath string, configFile string) error {
+func writeConfig(configPath string, configFile string) error {
 	cfgPath := filepath.Join(configPath, configFile)
 
 	// check if configPath exists, if not create it
@@ -198,198 +197,240 @@ func (c *AppConfig) writeConfig(configPath string, configFile string) error {
 	return nil
 }
 
-type Config interface {
-	UpdateConfig() error
-	DynamicReload(log logger.Logger)
-}
-
 type AppConfig struct {
-	Config *domain.Config
-	m      *sync.Mutex
-	k      *koanf.Koanf
+	current    atomic.Pointer[domain.Config]
+	configFile string
+	version    string
 }
 
 func New(configPath string, version string) *AppConfig {
-	c := &AppConfig{
-		Config: &domain.Config{
-			Version:    version,
-			ConfigPath: configPath,
-		},
-		m: new(sync.Mutex),
-		k: koanf.New("."),
-	}
-
-	c.defaults()
-	c.load()
-	c.loadFromEnv()
-
-	if c.Config.DownloadLocation == "" {
-		log.Fatalf("downloadLocation can't be empty, please provide a valid path to the directory you want your downloads to go to")
+	c, err := Load(configPath, version)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	return c
 }
 
-func (c *AppConfig) defaults() {
-	c.Config.DownloadLocation = ""
-	c.Config.NamingTemplate = "{manga:<.>} Ch. {num:3}"
-	c.Config.CheckInterval = 15
-	c.Config.PprofEnabled = false
-	c.Config.PprofAddress = "127.0.0.1:6060"
-	c.Config.MonitoredManga = make(map[string]*domain.MonitoredManga)
-	c.Config.LogPath = ""
-	c.Config.LogLevel = "DEBUG"
-	c.Config.LogMaxSize = 50
-	c.Config.LogMaxBackups = 3
+func Load(configPath string, version string) (*AppConfig, error) {
+	configFile, err := resolveConfigFile(configPath)
+	if err != nil {
+		return nil, err
+	}
 
-	// load default values into koanf
-	if err := c.k.Load(structs.Provider(c.Config, "yaml"), nil); err != nil {
-		log.Fatalf("could not load default values into config: %q", err)
+	c := &AppConfig{configFile: configFile, version: version}
+	snapshot, err := c.loadSnapshot()
+	if err != nil {
+		return nil, err
+	}
+	c.current.Store(snapshot)
+
+	return c, nil
+}
+
+func defaultConfig(version, configFile string) domain.Config {
+	return domain.Config{
+		Version:        version,
+		ConfigPath:     filepath.Dir(configFile),
+		NamingTemplate: "{manga:<.>} Ch. {num:3}{title: - <.>}",
+		CheckInterval:  15,
+		PprofAddress:   "127.0.0.1:6060",
+		MonitoredManga: make(map[string]*domain.MonitoredManga),
+		LogLevel:       "DEBUG",
+		LogMaxSize:     50,
+		LogMaxBackups:  3,
 	}
 }
 
-func (c *AppConfig) loadFromEnv() {
-	prefix := "MANGARR__"
+func resolveConfigFile(configPath string) (string, error) {
+	if configPath != "" {
+		cleanPath := filepath.Clean(configPath)
+		if err := writeConfig(cleanPath, "config.yaml"); err != nil {
+			return "", fmt.Errorf("writing config template: %w", err)
+		}
+
+		return filepath.Join(cleanPath, "config.yaml"), nil
+	}
+
+	locations := []string{
+		"./config.yaml",
+		"$HOME/.config/mangarr/config.yaml",
+		"$HOME/.mangarr/config.yaml",
+	}
+	for _, location := range locations {
+		expanded := os.ExpandEnv(location)
+		if _, err := os.Stat(expanded); err == nil {
+			return expanded, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find config file")
+}
+
+func (c *AppConfig) loadSnapshot() (*domain.Config, error) {
+	cfg := defaultConfig(c.version, c.configFile)
+	k := koanf.New(".")
+	if err := k.Load(structs.Provider(&cfg, "yaml"), nil); err != nil {
+		return nil, fmt.Errorf("loading config defaults: %w", err)
+	}
+	if err := k.Load(file.Provider(c.configFile), yaml.Parser()); err != nil {
+		return nil, fmt.Errorf("reading config file %s: %w", c.configFile, err)
+	}
+	if err := k.Unmarshal("", &cfg); err != nil {
+		return nil, fmt.Errorf("decoding config file %s: %w", c.configFile, err)
+	}
+
+	applyEnvironment(&cfg)
+	if err := validate(cfg); err != nil {
+		return nil, fmt.Errorf("validating config file %s: %w", c.configFile, err)
+	}
+
+	snapshot := cloneConfig(cfg)
+	return &snapshot, nil
+}
+
+func applyEnvironment(cfg *domain.Config) {
+	const prefix = "MANGARR__"
 
 	envs := os.Environ()
 	for _, env := range envs {
-		if strings.HasPrefix(env, prefix) {
-			envPair := strings.SplitN(env, "=", 2)
+		if !strings.HasPrefix(env, prefix) {
+			continue
+		}
 
-			if envPair[1] != "" {
-				switch envPair[0] {
-				case prefix + "DOWNLOAD_LOCATION":
-					c.Config.DownloadLocation = envPair[1]
-				case prefix + "NAMING_TEMPLATE":
-					c.Config.NamingTemplate = envPair[1]
-				case prefix + "CHECK_INTERVAL":
-					if i, _ := strconv.ParseInt(envPair[1], 10, 32); i > 0 {
-						c.Config.CheckInterval = time.Duration(i)
-					}
-				case prefix + "PPROF_ENABLED":
-					if b, err := strconv.ParseBool(envPair[1]); err == nil {
-						c.Config.PprofEnabled = b
-					}
-				case prefix + "PPROF_ADDRESS":
-					c.Config.PprofAddress = envPair[1]
-				case prefix + "LOG_LEVEL":
-					c.Config.LogLevel = envPair[1]
-				case prefix + "LOG_PATH":
-					c.Config.LogPath = envPair[1]
-				case prefix + "LOG_MAX_SIZE":
-					if i, _ := strconv.ParseInt(envPair[1], 10, 32); i > 0 {
-						c.Config.LogMaxSize = int(i)
-					}
-				case prefix + "LOG_MAX_BACKUPS":
-					if i, _ := strconv.ParseInt(envPair[1], 10, 32); i > 0 {
-						c.Config.LogMaxBackups = int(i)
-					}
-				}
+		envPair := strings.SplitN(env, "=", 2)
+		if len(envPair) != 2 || envPair[1] == "" {
+			continue
+		}
+
+		switch envPair[0] {
+		case prefix + "DOWNLOAD_LOCATION":
+			cfg.DownloadLocation = envPair[1]
+		case prefix + "NAMING_TEMPLATE":
+			cfg.NamingTemplate = envPair[1]
+		case prefix + "CHECK_INTERVAL":
+			if i, err := strconv.ParseInt(envPair[1], 10, 32); err == nil {
+				cfg.CheckInterval = time.Duration(i)
+			}
+		case prefix + "PPROF_ENABLED":
+			if enabled, err := strconv.ParseBool(envPair[1]); err == nil {
+				cfg.PprofEnabled = enabled
+			}
+		case prefix + "PPROF_ADDRESS":
+			cfg.PprofAddress = envPair[1]
+		case prefix + "LOG_LEVEL":
+			cfg.LogLevel = strings.ToUpper(envPair[1])
+		case prefix + "LOG_PATH":
+			cfg.LogPath = envPair[1]
+		case prefix + "LOG_MAX_SIZE":
+			if i, err := strconv.ParseInt(envPair[1], 10, 32); err == nil {
+				cfg.LogMaxSize = int(i)
+			}
+		case prefix + "LOG_MAX_BACKUPS":
+			if i, err := strconv.ParseInt(envPair[1], 10, 32); err == nil {
+				cfg.LogMaxBackups = int(i)
 			}
 		}
 	}
-
-	if err := c.k.Load(structs.Provider(c.Config, "yaml"), nil); err != nil {
-		log.Fatalf("could not load env vars into config: %q", err)
-	}
 }
 
-func (c *AppConfig) load() {
-	configPath := path.Clean(c.Config.ConfigPath)
-
-	var configFile string
-
-	if configPath != "" {
-		if err := c.writeConfig(configPath, "config.yaml"); err != nil {
-			log.Printf("config write error: %q", err)
-		}
-
-		configFile = path.Join(configPath, "config.yaml")
-	} else {
-		locations := []string{
-			"./config.yaml",
-			"$HOME/.config/mangarr/config.yaml",
-			"$HOME/.mangarr/config.yaml",
-		}
-
-		for _, loc := range locations {
-			expandedLoc := os.ExpandEnv(loc)
-			if _, err := os.Stat(expandedLoc); err == nil {
-				configFile = expandedLoc
-				break
-			}
-		}
-
-		if configFile == "" {
-			log.Fatalf("could not find config file")
-		}
+func validate(cfg domain.Config) error {
+	if cfg.DownloadLocation == "" {
+		return fmt.Errorf("downloadLocation cannot be empty")
 	}
-
-	if err := c.k.Load(file.Provider(configFile), yaml.Parser()); err != nil {
-		log.Fatalf("config read error: %q", err)
+	if cfg.NamingTemplate == "" {
+		return fmt.Errorf("namingTemplate cannot be empty")
 	}
-	c.Config.ConfigPath = filepath.Dir(configFile)
-
-	if err := c.k.Unmarshal("", c.Config); err != nil {
-		log.Fatalf("could not unmarshal config file: %v: err %q", configFile, err)
+	if cfg.CheckInterval <= 0 {
+		return fmt.Errorf("checkInterval must be greater than zero")
 	}
-}
-
-func (c *AppConfig) DynamicReload(log logger.Logger) {
-	configFile := path.Join(c.Config.ConfigPath, "config.yaml")
-
-	f := file.Provider(configFile)
-
-	f.Watch(func(event any, err error) {
-		if err != nil {
-			log.Error().Err(err).Msg("error watching config file")
-			return
-		}
-
-		c.m.Lock()
-		defer c.m.Unlock()
-
-		// create a new koanf instance for reloading
-		k := koanf.New(".")
-
-		// load the config file
-		if err := k.Load(f, yaml.Parser()); err != nil {
-			log.Error().Err(err).Msg("failed to reload config file")
-			return
-		}
-
-		// unmarshal the updated config into the Config struct
-		if err := k.Unmarshal("", c.Config); err != nil {
-			log.Error().Err(err).Msg("failed to unmarshal updated config")
-			return
-		}
-
-		log.SetLogLevel(c.Config.LogLevel)
-
-		log.Debug().Msg("config file reloaded!")
-	})
-}
-
-func (c *AppConfig) UpdateConfig() error {
-	configFile := path.Join(c.Config.ConfigPath, "config.yaml")
-
-	f, err := os.ReadFile(configFile)
-	if err != nil {
-		return fmt.Errorf("could not read config configFile: %s: %w", configFile, err)
+	if cfg.PprofEnabled && cfg.PprofAddress == "" {
+		return fmt.Errorf("pprofAddress cannot be empty when pprof is enabled")
 	}
-
-	lines := strings.Split(string(f), "\n")
-	lines = c.processLines(lines)
-
-	output := strings.Join(lines, "\n")
-	if err := os.WriteFile(configFile, []byte(output), 0o644); err != nil {
-		return fmt.Errorf("could not write config file: %s: %w", configFile, err)
+	switch cfg.LogLevel {
+	case "ERROR", "DEBUG", "INFO", "WARN", "TRACE":
+	default:
+		return fmt.Errorf("unsupported logLevel %q", cfg.LogLevel)
+	}
+	if cfg.LogMaxSize <= 0 {
+		return fmt.Errorf("logMaxSize must be greater than zero")
+	}
+	if cfg.LogMaxBackups <= 0 {
+		return fmt.Errorf("logMaxBackups must be greater than zero")
+	}
+	for name, manga := range cfg.MonitoredManga {
+		if manga == nil {
+			return fmt.Errorf("monitoredManga %q cannot be null", name)
+		}
 	}
 
 	return nil
 }
 
-func (c *AppConfig) processLines(lines []string) []string {
+func (c *AppConfig) Snapshot() domain.Config {
+	return cloneConfig(*c.current.Load())
+}
+
+func cloneConfig(cfg domain.Config) domain.Config {
+	clone := cfg
+	clone.MonitoredManga = make(map[string]*domain.MonitoredManga, len(cfg.MonitoredManga))
+	for name, manga := range cfg.MonitoredManga {
+		mangaClone := *manga
+		clone.MonitoredManga[name] = &mangaClone
+	}
+
+	return clone
+}
+
+func (c *AppConfig) DynamicReload(log logger.Logger) (<-chan struct{}, error) {
+	reloaded := make(chan struct{}, 1)
+	f := file.Provider(c.configFile)
+
+	err := f.Watch(func(_ any, watchErr error) {
+		if watchErr != nil {
+			log.Error().Err(watchErr).Msg("error watching config file")
+			return
+		}
+
+		snapshot, err := c.loadSnapshot()
+		if err != nil {
+			log.Error().Err(err).Msg("config reload rejected")
+			return
+		}
+
+		c.current.Store(snapshot)
+		log.SetLogLevel(snapshot.LogLevel)
+		select {
+		case reloaded <- struct{}{}:
+		default:
+		}
+		log.Debug().Msg("config file reloaded")
+	})
+	if err != nil {
+		return nil, fmt.Errorf("watching config file %s: %w", c.configFile, err)
+	}
+
+	return reloaded, nil
+}
+
+func (c *AppConfig) UpdateConfig() error {
+	f, err := os.ReadFile(c.configFile)
+	if err != nil {
+		return fmt.Errorf("could not read config file %s: %w", c.configFile, err)
+	}
+
+	lines := strings.Split(string(f), "\n")
+	lines = processLines(lines, c.Snapshot())
+
+	output := strings.Join(lines, "\n")
+	if err := os.WriteFile(c.configFile, []byte(output), 0o644); err != nil {
+		return fmt.Errorf("could not write config file %s: %w", c.configFile, err)
+	}
+
+	return nil
+}
+
+func processLines(lines []string, cfg domain.Config) []string {
 	// keep track of not found values to append at the bottom
 	var (
 		foundLineLogLevel     = false
@@ -400,23 +441,23 @@ func (c *AppConfig) processLines(lines []string) []string {
 
 	for i, line := range lines {
 		if !foundLineLogLevel && strings.Contains(line, "logLevel:") {
-			lines[i] = fmt.Sprintf(`logLevel: "%s"`, c.Config.LogLevel)
+			lines[i] = fmt.Sprintf(`logLevel: "%s"`, cfg.LogLevel)
 			foundLineLogLevel = true
 		}
 		if !foundLineLogPath && strings.Contains(line, "logPath:") {
-			if c.Config.LogPath == "" {
+			if cfg.LogPath == "" {
 				lines[i] = `#logPath: ""`
 			} else {
-				lines[i] = fmt.Sprintf(`logPath: "%s"`, c.Config.LogPath)
+				lines[i] = fmt.Sprintf(`logPath: "%s"`, cfg.LogPath)
 			}
 			foundLineLogPath = true
 		}
 		if !foundLinePprofEnabled && strings.Contains(line, "pprofEnabled:") {
-			lines[i] = fmt.Sprintf(`pprofEnabled: %t`, c.Config.PprofEnabled)
+			lines[i] = fmt.Sprintf(`pprofEnabled: %t`, cfg.PprofEnabled)
 			foundLinePprofEnabled = true
 		}
 		if !foundLinePprofAddress && strings.Contains(line, "pprofAddress:") {
-			lines[i] = fmt.Sprintf(`pprofAddress: "%s"`, c.Config.PprofAddress)
+			lines[i] = fmt.Sprintf(`pprofAddress: "%s"`, cfg.PprofAddress)
 			foundLinePprofAddress = true
 		}
 	}
@@ -428,7 +469,7 @@ func (c *AppConfig) processLines(lines []string) []string {
 		lines = append(lines, "#")
 		lines = append(lines, `# Options: "ERROR", "DEBUG", "INFO", "WARN", "TRACE"`)
 		lines = append(lines, "#")
-		lines = append(lines, fmt.Sprintf(`logLevel: "%s"`, c.Config.LogLevel))
+		lines = append(lines, fmt.Sprintf(`logLevel: "%s"`, cfg.LogLevel))
 	}
 
 	if !foundLineLogPath {
@@ -436,10 +477,10 @@ func (c *AppConfig) processLines(lines []string) []string {
 		lines = append(lines, "#")
 		lines = append(lines, "# Optional")
 		lines = append(lines, "#")
-		if c.Config.LogPath == "" {
+		if cfg.LogPath == "" {
 			lines = append(lines, `#logPath: ""`)
 		} else {
-			lines = append(lines, fmt.Sprintf(`logPath: "%s"`, c.Config.LogPath))
+			lines = append(lines, fmt.Sprintf(`logPath: "%s"`, cfg.LogPath))
 		}
 	}
 
@@ -448,7 +489,7 @@ func (c *AppConfig) processLines(lines []string) []string {
 		lines = append(lines, "#")
 		lines = append(lines, "# Default: false")
 		lines = append(lines, "#")
-		lines = append(lines, fmt.Sprintf(`pprofEnabled: %t`, c.Config.PprofEnabled))
+		lines = append(lines, fmt.Sprintf(`pprofEnabled: %t`, cfg.PprofEnabled))
 	}
 
 	if !foundLinePprofAddress {
@@ -456,7 +497,7 @@ func (c *AppConfig) processLines(lines []string) []string {
 		lines = append(lines, "#")
 		lines = append(lines, `# Default: "127.0.0.1:6060"`)
 		lines = append(lines, "#")
-		lines = append(lines, fmt.Sprintf(`pprofAddress: "%s"`, c.Config.PprofAddress))
+		lines = append(lines, fmt.Sprintf(`pprofAddress: "%s"`, cfg.PprofAddress))
 	}
 
 	return lines

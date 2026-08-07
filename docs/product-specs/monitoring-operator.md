@@ -19,3 +19,5 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - monitor logs remain actionable for source failures
 - failure handling does not corrupt already-downloaded archives
 - source-specific runtime requirements stay documented when they appear
+- monitor checks configured manga once at startup before waiting for the interval
+- invalid reloads keep the last valid config snapshot active

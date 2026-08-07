@@ -12,7 +12,7 @@ type Config struct {
 	PprofAddress     string                     `yaml:"pprofAddress"`
 	MonitoredManga   map[string]*MonitoredManga `yaml:"monitoredManga"`
 	LogPath          string                     `yaml:"logPath"`
-	LogLevel         string                     `yaml:"LogLevel"`
+	LogLevel         string                     `yaml:"logLevel"`
 	LogMaxSize       int                        `yaml:"logMaxSize"` // in megabytes
 	LogMaxBackups    int                        `yaml:"logMaxBackups"`
 }
