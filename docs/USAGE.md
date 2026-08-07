@@ -127,6 +127,11 @@ Environment overrides use the `MANGARR__` prefix:
 - `MANGARR__LOG_MAX_SIZE`
 - `MANGARR__LOG_MAX_BACKUPS`
 
+Monitor checks all configured manga once at startup. It then waits for the check
+interval. Changes to monitored manga, naming, download location, check interval,
+and log level reload while monitor runs. Environment overrides are reapplied to
+each reload. Changes to pprof and log file output settings require a restart.
+
 ### `version`
 
 Show local build/version info.

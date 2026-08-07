@@ -97,3 +97,16 @@ Serves goal/decision because: Failed writes can no longer leave a final CBZ that
 later monitor or download runs mistake for a completed chapter.
 
 Notes/risks: Atomic replacement follows the host filesystem's rename semantics.
+
+## Bucket 3 - Monitor configuration and lifecycle - ALIGNED
+
+Built: Config loads into validated immutable snapshots, reload publishes only
+valid snapshots, and monitor runs immediately with a reload-aware timer and
+context-driven shutdown.
+
+Serves goal/decision because: Monitor no longer reads maps while a watcher mutates
+them, invalid intervals cannot panic the scheduler, and runtime behavior matches
+the operator contract.
+
+Notes/risks: Pprof and log destination changes remain restart-only because those
+resources are constructed once at process startup.

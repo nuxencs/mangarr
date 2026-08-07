@@ -31,7 +31,9 @@ Semaphores cap concurrency. The code favors bounded parallelism over unbounded g
 - defaults are embedded in Go structs/template text
 - config path lookup falls back through local and home-directory locations
 - env overrides use `MANGARR__` prefix
-- monitor mode can reload config while running
+- monitor mode publishes validated immutable config snapshots while running
+- monitored manga, naming, download location, interval, and log level reload live
+- pprof and log output destinations require a restart
 
 ## Operational Risk
 
