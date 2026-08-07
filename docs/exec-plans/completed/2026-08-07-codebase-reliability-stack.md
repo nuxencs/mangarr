@@ -205,3 +205,4 @@ container UID and GID.
 - `goreleaser check`
 - Docker registry manifest lookup for both pinned base images
 - GitHub Actions checks passed for stack PRs #101 through #108 before final PR publication
+- Live discovery and latest-chapter page resolution passed for all nine source adapters on 2026-08-08

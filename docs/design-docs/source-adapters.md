@@ -1,6 +1,6 @@
 # Source Adapters
 
-Verified against `internal/source/` on 2026-08-07.
+Verified against `internal/source/` and all live sources on 2026-08-08.
 
 All adapters implement the small `domain.Source` contract:
 
