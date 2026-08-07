@@ -15,6 +15,7 @@ Verified on 2026-03-26.
 - shared retry policy in `internal/sharedhttp/`
 - bounded concurrency via semaphores
 - skip-on-existing archive behavior
+- atomic archive publication after ZIP writers and files close successfully
 - optional `pprof` endpoint for runtime inspection
 - config reload without full process restart
 

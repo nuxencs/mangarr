@@ -33,8 +33,12 @@ type imageMeta struct {
 }
 
 func IsValidLocation(location string) error {
-	if _, err := os.Stat(location); err != nil {
+	info, err := os.Stat(location)
+	if err != nil {
 		return fmt.Errorf("stat location %s: %w", location, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("location %s is not a directory", location)
 	}
 
 	return nil
@@ -107,18 +111,7 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	// Sort images lexicographically so they stay in page order.
 	sort.Slice(images, func(i, j int) bool { return images[i].name < images[j].name })
 
-	cbzFile, createErr := os.Create(cbzPath)
-	if createErr != nil {
-		return fmt.Errorf("creating %s: %w", cbzPath, createErr)
-	}
-	defer cbzFile.Close()
-
-	bufWriter := bufio.NewWriter(cbzFile)
-	defer bufWriter.Flush()
-
-	zipWriter := zip.NewWriter(bufWriter)
-	defer zipWriter.Close()
-
+	selectedImages := make([]imageMeta, 0, len(images))
 	for _, img := range images {
 		// Skip pages that are highly likely not a Manhwa page
 		if isManhwa && isLikelyUnwanted(img, mostCommonW) {
@@ -127,11 +120,68 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 				Msg("skipped image because it's likely not a Manhwa page")
 			continue
 		}
-		if addErr := addFileToZip(zipWriter, img.path, img.name); addErr != nil {
-			return addErr
-		}
+		selectedImages = append(selectedImages, img)
+	}
+	if len(selectedImages) == 0 {
+		return fmt.Errorf("creating archive: no images to write")
 	}
 
+	if err := publishFileAtomically(cbzPath, func(destination io.Writer) error {
+		zipWriter := zip.NewWriter(destination)
+		for _, img := range selectedImages {
+			if err := addFileToZip(zipWriter, img.path, img.name); err != nil {
+				_ = zipWriter.Close()
+				return err
+			}
+		}
+
+		if err := zipWriter.Close(); err != nil {
+			return fmt.Errorf("closing zip archive: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("publishing %s: %w", cbzPath, err)
+	}
+
+	return nil
+}
+
+func publishFileAtomically(destinationPath string, write func(io.Writer) error) (err error) {
+	destinationDir := filepath.Dir(destinationPath)
+	tmpFile, err := os.CreateTemp(destinationDir, "."+filepath.Base(destinationPath)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("creating temporary file: %w", err)
+	}
+
+	tmpPath := tmpFile.Name()
+	published := false
+	defer func() {
+		if published {
+			return
+		}
+
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
+	}()
+
+	if err := tmpFile.Chmod(0o644); err != nil {
+		return fmt.Errorf("setting temporary file permissions: %w", err)
+	}
+	if err := write(tmpFile); err != nil {
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		return fmt.Errorf("syncing temporary file: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("closing temporary file: %w", err)
+	}
+	if err := os.Rename(tmpPath, destinationPath); err != nil {
+		return fmt.Errorf("renaming temporary file: %w", err)
+	}
+
+	published = true
 	return nil
 }
 
