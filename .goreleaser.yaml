@@ -44,7 +44,7 @@ archives:
       - mangarr
     format_overrides:
       - goos: windows
-        formats: [ "zip" ]
+        formats: ["zip"]
     files:
       - none*
     name_template: >-
@@ -60,7 +60,7 @@ release:
     **Full Changelog**: https://github.com/nuxencs/mangarr/compare/{{ .PreviousTag }}...{{ .Tag }}
 
     ## What to do next?
-    
+
     - Read the [documentation](https://github.com/nuxencs/mangarr#readme)
 
 checksum:

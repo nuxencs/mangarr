@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    name: Go verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up protobuf compiler
+        uses: arduino/setup-protoc@v3
+        with:
+          version: "35.1"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Go verification tools
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
+
+      - name: Verify generated code
+        run: |
+          go generate ./...
+          git diff --exit-code
+
+      - name: Verify module files
+        run: go mod tidy -diff
+
+      - name: Verify formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Run race tests
+        run: go test -race ./...
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Build packages
+        run: go build ./...
+
+      - name: Scan vulnerabilities
+        run: govulncheck ./...
+
+  repository-files:
+    name: Repository file verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+
+      - name: Install YAML validator
+        run: python -m pip install yamllint==1.37.1
+
+      - name: Validate YAML
+        run: yamllint .github .goreleaser.yaml config.yaml docker-compose.yml
+
+      - name: Validate Markdown links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress './**/*.md'
+          fail: true
+
+      - name: Validate GoReleaser configuration
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: check
+
+      - name: Validate Compose configuration
+        env:
+          DOCKERCONFDIR: /tmp/mangarr-config
+          PGID: "65534"
+          PUID: "65534"
+        run: docker compose config --quiet
