@@ -160,3 +160,17 @@ across page resolution, image transport, archive creation, and skip behavior.
 
 Notes/risks: Chapter selection and caller-specific summary logging remain in the
 commands because those behaviors differ between one-shot and monitor modes.
+
+## Bucket 8 - Entropy and dependency cleanup - ALIGNED
+
+Built: Removed unused browser automation, PDF output, the custom semaphore package,
+the production-only panic parser helper, and shallow logger interfaces and methods.
+Tidied the module graph, which removed the Rod and FPDF dependency trees. The CI
+baseline already enforces reproducible protobuf output.
+
+Serves goal/decision because: The repository now exposes only supported behavior,
+has fewer dependency and maintenance surfaces, and reports no unreachable
+production functions under `deadcode`.
+
+Notes/risks: Test-only parse helpers remain local to the packages that need concise
+fixture setup. They are not part of the production API.

@@ -11,7 +11,6 @@ import (
 	"mangarr/internal/domain"
 	"mangarr/internal/files"
 	"mangarr/internal/parse"
-	"mangarr/internal/semaphore"
 	"mangarr/internal/source"
 
 	"github.com/rs/zerolog"
@@ -94,13 +93,12 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 
 			results := make(chan chapterResult, len(selectedChapterNumbers))
 
-			// semaphore to limit concurrency to maxConcurrentChapterProcesses which is set to 10
-			sem := semaphore.NewWeighted(maxConcurrentChapterProcesses)
+			limit := make(chan struct{}, maxConcurrentChapterProcesses)
 			var wg sync.WaitGroup
 
 			for _, chapterNumber := range selectedChapterNumbers {
 				wg.Go(func() {
-					sem.Acquire()
+					limit <- struct{}{}
 
 					result := chapterResult{
 						chapterNumber: chapterNumber,
@@ -114,7 +112,7 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 						}
 
 						results <- result
-						sem.Release()
+						<-limit
 					}()
 
 					selectedChapter, ok := selectedManga.Chapters[chapterNumber]

@@ -59,12 +59,12 @@ func TestAsurascansDiscoverParsesCurrentSeriesURL(t *testing.T) {
 	require.Equal(t, server.URL+currentSeries, manga.URL)
 	require.Len(t, manga.Chapters, 2)
 
-	ch249, ok := manga.Chapters[domain.MustParseChapterNumber("249")]
+	ch249, ok := manga.Chapters[mustChapterNumber("249")]
 	require.True(t, ok)
 	require.Equal(t, "Tangled Threads (2)", ch249.Title)
 	require.Equal(t, server.URL+currentChapter1, ch249.URL)
 
-	ch248, ok := manga.Chapters[domain.MustParseChapterNumber("248")]
+	ch248, ok := manga.Chapters[mustChapterNumber("248")]
 	require.True(t, ok)
 	require.Equal(t, "Tangled Threads (1)", ch248.Title)
 	require.Equal(t, server.URL+currentChapter2, ch248.URL)
@@ -114,10 +114,10 @@ func TestAsurascansDiscoverSkipsLockedChapters(t *testing.T) {
 	require.Equal(t, "Pick Me Up, Infinite Gacha", manga.Title)
 	require.Len(t, manga.Chapters, 1)
 
-	_, hasLocked := manga.Chapters[domain.MustParseChapterNumber("194")]
+	_, hasLocked := manga.Chapters[mustChapterNumber("194")]
 	require.False(t, hasLocked, "locked chapter 194 should be filtered out")
 
-	ch193, ok := manga.Chapters[domain.MustParseChapterNumber("193")]
+	ch193, ok := manga.Chapters[mustChapterNumber("193")]
 	require.True(t, ok)
 	require.Equal(t, "Regular Title", ch193.Title)
 }
@@ -155,7 +155,7 @@ func TestAsurascansPagesExtractsChapterAssets(t *testing.T) {
 
 	chapter := domain.Chapter{
 		URL:    server.URL + chapterPath,
-		Number: domain.MustParseChapterNumber("249"),
+		Number: mustChapterNumber("249"),
 	}
 
 	pages, err := src.Pages(t.Context(), chapter)

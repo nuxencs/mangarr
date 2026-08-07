@@ -206,8 +206,8 @@ func TestComixChaptersPaginatesAndFiltersGroup(t *testing.T) {
 	manga := domain.Manga{ID: "pvry", Chapters: make(map[domain.ChapterNumber]domain.Chapter)}
 	require.NoError(t, source.getChapters(t.Context(), manga))
 	require.Len(t, manga.Chapters, 2)
-	require.Equal(t, "101", manga.Chapters[domain.MustParseChapterNumber("11")].ID)
-	require.Equal(t, server.URL+"/chapter/2", manga.Chapters[domain.MustParseChapterNumber("10")].URL)
+	require.Equal(t, "101", manga.Chapters[mustChapterNumber("11")].ID)
+	require.Equal(t, server.URL+"/chapter/2", manga.Chapters[mustChapterNumber("10")].URL)
 }
 
 func TestComixPagesNormalizesCompactPages(t *testing.T) {

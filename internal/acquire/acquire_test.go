@@ -40,7 +40,7 @@ func TestChapterDownloadsAndThenSkipsExistingArchive(t *testing.T) {
 			Title: "Original Title",
 		},
 		Chapter: domain.Chapter{
-			Number: domain.MustParseChapterNumber("7.1"),
+			Number: mustChapterNumber("7.1"),
 			Title:  "The Chapter",
 		},
 		DownloadDirectory: t.TempDir(),
@@ -73,7 +73,7 @@ func TestChapterReturnsPageResolutionErrorWithoutPublishingArchive(t *testing.T)
 	request := Request{
 		Source:            &pageSource{err: context.Canceled},
 		Manga:             domain.Manga{Title: "Title"},
-		Chapter:           domain.Chapter{Number: domain.MustParseChapterNumber("2")},
+		Chapter:           domain.Chapter{Number: mustChapterNumber("2")},
 		DownloadDirectory: downloadDirectory,
 		NamingTemplate:    "Chapter {num}",
 	}
@@ -91,6 +91,14 @@ type pageSource struct {
 	pages []domain.ImageInfo
 	err   error
 	calls int
+}
+
+func mustChapterNumber(input string) domain.ChapterNumber {
+	number, err := domain.ParseChapterNumber(input)
+	if err != nil {
+		panic(err)
+	}
+	return number
 }
 
 func (s *pageSource) Pages(context.Context, domain.Chapter) ([]domain.ImageInfo, error) {

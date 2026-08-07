@@ -105,7 +105,7 @@ func resetTimer(timer *time.Timer, duration time.Duration) {
 	timer.Reset(duration)
 }
 
-func runMonitorCycle(ctx context.Context, cfg domain.Config, log logger.Logger) {
+func runMonitorCycle(ctx context.Context, cfg domain.Config, log *logger.DefaultLogger) {
 	if err := files.IsValidLocation(cfg.DownloadLocation); err != nil {
 		log.Error().Err(err).Msg("invalid download location")
 		return
@@ -124,7 +124,7 @@ func runMonitorCycle(ctx context.Context, cfg domain.Config, log logger.Logger) 
 	_ = group.Wait()
 }
 
-func monitorManga(ctx context.Context, cfg domain.Config, mangaTitle string, monitoredManga domain.MonitoredManga, log logger.Logger) error {
+func monitorManga(ctx context.Context, cfg domain.Config, mangaTitle string, monitoredManga domain.MonitoredManga, log *logger.DefaultLogger) error {
 	mangaSource, err := source.Select(monitoredManga)
 	if err != nil {
 		return fmt.Errorf("selecting manga source: %w", err)

@@ -373,7 +373,7 @@ func cloneConfig(cfg domain.Config) domain.Config {
 	return clone
 }
 
-func (c *AppConfig) DynamicReload(log logger.Logger) (<-chan struct{}, error) {
+func (c *AppConfig) DynamicReload(log *logger.DefaultLogger) (<-chan struct{}, error) {
 	reloaded := make(chan struct{}, 1)
 	f := file.Provider(c.configFile)
 

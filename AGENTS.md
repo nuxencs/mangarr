@@ -23,7 +23,6 @@ Docs are the operator-facing system of record. If behavior changes, update docs 
 - `internal/download/`: image fetch/retry/concurrency.
 - `internal/files/`: archive creation.
 - `internal/config/`: config load/default/reload.
-- `internal/browser/`: shared browser manager for JS-heavy sources.
 - `internal/sharedhttp/`: HTTP client/retry policy.
 
 ## Harness Working Loop

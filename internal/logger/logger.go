@@ -12,20 +12,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// Logger interface
-type Logger interface {
-	Log() *zerolog.Event
-	Fatal() *zerolog.Event
-	Err(err error) *zerolog.Event
-	Error() *zerolog.Event
-	Warn() *zerolog.Event
-	Info() *zerolog.Event
-	Trace() *zerolog.Event
-	Debug() *zerolog.Event
-	With() zerolog.Context
-	SetLogLevel(level string)
-}
-
 // DefaultLogger default logging controller
 type DefaultLogger struct {
 	log     zerolog.Logger
@@ -33,7 +19,7 @@ type DefaultLogger struct {
 	writers []io.Writer
 }
 
-func New(cfg *domain.Config) Logger {
+func New(cfg *domain.Config) *DefaultLogger {
 	l := &DefaultLogger{
 		writers: make([]io.Writer, 0),
 		level:   zerolog.DebugLevel,
@@ -96,32 +82,12 @@ func (l *DefaultLogger) SetLogLevel(level string) {
 	}
 }
 
-// Log log something at fatal level.
-func (l *DefaultLogger) Log() *zerolog.Event {
-	return l.log.Log().Timestamp()
-}
-
-// Fatal log something at fatal level. This will panic!
-func (l *DefaultLogger) Fatal() *zerolog.Event {
-	return l.log.Fatal().Timestamp()
-}
-
 // Error log something at Error level
 func (l *DefaultLogger) Error() *zerolog.Event {
 	return l.log.Error().Timestamp()
 }
 
-// Err log something at Err level
-func (l *DefaultLogger) Err(err error) *zerolog.Event {
-	return l.log.Err(err).Timestamp()
-}
-
-// Warn log something at warning level.
-func (l *DefaultLogger) Warn() *zerolog.Event {
-	return l.log.Warn().Timestamp()
-}
-
-// Info log something at fatal level.
+// Info logs at info level.
 func (l *DefaultLogger) Info() *zerolog.Event {
 	return l.log.Info().Timestamp()
 }
@@ -129,11 +95,6 @@ func (l *DefaultLogger) Info() *zerolog.Event {
 // Debug log something at debug level.
 func (l *DefaultLogger) Debug() *zerolog.Event {
 	return l.log.Debug().Timestamp()
-}
-
-// Trace log something at fatal level. This will panic!
-func (l *DefaultLogger) Trace() *zerolog.Event {
-	return l.log.Trace().Timestamp()
 }
 
 // With log with context

@@ -8,7 +8,7 @@ Verified on 2026-03-07.
 2. Docs are part of the product surface for maintainers. Stale docs are defects.
 3. Plans are first-class artifacts for non-trivial work. Important decisions should survive the thread.
 4. Root-cause fixes over patches. If drift or duplication is visible in the touched area, reduce it.
-5. Mechanical sympathy matters. Keep concurrency, retries, and browser automation explicit.
+5. Mechanical sympathy matters. Keep concurrency, retries, and remote transport explicit.
 6. Prefer shared seams for transport, archive creation, and config handling. Keep source-specific hacks contained.
 7. Verification is mandatory. Narrow check while iterating; full gate before handoff.
 

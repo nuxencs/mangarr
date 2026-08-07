@@ -3,6 +3,8 @@ package source
 import (
 	"embed"
 	"testing"
+
+	"mangarr/internal/domain"
 )
 
 //go:embed testdata/*
@@ -16,4 +18,12 @@ func fixture(t *testing.T, name string) []byte {
 	}
 
 	return contents
+}
+
+func mustChapterNumber(input string) domain.ChapterNumber {
+	number, err := domain.ParseChapterNumber(input)
+	if err != nil {
+		panic(err)
+	}
+	return number
 }

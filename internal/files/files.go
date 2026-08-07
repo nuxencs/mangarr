@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/go-pdf/fpdf"
 	"github.com/rs/zerolog"
 	_ "golang.org/x/image/webp" // needed to decode webp
 )
@@ -198,43 +197,6 @@ func isLikelyUnwanted(img imageMeta, dominantW int) bool {
 	}
 
 	return true
-}
-
-// CreatePDF creates a pdf file named pdfPath and adds all files from sourceDir to it
-func CreatePDF(sourceDir, pdfPath string) error {
-	err := os.MkdirAll(filepath.Dir(pdfPath), os.ModePerm)
-	if err != nil {
-		return err
-	}
-
-	pdf := fpdf.New(fpdf.OrientationPortrait, fpdf.UnitMillimeter, "", "")
-
-	walkErr := filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !info.IsDir() {
-			pdfInfo := pdf.RegisterImageOptions(path, fpdf.ImageOptions{})
-			imgWidth, imgHeight := pdfInfo.Extent()
-
-			// filter out wide images
-			if imgWidth > imgHeight {
-				return nil
-			}
-
-			pdf.AddPageFormat(fpdf.OrientationPortrait, fpdf.SizeType{Wd: imgWidth, Ht: imgHeight})
-
-			pdf.ImageOptions(path, 0, 0, imgWidth, imgHeight, false, fpdf.ImageOptions{}, 0, "")
-		}
-
-		return nil
-	})
-	if walkErr != nil {
-		return walkErr
-	}
-
-	return pdf.OutputFileAndClose(pdfPath)
 }
 
 // addFileToZip copies a single file into an open zip archive.

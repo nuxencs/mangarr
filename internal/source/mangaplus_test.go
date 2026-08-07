@@ -88,12 +88,12 @@ func TestMangaPlusDiscoverParsesChapterListV2(t *testing.T) {
 	require.Equal(t, "Hero Organization", manga.Title)
 	require.Len(t, manga.Chapters, 2)
 
-	chapter1, ok := manga.Chapters[domain.MustParseChapterNumber("1")]
+	chapter1, ok := manga.Chapters[mustChapterNumber("1")]
 	require.True(t, ok)
 	require.Equal(t, "1022325", chapter1.ID)
 	require.Equal(t, "Chapter 1: THE ORDINARY AND THE GENIUS", chapter1.Title)
 
-	chapter2, ok := manga.Chapters[domain.MustParseChapterNumber("2")]
+	chapter2, ok := manga.Chapters[mustChapterNumber("2")]
 	require.True(t, ok)
 	require.Equal(t, "1022326", chapter2.ID)
 	require.Equal(t, "Chapter 2: HEROES", chapter2.Title)
@@ -128,8 +128,8 @@ func TestMangaPlusDiscoverKeepsLegacyChapterGroups(t *testing.T) {
 	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Len(t, manga.Chapters, 2)
-	require.Equal(t, "1001", manga.Chapters[domain.MustParseChapterNumber("1")].ID)
-	require.Equal(t, "1002", manga.Chapters[domain.MustParseChapterNumber("10")].ID)
+	require.Equal(t, "1001", manga.Chapters[mustChapterNumber("1")].ID)
+	require.Equal(t, "1002", manga.Chapters[mustChapterNumber("10")].ID)
 }
 
 func TestMangaPlusPagesParsesViewerPages(t *testing.T) {

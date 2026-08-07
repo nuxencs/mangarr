@@ -102,12 +102,12 @@ func TestAtsumaruDiscover(t *testing.T) {
 	require.True(t, manga.IsManhwa)
 	require.Len(t, manga.Chapters, 2)
 
-	ch0, ok := manga.Chapters[domain.MustParseChapterNumber("0")]
+	ch0, ok := manga.Chapters[mustChapterNumber("0")]
 	require.True(t, ok)
 	require.Equal(t, "chapter-0", ch0.ID)
 	require.Equal(t, "Chapter 0", ch0.Title)
 
-	ch71, ok := manga.Chapters[domain.MustParseChapterNumber("7.1")]
+	ch71, ok := manga.Chapters[mustChapterNumber("7.1")]
 	require.True(t, ok)
 	require.Equal(t, "chapter-7-1", ch71.ID)
 	require.Equal(t, "Chapter 7.1", ch71.Title)
@@ -171,7 +171,7 @@ func TestAtsumaruPages(t *testing.T) {
 	src := newTestAtsumaru(server.URL + "/manga/Q5Mqy")
 	chapter := domain.Chapter{
 		ID:     "yzmwX4",
-		Number: domain.MustParseChapterNumber("121"),
+		Number: mustChapterNumber("121"),
 	}
 
 	pages, err := src.Pages(t.Context(), chapter)
@@ -192,7 +192,7 @@ func TestAtsumaruPagesErrorsWhenNoPages(t *testing.T) {
 	src := newTestAtsumaru(server.URL + "/manga/Q5Mqy")
 	chapter := domain.Chapter{
 		ID:     "yzmwX4",
-		Number: domain.MustParseChapterNumber("121"),
+		Number: mustChapterNumber("121"),
 	}
 
 	_, err := src.Pages(t.Context(), chapter)

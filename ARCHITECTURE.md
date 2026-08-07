@@ -16,7 +16,7 @@ Verified against code on 2026-03-25.
 | --- | --- | --- |
 | Download now | `cmd/download.go` | source selection, chapter selection, archive write |
 | Continuous monitor | `cmd/monitor.go` | config load, ticker loop, dynamic reload, latest-chapter fetch |
-| Source integration | `internal/source/` | highest churn; mixed API, HTML scraping, browser automation |
+| Source integration | `internal/source/` | highest churn; mixed API and HTML scraping |
 | Chapter acquisition | `internal/acquire/`, `internal/download/`, `internal/files/` | naming, existing-file policy, page resolution, image fetch, CBZ creation |
 | Ops + packaging | `.github/workflows/release.yml`, `.goreleaser.yaml`, `ci.Dockerfile` | release binaries and multi-arch Docker images |
 
@@ -25,12 +25,12 @@ Verified against code on 2026-03-25.
 | Layer | Packages | Responsibility |
 | --- | --- | --- |
 | CLI surface | `main.go`, `cmd/` | parse flags, bootstrap commands, orchestrate flows |
-| Application orchestration | `cmd/`, `internal/acquire/`, `internal/config/`, `internal/browser/` | compose sources, acquire chapters, concurrency, config/runtime lifecycle |
-| Core domain helpers | `internal/domain/`, `internal/parse/`, `internal/templater/`, `internal/sanitize/`, `internal/semaphore/` | shared logic independent from any source |
-| Integration layer | `internal/source/`, `internal/sharedhttp/`, `internal/download/` | fetch remote data, retry transient failures, browser-backed scraping |
+| Application orchestration | `cmd/`, `internal/acquire/`, `internal/config/` | compose sources, acquire chapters, concurrency, config/runtime lifecycle |
+| Core domain helpers | `internal/domain/`, `internal/parse/`, `internal/templater/`, `internal/sanitize/` | shared logic independent from any source |
+| Integration layer | `internal/source/`, `internal/sharedhttp/`, `internal/download/` | fetch remote data and retry transient failures |
 | Output + observability | `internal/files/`, `internal/logger/`, `internal/perf/`, `internal/buildinfo/` | archive write, logging, profiling, build metadata |
 
-Rule: source-specific scraping logic stays in `internal/source/`. Generic retry, browser lifecycle, archive creation, and parsing stay shared.
+Rule: source-specific scraping logic stays in `internal/source/`. Generic retry, archive creation, and parsing stay shared.
 
 ## Runtime Flows
 
@@ -65,9 +65,6 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
   - shared in `internal/sharedhttp/`
   - retries transport failures and `500/502/503/504`
   - fails fast on `404/429/401/403/405`
-- Browser-backed sources:
-  - none currently
-  - shared lifecycle in `internal/browser/` remains available for future JS-heavy sources
 
 ## Hotspots
 

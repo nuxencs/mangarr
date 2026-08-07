@@ -8,17 +8,13 @@ import (
 	"net/http/pprof"
 	"time"
 
-	"github.com/rs/zerolog"
+	"mangarr/internal/logger"
 )
 
 const shutdownTimeout = 5 * time.Second
 
-type Logger interface {
-	Error() *zerolog.Event
-}
-
 // StartPprofServer starts a dedicated pprof HTTP server.
-func StartPprofServer(ctx context.Context, log Logger, address string) (string, error) {
+func StartPprofServer(ctx context.Context, log *logger.DefaultLogger, address string) (string, error) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		return "", err

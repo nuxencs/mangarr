@@ -9,7 +9,11 @@ import (
 )
 
 func chapterNumber(input string) domain.ChapterNumber {
-	return domain.MustParseChapterNumber(input)
+	number, err := domain.ParseChapterNumber(input)
+	if err != nil {
+		panic(err)
+	}
+	return number
 }
 
 func chapterMap(inputs ...string) map[domain.ChapterNumber]domain.Chapter {

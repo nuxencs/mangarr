@@ -43,7 +43,7 @@ func TestWeebCentralPagesExtractsChapterAssets(t *testing.T) {
 
 	chapter := domain.Chapter{
 		URL:    server.URL + chapterPath + "?foo=bar#reader",
-		Number: domain.MustParseChapterNumber("340.2"),
+		Number: mustChapterNumber("340.2"),
 	}
 
 	pages, err := src.Pages(t.Context(), chapter)
@@ -71,7 +71,7 @@ func TestWeebCentralResolvesRelativeChapterURLs(t *testing.T) {
 	defer server.Close()
 
 	src := newTestWeebCentral(server.URL+"/series/series-id", server.URL)
-	chapterNumber := domain.MustParseChapterNumber("356")
+	chapterNumber := mustChapterNumber("356")
 	manga := domain.Manga{
 		Title:    "Blue Lock",
 		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
@@ -103,7 +103,7 @@ func TestWeebCentralPagesErrorsWhenFragmentHasNoImages(t *testing.T) {
 
 	chapter := domain.Chapter{
 		URL:    server.URL + chapterPath,
-		Number: domain.MustParseChapterNumber("1"),
+		Number: mustChapterNumber("1"),
 	}
 
 	_, err := src.Pages(t.Context(), chapter)
