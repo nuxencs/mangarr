@@ -1,30 +1,33 @@
 package cmd
 
+import "github.com/spf13/cobra"
+
 const (
 	maxConcurrentChapterProcesses = 10
 	maxConcurrentSourceProcesses  = 10
 )
 
-var (
-	configPath        string
+type rootOptions struct {
+	configPath string
+}
+
+type downloadOptions struct {
 	naming            string
 	downloadDirectory string
 	mangaSource       string
 	overwrite         string
+	manga             string
+	group             string
+	language          string
+	chapterNumbers    string
+	first             bool
+	latest            bool
+	downloadAll       bool
+}
 
-	manga    string
-	group    string
-	language string
-
-	chapterNumbers string
-	first          bool
-	latest         bool
-	downloadAll    bool
-)
-
-func initRootFlags() {
-	rootCmd.PersistentFlags().StringVarP(
-		&configPath,
+func initRootFlags(root *cobra.Command, options *rootOptions) {
+	root.PersistentFlags().StringVarP(
+		&options.configPath,
 		"config",
 		"c",
 		"",
@@ -32,95 +35,95 @@ func initRootFlags() {
 	)
 }
 
-func initDownloadFlags() {
-	downloadCmd.Flags().StringVarP(
-		&downloadDirectory,
+func initDownloadFlags(download *cobra.Command, options *downloadOptions) {
+	download.Flags().StringVarP(
+		&options.downloadDirectory,
 		"downloadDirectory",
 		"d",
 		"",
 		"specifies the directory where you want to save your downloads to",
 	)
-	downloadCmd.Flags().StringVarP(
-		&mangaSource,
+	download.Flags().StringVarP(
+		&options.mangaSource,
 		"source",
 		"s",
 		"",
 		"specifies the source of the manga",
 	)
-	downloadCmd.Flags().StringVarP(
-		&naming,
+	download.Flags().StringVarP(
+		&options.naming,
 		"naming",
 		"n",
 		"{manga:<.>} Ch. {num:3}{title: - <.>}",
 		"specifies the naming template you want to use for naming chapters",
 	)
-	downloadCmd.Flags().StringVarP(
-		&overwrite,
+	download.Flags().StringVarP(
+		&options.overwrite,
 		"overwrite",
 		"o",
 		"",
 		"overwrites the parsed manga name",
 	)
 
-	downloadCmd.Flags().StringVarP(
-		&manga,
+	download.Flags().StringVarP(
+		&options.manga,
 		"manga",
 		"m",
 		"",
 		"specifies the manga you want to download",
 	)
-	downloadCmd.Flags().StringVarP(
-		&group,
+	download.Flags().StringVarP(
+		&options.group,
 		"group",
 		"g",
 		"",
 		"specifies the group you want to download the chapter from",
 	)
-	downloadCmd.Flags().StringVarP(
-		&language,
+	download.Flags().StringVarP(
+		&options.language,
 		"language",
 		"l",
 		"en",
 		"specifies the language you want to download. default: en",
 	)
 
-	downloadCmd.Flags().StringVarP(
-		&chapterNumbers,
+	download.Flags().StringVarP(
+		&options.chapterNumbers,
 		"chapters",
 		"C",
 		"",
 		"specifies the chapter numbers you want to download",
 	)
-	downloadCmd.Flags().BoolVarP(
-		&first,
+	download.Flags().BoolVarP(
+		&options.first,
 		"first",
 		"1",
 		false,
 		"download the first chapter",
 	)
-	downloadCmd.Flags().BoolVarP(
-		&latest,
+	download.Flags().BoolVarP(
+		&options.latest,
 		"latest",
 		"L",
 		false,
 		"download the latest chapter",
 	)
-	downloadCmd.Flags().BoolVarP(
-		&downloadAll,
+	download.Flags().BoolVarP(
+		&options.downloadAll,
 		"all",
 		"A",
 		false,
 		"download all available chapters",
 	)
 
-	downloadCmd.MarkFlagsMutuallyExclusive("first", "chapters")
-	downloadCmd.MarkFlagsMutuallyExclusive("latest", "chapters")
-	downloadCmd.MarkFlagsMutuallyExclusive("first", "latest")
-	downloadCmd.MarkFlagsMutuallyExclusive("all", "chapters")
-	downloadCmd.MarkFlagsMutuallyExclusive("all", "first")
-	downloadCmd.MarkFlagsMutuallyExclusive("all", "latest")
+	download.MarkFlagsMutuallyExclusive("first", "chapters")
+	download.MarkFlagsMutuallyExclusive("latest", "chapters")
+	download.MarkFlagsMutuallyExclusive("first", "latest")
+	download.MarkFlagsMutuallyExclusive("all", "chapters")
+	download.MarkFlagsMutuallyExclusive("all", "first")
+	download.MarkFlagsMutuallyExclusive("all", "latest")
 
-	_ = downloadCmd.MarkFlagRequired("downloadDirectory")
-	_ = downloadCmd.MarkFlagRequired("source")
-	_ = downloadCmd.MarkFlagRequired("manga")
+	_ = download.MarkFlagRequired("downloadDirectory")
+	_ = download.MarkFlagRequired("source")
+	_ = download.MarkFlagRequired("manga")
 }

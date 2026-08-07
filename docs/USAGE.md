@@ -134,7 +134,8 @@ each reload. Changes to pprof and log file output settings require a restart.
 
 ### `version`
 
-Show local build/version info.
+Show local build/version info and attempt an advisory update check. Local version
+output succeeds when GitHub is unavailable.
 
 ```bash
 mangarr version

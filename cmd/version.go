@@ -4,70 +4,71 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"mangarr/internal/buildinfo"
 
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 const githubURL = "https://api.github.com/repos/nuxencs/mangarr/releases/latest"
 
-// versionCmd represents the version command
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Display version info",
-	Run: func(cmd *cobra.Command, _ []string) {
-		ctx := cmd.Context()
+func newVersionCommand(client *http.Client, releaseURL string) *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Display version info",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			fmt.Fprintln(cmd.OutOrStdout(), "Version:", buildinfo.Version)
+			fmt.Fprintln(cmd.OutOrStdout(), "Commit:", buildinfo.Commit)
+			fmt.Fprintln(cmd.OutOrStdout(), "Build date:", buildinfo.Date)
 
-		fmt.Println("Version:", buildinfo.Version)
-		fmt.Println("Commit:", buildinfo.Commit)
-		fmt.Println("Build date:", buildinfo.Date)
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubURL, nil)
-		if err != nil {
-			fmt.Println("Failed to create request:", err)
-			os.Exit(1)
-		}
-
-		// get the latest release tag from api
-		client := http.Client{
-			Timeout: 10 * time.Second,
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			if errors.Is(err, http.ErrHandlerTimeout) {
-				fmt.Println("Server timed out while fetching latest release from api")
-			} else {
-				fmt.Println("Failed to fetch latest release from api:", err)
+			release, err := latestRelease(cmd, client, releaseURL)
+			if err != nil {
+				fmt.Fprintln(cmd.ErrOrStderr(), "Update check unavailable:", err)
+				return nil
 			}
-			os.Exit(1)
-		}
-		defer resp.Body.Close()
+			if release.TagName != buildinfo.Version && buildinfo.Version != "dev" {
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintln(cmd.OutOrStdout(), "Update available:", buildinfo.Version, "->", release.TagName)
+				fmt.Fprintln(cmd.OutOrStdout(), "Published at:", release.PublishedAt.Format(time.RFC3339))
+			}
 
-		// api returns 500 instead of 404 here
-		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusInternalServerError {
-			fmt.Println("No release found")
-			os.Exit(1)
-		}
+			return nil
+		},
+	}
+}
 
-		var rel struct {
-			TagName     string    `json:"tag_name"`
-			PublishedAt time.Time `json:"published_at"`
-		}
+type releaseInfo struct {
+	TagName     string    `json:"tag_name"`
+	PublishedAt time.Time `json:"published_at"`
+}
 
-		if err := json.NewDecoder(resp.Body).Decode(&rel); err != nil {
-			fmt.Println("Failed to decode response from api:", err)
-			os.Exit(1)
-		}
+func latestRelease(cmd *cobra.Command, client *http.Client, releaseURL string) (releaseInfo, error) {
+	req, err := http.NewRequestWithContext(cmd.Context(), http.MethodGet, releaseURL, nil)
+	if err != nil {
+		return releaseInfo{}, fmt.Errorf("creating request: %w", err)
+	}
 
-		if rel.TagName != buildinfo.Version && buildinfo.Version != "dev" {
-			fmt.Println()
-			fmt.Println("Update available:", buildinfo.Version, "->", rel.TagName)
-			fmt.Println("Published at:", rel.PublishedAt.Format(time.RFC3339))
-		}
-	},
+	resp, err := client.Do(req)
+	if err != nil {
+		return releaseInfo{}, fmt.Errorf("fetching latest release: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return releaseInfo{}, fmt.Errorf("no published release")
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return releaseInfo{}, fmt.Errorf("fetching latest release: status code %d", resp.StatusCode)
+	}
+
+	var release releaseInfo
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return releaseInfo{}, fmt.Errorf("decoding latest release: %w", err)
+	}
+	if release.TagName == "" {
+		return releaseInfo{}, fmt.Errorf("latest release response has no tag")
+	}
+
+	return release, nil
 }
