@@ -114,7 +114,7 @@ monitoredManga:
 #
 # Optional
 #
-#logPath: ""
+# logPath: ""
 
 # Log level
 #
@@ -130,7 +130,7 @@ logLevel: "DEBUG"
 #
 # Max log size in megabytes
 #
-#logMaxSize: 50
+# logMaxSize: 50
 
 # Log Max Backups
 #
@@ -138,4 +138,4 @@ logLevel: "DEBUG"
 #
 # Max amount of old log files
 #
-#logMaxBackups = 3
+# logMaxBackups = 3
