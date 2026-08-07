@@ -119,7 +119,7 @@ func TestComixCodecRejectsInvalidEnvelope(t *testing.T) {
 	require.ErrorContains(t, err, "decoding Comix encrypted payload")
 }
 
-func TestComixGetMangaUsesCurrentEncryptedAPI(t *testing.T) {
+func TestComixMangaUsesCurrentEncryptedAPI(t *testing.T) {
 	t.Parallel()
 
 	codec, err := newComixCodec()
@@ -146,7 +146,7 @@ func TestComixGetMangaUsesCurrentEncryptedAPI(t *testing.T) {
 	defer server.Close()
 
 	source := newTestComix(t, server, "https://comix.to/title/pvry-one-piece", "")
-	manga, err := source.GetManga(t.Context())
+	manga, err := source.getManga(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "pvry", manga.ID)
 	require.Equal(t, "One Piece", manga.Title)
@@ -155,7 +155,7 @@ func TestComixGetMangaUsesCurrentEncryptedAPI(t *testing.T) {
 	require.NotNil(t, manga.Chapters)
 }
 
-func TestComixGetChaptersPaginatesAndFiltersGroup(t *testing.T) {
+func TestComixChaptersPaginatesAndFiltersGroup(t *testing.T) {
 	t.Parallel()
 
 	codec, err := newComixCodec()
@@ -204,13 +204,13 @@ func TestComixGetChaptersPaginatesAndFiltersGroup(t *testing.T) {
 
 	source := newTestComix(t, server, "https://comix.to/title/pvry-one-piece", "6594")
 	manga := domain.Manga{ID: "pvry", Chapters: make(map[domain.ChapterNumber]domain.Chapter)}
-	require.NoError(t, source.GetChapters(t.Context(), manga))
+	require.NoError(t, source.getChapters(t.Context(), manga))
 	require.Len(t, manga.Chapters, 2)
 	require.Equal(t, "101", manga.Chapters[domain.MustParseChapterNumber("11")].ID)
 	require.Equal(t, server.URL+"/chapter/2", manga.Chapters[domain.MustParseChapterNumber("10")].URL)
 }
 
-func TestComixGetImageURLsNormalizesCompactPages(t *testing.T) {
+func TestComixPagesNormalizesCompactPages(t *testing.T) {
 	t.Parallel()
 
 	codec, err := newComixCodec()
@@ -232,17 +232,18 @@ func TestComixGetImageURLsNormalizesCompactPages(t *testing.T) {
 
 	source := newTestComix(t, server, "https://comix.to/title/pvry-one-piece", "")
 	chapter := domain.Chapter{ID: "101"}
-	require.NoError(t, source.GetImageURLs(t.Context(), &chapter))
-	require.Len(t, chapter.ImageInfo, 2)
-	require.Equal(t, "https://images.example/one.webp", chapter.ImageInfo[0].ImageURL)
-	require.Equal(t, map[string]string{"Referer": server.URL + "/"}, chapter.ImageInfo[0].RequestHeaders)
-	require.Nil(t, chapter.ImageInfo[0].Processor)
-	require.Equal(t, "https://cdn.example/two.webp", chapter.ImageInfo[1].ImageURL)
-	require.Equal(t, map[string]string{"Referer": server.URL + "/"}, chapter.ImageInfo[1].RequestHeaders)
-	require.Nil(t, chapter.ImageInfo[1].Processor)
+	pages, err := source.Pages(t.Context(), chapter)
+	require.NoError(t, err)
+	require.Len(t, pages, 2)
+	require.Equal(t, "https://images.example/one.webp", pages[0].ImageURL)
+	require.Equal(t, map[string]string{"Referer": server.URL + "/"}, pages[0].RequestHeaders)
+	require.Nil(t, pages[0].Processor)
+	require.Equal(t, "https://cdn.example/two.webp", pages[1].ImageURL)
+	require.Equal(t, map[string]string{"Referer": server.URL + "/"}, pages[1].RequestHeaders)
+	require.Nil(t, pages[1].Processor)
 }
 
-func TestComixGetImageURLsMarksScrambledPage(t *testing.T) {
+func TestComixPagesMarksScrambledPage(t *testing.T) {
 	t.Parallel()
 
 	codec, err := newComixCodec()
@@ -261,10 +262,11 @@ func TestComixGetImageURLsMarksScrambledPage(t *testing.T) {
 
 	source := newTestComix(t, server, "https://comix.to/title/pvry-one-piece", "")
 	chapter := domain.Chapter{ID: "101"}
-	require.NoError(t, source.GetImageURLs(t.Context(), &chapter))
-	require.Len(t, chapter.ImageInfo, 2)
-	require.Nil(t, chapter.ImageInfo[0].Processor)
-	require.IsType(t, comixImageProcessor{}, chapter.ImageInfo[1].Processor)
+	pages, err := source.Pages(t.Context(), chapter)
+	require.NoError(t, err)
+	require.Len(t, pages, 2)
+	require.Nil(t, pages[0].Processor)
+	require.IsType(t, comixImageProcessor{}, pages[1].Processor)
 }
 
 func TestComixExtractIDRequiresCanonicalTitleURL(t *testing.T) {

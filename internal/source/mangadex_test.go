@@ -38,15 +38,12 @@ func TestMangaDexPaginatesBeforeRejectingFilteredResults(t *testing.T) {
 	source.BaseURL = server.URL
 	source.Client = server.Client()
 
-	manga, err := source.GetManga(t.Context())
+	manga, err := source.Discover(t.Context())
 	if err != nil {
 		t.Fatalf("get manga: %v", err)
 	}
 	if manga.Title != "Fixture English" {
 		t.Fatalf("manga title = %q", manga.Title)
-	}
-	if err := source.GetChapters(t.Context(), manga); err != nil {
-		t.Fatalf("get chapters: %v", err)
 	}
 	if len(manga.Chapters) != 1 {
 		t.Fatalf("chapter count = %d, want 1", len(manga.Chapters))
@@ -56,11 +53,12 @@ func TestMangaDexPaginatesBeforeRejectingFilteredResults(t *testing.T) {
 		if chapter.ID != "chapter-selected" {
 			t.Fatalf("chapter ID = %q", chapter.ID)
 		}
-		if err := source.GetImageURLs(t.Context(), &chapter); err != nil {
+		pages, err := source.Pages(t.Context(), chapter)
+		if err != nil {
 			t.Fatalf("get image URLs: %v", err)
 		}
-		if len(chapter.ImageInfo) != 2 {
-			t.Fatalf("image count = %d, want 2", len(chapter.ImageInfo))
+		if len(pages) != 2 {
+			t.Fatalf("image count = %d, want 2", len(pages))
 		}
 	}
 }

@@ -54,8 +54,20 @@ func (t *tcbscans) ValidateInput() error {
 	return nil
 }
 
-// GetManga gets the selected manga from TCB Scans
-func (t *tcbscans) GetManga(ctx context.Context) (domain.Manga, error) {
+// Discover gets the selected manga and its chapters from TCB Scans.
+func (t *tcbscans) Discover(ctx context.Context) (domain.Manga, error) {
+	manga, err := t.getManga(ctx)
+	if err != nil {
+		return domain.Manga{}, err
+	}
+	if err := t.getChapters(ctx, manga); err != nil {
+		return domain.Manga{}, err
+	}
+
+	return manga, nil
+}
+
+func (t *tcbscans) getManga(ctx context.Context) (domain.Manga, error) {
 	mangas := make(map[string]domain.Manga)
 	var errors []error
 	c := t.Collector.Clone()
@@ -98,8 +110,7 @@ func (t *tcbscans) GetManga(ctx context.Context) (domain.Manga, error) {
 	return selectedManga, nil
 }
 
-// GetChapters gets all chapters for a manga
-func (t *tcbscans) GetChapters(ctx context.Context, manga domain.Manga) error {
+func (t *tcbscans) getChapters(ctx context.Context, manga domain.Manga) error {
 	var errors []error
 	c := t.Collector.Clone()
 	c.Context = ctx
@@ -148,8 +159,8 @@ func (t *tcbscans) GetChapters(ctx context.Context, manga domain.Manga) error {
 	return nil
 }
 
-// GetImageURLs gets all image urls for a chapter
-func (t *tcbscans) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+// Pages gets all image URLs for a chapter.
+func (t *tcbscans) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
 	var imageInfos []domain.ImageInfo
 	var errors []error
 	c := t.Collector.Clone()
@@ -165,24 +176,23 @@ func (t *tcbscans) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 
 	path, err := url.JoinPath(t.BaseURL, chapter.URL)
 	if err != nil {
-		return fmt.Errorf("building URL: %w", err)
+		return nil, fmt.Errorf("building URL: %w", err)
 	}
 
 	err = c.Visit(path)
 	if err != nil {
-		return fmt.Errorf("visiting URL %s: %w", path, err)
+		return nil, fmt.Errorf("visiting URL %s: %w", path, err)
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
+		return nil, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
+		return nil, fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
-	chapter.ImageInfo = imageInfos
-	return nil
+	return imageInfos, nil
 }
 
 // getChapterNumber gets the chapter number from the scraped chapter name

@@ -23,7 +23,7 @@ func newTestCubari(mangaURL, baseURL string) *cubari {
 	}
 }
 
-func TestCubariGetMangaProxyChapter(t *testing.T) {
+func TestCubariDiscoverProxyChapter(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +46,7 @@ func TestCubariGetMangaProxyChapter(t *testing.T) {
 
 	src := newTestCubari(server.URL+"/gist", server.URL)
 
-	manga, err := src.GetManga(t.Context())
+	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 
 	chapter, ok := manga.Chapters[domain.ChapterNumber{Whole: 236}]

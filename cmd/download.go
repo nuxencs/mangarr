@@ -40,42 +40,23 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 				return fmt.Errorf("invalid download location: %w", err)
 			}
 
-			var s domain.Source
-
-			switch options.mangaSource {
-			case "tcbscans":
-				s = source.NewTCBScans(options.manga)
-			case "mangadex":
-				s = source.NewMangadex(options.manga, options.group, options.language)
-			case "mangaplus":
-				s = source.NewMangaPlus(options.manga)
-			case "flamecomics":
-				s = source.NewFlamecomics(options.manga)
-			case "asurascans":
-				s = source.NewAsurascans(options.manga)
-			case "cubari":
-				s = source.NewCubari(options.manga, options.group)
-			case "weebcentral":
-				s = source.NewWeebCentral(options.manga)
-			case "comix":
-				s = source.NewComix(options.manga, options.group)
-			case "atsumaru":
-				s = source.NewAtsumaru(options.manga, options.group)
-			default:
-				return fmt.Errorf("invalid source %q", options.mangaSource)
+			s, err := source.Select(domain.MonitoredManga{
+				Source:   options.mangaSource,
+				Manga:    options.manga,
+				Group:    options.group,
+				Language: options.language,
+			})
+			if err != nil {
+				return fmt.Errorf("selecting source: %w", err)
 			}
 
 			if err := s.ValidateInput(); err != nil {
 				return fmt.Errorf("invalid input: %w", err)
 			}
 
-			selectedManga, err := s.GetManga(ctx)
+			selectedManga, err := s.Discover(ctx)
 			if err != nil {
 				return fmt.Errorf("getting manga from %s: %w", s, err)
-			}
-
-			if err := s.GetChapters(ctx, selectedManga); err != nil {
-				return fmt.Errorf("getting chapters for %s: %w", selectedManga.Title, err)
 			}
 
 			var selectedChapterNumbers []domain.ChapterNumber
@@ -164,10 +145,12 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 						return
 					}
 
-					if err := s.GetImageURLs(ctx, &selectedChapter); err != nil {
+					pages, err := s.Pages(ctx, selectedChapter)
+					if err != nil {
 						log.Error().Err(err).Msgf("Failed to get image URLs for chapter %s", selectedChapter.Number)
 						return
 					}
+					selectedChapter.ImageInfo = pages
 
 					log.Info().Msgf("Downloading %q", templatedName)
 					if err := download.Chapter(ctx, log, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {

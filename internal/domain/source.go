@@ -9,9 +9,8 @@ import (
 type Source interface {
 	String() string
 	ValidateInput() error
-	GetManga(context.Context) (Manga, error)
-	GetChapters(context.Context, Manga) error
-	GetImageURLs(context.Context, *Chapter) error
+	Discover(context.Context) (Manga, error)
+	Pages(context.Context, Chapter) ([]ImageInfo, error)
 }
 
 type Manga struct {

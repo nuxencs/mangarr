@@ -78,7 +78,7 @@ func (a *asurascans) ValidateInput() error {
 	return nil
 }
 
-func (a *asurascans) GetManga(ctx context.Context) (domain.Manga, error) {
+func (a *asurascans) Discover(ctx context.Context) (domain.Manga, error) {
 	parsed, err := url.Parse(a.MangaURL)
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("parsing URL %s: %w", a.MangaURL, err)
@@ -175,20 +175,16 @@ func (a *asurascans) GetManga(ctx context.Context) (domain.Manga, error) {
 	return manga, nil
 }
 
-func (a *asurascans) GetChapters(_ context.Context, _ domain.Manga) error {
-	return nil
-}
-
-func (a *asurascans) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+func (a *asurascans) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
 	body, err := a.fetch(ctx, chapter.URL)
 	if err != nil {
-		return fmt.Errorf("fetching chapter page %s: %w", chapter.URL, err)
+		return nil, fmt.Errorf("fetching chapter page %s: %w", chapter.URL, err)
 	}
 
 	matches := asurascansChapterAssetPattern.FindAllString(string(body), -1)
 	imageURLs := dedupeStrings(matches)
 	if len(imageURLs) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
+		return nil, fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
 	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
@@ -196,8 +192,7 @@ func (a *asurascans) GetImageURLs(ctx context.Context, chapter *domain.Chapter) 
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
 	}
 
-	chapter.ImageInfo = imageInfos
-	return nil
+	return imageInfos, nil
 }
 
 func (a *asurascans) fetch(ctx context.Context, rawURL string) ([]byte, error) {

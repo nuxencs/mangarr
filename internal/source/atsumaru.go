@@ -94,7 +94,7 @@ func (a *atsumaru) ValidateInput() error {
 	return nil
 }
 
-func (a *atsumaru) GetManga(ctx context.Context) (domain.Manga, error) {
+func (a *atsumaru) Discover(ctx context.Context) (domain.Manga, error) {
 	mangaID, err := a.extractMangaID()
 	if err != nil {
 		return domain.Manga{}, err
@@ -144,14 +144,10 @@ func (a *atsumaru) GetManga(ctx context.Context) (domain.Manga, error) {
 	return manga, nil
 }
 
-func (a *atsumaru) GetChapters(_ context.Context, _ domain.Manga) error {
-	return nil
-}
-
-func (a *atsumaru) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+func (a *atsumaru) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
 	mangaID, err := a.extractMangaID()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	apiURL, err := a.apiURL("api/read/chapter", url.Values{
@@ -159,30 +155,29 @@ func (a *atsumaru) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 		"chapterId": []string{chapter.ID},
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var chapterResp atsumaruReadChapterResponse
 	if err := a.getJSON(ctx, apiURL, &chapterResp); err != nil {
-		return fmt.Errorf("getting chapter pages from %s: %w", apiURL, err)
+		return nil, fmt.Errorf("getting chapter pages from %s: %w", apiURL, err)
 	}
 
 	imageInfos := make([]domain.ImageInfo, 0, len(chapterResp.ReadChapter.Pages))
 	for _, page := range chapterResp.ReadChapter.Pages {
 		imageURL, err := a.resolveImageURL(page.Image)
 		if err != nil {
-			return fmt.Errorf("resolving image URL %s: %w", page.Image, err)
+			return nil, fmt.Errorf("resolving image URL %s: %w", page.Image, err)
 		}
 
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
+		return nil, fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
 	}
 
-	chapter.ImageInfo = imageInfos
-	return nil
+	return imageInfos, nil
 }
 
 func (a *atsumaru) extractMangaID() (string, error) {

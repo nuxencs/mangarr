@@ -29,23 +29,21 @@ func TestTCBScansFixtureFlow(t *testing.T) {
 	source := NewTCBScans("One Piece").(*tcbscans)
 	source.BaseURL = server.URL
 
-	manga, err := source.GetManga(t.Context())
+	manga, err := source.Discover(t.Context())
 	if err != nil {
-		t.Fatalf("get manga: %v", err)
-	}
-	if err := source.GetChapters(t.Context(), manga); err != nil {
-		t.Fatalf("get chapters: %v", err)
+		t.Fatalf("discover manga: %v", err)
 	}
 	if len(manga.Chapters) != 1 {
 		t.Fatalf("chapter count = %d, want 1", len(manga.Chapters))
 	}
 
 	for _, chapter := range manga.Chapters {
-		if err := source.GetImageURLs(t.Context(), &chapter); err != nil {
+		pages, err := source.Pages(t.Context(), chapter)
+		if err != nil {
 			t.Fatalf("get image URLs: %v", err)
 		}
-		if len(chapter.ImageInfo) != 2 {
-			t.Fatalf("image count = %d, want 2", len(chapter.ImageInfo))
+		if len(pages) != 2 {
+			t.Fatalf("image count = %d, want 2", len(pages))
 		}
 	}
 }
@@ -61,7 +59,7 @@ func TestTCBScansHonorsContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 
-	if _, err := source.GetManga(ctx); err == nil {
+	if _, err := source.Discover(ctx); err == nil {
 		t.Fatal("expected canceled scrape to fail")
 	}
 }

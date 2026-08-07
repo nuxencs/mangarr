@@ -73,8 +73,20 @@ func (w *weebcentral) ValidateInput() error {
 	return nil
 }
 
-// GetManga gets the selected manga from Weeb Central
-func (w *weebcentral) GetManga(ctx context.Context) (domain.Manga, error) {
+// Discover gets the selected manga and its chapters from Weeb Central.
+func (w *weebcentral) Discover(ctx context.Context) (domain.Manga, error) {
+	manga, err := w.getManga(ctx)
+	if err != nil {
+		return domain.Manga{}, err
+	}
+	if err := w.getChapters(ctx, manga); err != nil {
+		return domain.Manga{}, err
+	}
+
+	return manga, nil
+}
+
+func (w *weebcentral) getManga(ctx context.Context) (domain.Manga, error) {
 	var manga domain.Manga
 	var errors []error
 	c := w.Collector.Clone()
@@ -103,8 +115,7 @@ func (w *weebcentral) GetManga(ctx context.Context) (domain.Manga, error) {
 	return manga, nil
 }
 
-// GetChapters gets all chapters for a manga
-func (w *weebcentral) GetChapters(ctx context.Context, manga domain.Manga) error {
+func (w *weebcentral) getChapters(ctx context.Context, manga domain.Manga) error {
 	var errors []error
 	c := w.Collector.Clone()
 	c.Context = ctx
@@ -154,25 +165,25 @@ func (w *weebcentral) GetChapters(ctx context.Context, manga domain.Manga) error
 	return nil
 }
 
-// GetImageURLs gets all image urls for a chapter
-func (w *weebcentral) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+// Pages gets all image URLs for a chapter.
+func (w *weebcentral) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
 	imageURL, err := w.chapterImagesURL(chapter.URL)
 	if err != nil {
-		return fmt.Errorf("building chapter images URL from %s: %w", chapter.URL, err)
+		return nil, fmt.Errorf("building chapter images URL from %s: %w", chapter.URL, err)
 	}
 
 	body, err := w.fetch(ctx, imageURL)
 	if err != nil {
-		return fmt.Errorf("fetching chapter images %s: %w", imageURL, err)
+		return nil, fmt.Errorf("fetching chapter images %s: %w", imageURL, err)
 	}
 
 	imageURLs, err := w.extractImageURLs(body)
 	if err != nil {
-		return fmt.Errorf("extracting chapter image URLs from %s: %w", imageURL, err)
+		return nil, fmt.Errorf("extracting chapter image URLs from %s: %w", imageURL, err)
 	}
 
 	if len(imageURLs) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
+		return nil, fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
 	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
@@ -180,8 +191,7 @@ func (w *weebcentral) GetImageURLs(ctx context.Context, chapter *domain.Chapter)
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
 	}
 
-	chapter.ImageInfo = imageInfos
-	return nil
+	return imageInfos, nil
 }
 
 func (w *weebcentral) chapterImagesURL(chapterURL string) (string, error) {

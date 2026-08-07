@@ -128,7 +128,19 @@ func (c *comix) ValidateInput() error {
 	return nil
 }
 
-func (c *comix) GetManga(ctx context.Context) (domain.Manga, error) {
+func (c *comix) Discover(ctx context.Context) (domain.Manga, error) {
+	manga, err := c.getManga(ctx)
+	if err != nil {
+		return domain.Manga{}, err
+	}
+	if err := c.getChapters(ctx, manga); err != nil {
+		return domain.Manga{}, err
+	}
+
+	return manga, nil
+}
+
+func (c *comix) getManga(ctx context.Context) (domain.Manga, error) {
 	mangaID, err := c.extractIDFromURL(c.MangaURL)
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("extracting Comix ID from URL %s: %w", c.MangaURL, err)
@@ -151,7 +163,7 @@ func (c *comix) GetManga(ctx context.Context) (domain.Manga, error) {
 	}, nil
 }
 
-func (c *comix) GetChapters(ctx context.Context, manga domain.Manga) error {
+func (c *comix) getChapters(ctx context.Context, manga domain.Manga) error {
 	if manga.ID == "" {
 		return fmt.Errorf("getting Comix chapters: manga ID is empty")
 	}
@@ -205,24 +217,24 @@ func (c *comix) GetChapters(ctx context.Context, manga domain.Manga) error {
 	return nil
 }
 
-func (c *comix) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
-	if chapter == nil || chapter.ID == "" {
-		return fmt.Errorf("getting Comix image URLs: chapter ID is empty")
+func (c *comix) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
+	if chapter.ID == "" {
+		return nil, fmt.Errorf("getting Comix image URLs: chapter ID is empty")
 	}
 
 	var response comixChapterDetail
 	if err := c.get(ctx, comixAPIPath+"/chapters/"+url.PathEscape(chapter.ID), nil, &response); err != nil {
-		return fmt.Errorf("getting Comix image URLs for chapter %s: %w", chapter.ID, err)
+		return nil, fmt.Errorf("getting Comix image URLs for chapter %s: %w", chapter.ID, err)
 	}
 	if len(response.Pages.Items) == 0 {
-		return fmt.Errorf("getting Comix image URLs for chapter %s: response has no pages", chapter.ID)
+		return nil, fmt.Errorf("getting Comix image URLs for chapter %s: response has no pages", chapter.ID)
 	}
 
 	imageInfos := make([]domain.ImageInfo, 0, len(response.Pages.Items))
 	for i, image := range response.Pages.Items {
 		imageURL := resolveComixURL(response.Pages.BaseURL, image.URL)
 		if imageURL == "" {
-			return fmt.Errorf("getting Comix image URLs for chapter %s: page %d URL is empty", chapter.ID, i+1)
+			return nil, fmt.Errorf("getting Comix image URLs for chapter %s: page %d URL is empty", chapter.ID, i+1)
 		}
 		imageInfo := domain.ImageInfo{
 			ImageURL: imageURL,
@@ -236,8 +248,7 @@ func (c *comix) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error
 		imageInfos = append(imageInfos, imageInfo)
 	}
 
-	chapter.ImageInfo = imageInfos
-	return nil
+	return imageInfos, nil
 }
 
 func (c *comix) get(ctx context.Context, path string, params comixParams, destination any) error {
