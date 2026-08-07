@@ -110,7 +110,19 @@ func (m *mangadex) ValidateInput() error {
 	return nil
 }
 
-func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
+func (m *mangadex) Discover(ctx context.Context) (domain.Manga, error) {
+	manga, err := m.getManga(ctx)
+	if err != nil {
+		return domain.Manga{}, err
+	}
+	if err := m.getChapters(ctx, manga); err != nil {
+		return domain.Manga{}, err
+	}
+
+	return manga, nil
+}
+
+func (m *mangadex) getManga(ctx context.Context) (domain.Manga, error) {
 	var mangaResp mangadexManga
 	var isManhwa bool
 
@@ -167,7 +179,7 @@ func (m *mangadex) GetManga(ctx context.Context) (domain.Manga, error) {
 	}, nil
 }
 
-func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
+func (m *mangadex) getChapters(ctx context.Context, manga domain.Manga) error {
 	var retryErr error
 	var chapterResp mangadexChapters
 	var chapterCount int
@@ -257,18 +269,18 @@ func (m *mangadex) GetChapters(ctx context.Context, manga domain.Manga) error {
 	return nil
 }
 
-func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+func (m *mangadex) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
 	var chapterResp mangadexChapter
 	var imageInfos []domain.ImageInfo
 
 	path, err := url.JoinPath(m.BaseURL, "at-home/server", chapter.ID)
 	if err != nil {
-		return fmt.Errorf("building URL: %w", err)
+		return nil, fmt.Errorf("building URL: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, path, nil)
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
 	req.Header.Set("User-Agent", "mangarr")
@@ -292,24 +304,23 @@ func (m *mangadex) GetImageURLs(ctx context.Context, chapter *domain.Chapter) er
 		sharedhttp.RetryOptions(ctx)...,
 	)
 	if retryErr != nil {
-		return fmt.Errorf("executing request %s: %w", req.URL, retryErr)
+		return nil, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
 	}
 
 	for _, imageURL := range chapterResp.Chapter.Data {
 		imagePath, err := url.JoinPath(chapterResp.BaseURL, "data", chapterResp.Chapter.Hash, imageURL)
 		if err != nil {
-			return fmt.Errorf("building URL: %w", err)
+			return nil, fmt.Errorf("building URL: %w", err)
 		}
 
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imagePath})
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
+		return nil, fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
 	}
 
-	chapter.ImageInfo = imageInfos
-	return nil
+	return imageInfos, nil
 }
 
 func (m *mangadex) getMangaTitle(titles map[string]string) string {

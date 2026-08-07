@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAsurascansGetMangaParsesCurrentSeriesURL(t *testing.T) {
+func TestAsurascansDiscoverParsesCurrentSeriesURL(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -53,7 +53,7 @@ func TestAsurascansGetMangaParsesCurrentSeriesURL(t *testing.T) {
 
 	src := newTestAsurascans(server.URL+currentSeries, server.URL)
 
-	manga, err := src.GetManga(t.Context())
+	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "Solo Max-Level Newbie", manga.Title)
 	require.Equal(t, server.URL+currentSeries, manga.URL)
@@ -70,7 +70,7 @@ func TestAsurascansGetMangaParsesCurrentSeriesURL(t *testing.T) {
 	require.Equal(t, server.URL+currentChapter2, ch248.URL)
 }
 
-func TestAsurascansGetMangaSkipsLockedChapters(t *testing.T) {
+func TestAsurascansDiscoverSkipsLockedChapters(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -109,7 +109,7 @@ func TestAsurascansGetMangaSkipsLockedChapters(t *testing.T) {
 
 	src := newTestAsurascans(server.URL+currentSeries, server.URL)
 
-	manga, err := src.GetManga(t.Context())
+	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "Pick Me Up, Infinite Gacha", manga.Title)
 	require.Len(t, manga.Chapters, 1)
@@ -122,7 +122,7 @@ func TestAsurascansGetMangaSkipsLockedChapters(t *testing.T) {
 	require.Equal(t, "Regular Title", ch193.Title)
 }
 
-func TestAsurascansGetImageURLsExtractsChapterAssets(t *testing.T) {
+func TestAsurascansPagesExtractsChapterAssets(t *testing.T) {
 	t.Parallel()
 
 	const chapterPath = "/comics/solo-max-level-newbie-7f873ca6/chapter/249"
@@ -158,11 +158,11 @@ func TestAsurascansGetImageURLsExtractsChapterAssets(t *testing.T) {
 		Number: domain.MustParseChapterNumber("249"),
 	}
 
-	err := src.GetImageURLs(t.Context(), &chapter)
+	pages, err := src.Pages(t.Context(), chapter)
 	require.NoError(t, err)
-	require.Len(t, chapter.ImageInfo, 2)
-	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/001.webp", chapter.ImageInfo[0].ImageURL)
-	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/002.webp", chapter.ImageInfo[1].ImageURL)
+	require.Len(t, pages, 2)
+	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/001.webp", pages[0].ImageURL)
+	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/002.webp", pages[1].ImageURL)
 }
 
 func newTestAsurascans(mangaURL, baseURL string) *asurascans {

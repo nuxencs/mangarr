@@ -122,7 +122,7 @@ func (f *flamecomics) ValidateInput() error {
 	return nil
 }
 
-func (f *flamecomics) GetManga(ctx context.Context) (domain.Manga, error) {
+func (f *flamecomics) Discover(ctx context.Context) (domain.Manga, error) {
 	var responseData flamecomicsResponse
 	var errors []error
 
@@ -194,11 +194,7 @@ func (f *flamecomics) GetManga(ctx context.Context) (domain.Manga, error) {
 	return manga, nil
 }
 
-func (f *flamecomics) GetChapters(_ context.Context, _ domain.Manga) error {
-	return nil
-}
-
-func (f *flamecomics) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+func (f *flamecomics) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
 	var chapterResponse flamecomicsChapterResponse
 	var errors []error
 	c := f.Collector.Clone()
@@ -226,11 +222,11 @@ func (f *flamecomics) GetImageURLs(ctx context.Context, chapter *domain.Chapter)
 
 	err := c.Visit(chapter.URL)
 	if err != nil {
-		return fmt.Errorf("visiting URL %s: %w", chapter.URL, err)
+		return nil, fmt.Errorf("visiting URL %s: %w", chapter.URL, err)
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
+		return nil, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
 	}
 
 	responseChapter := chapterResponse.Props.PageProps.Chapter
@@ -260,9 +256,8 @@ func (f *flamecomics) GetImageURLs(ctx context.Context, chapter *domain.Chapter)
 	}
 
 	if len(imageURLs) == 0 {
-		return fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
+		return nil, fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
-	chapter.ImageInfo = imageURLs
-	return nil
+	return imageURLs, nil
 }

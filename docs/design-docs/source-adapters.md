@@ -2,7 +2,12 @@
 
 Verified against `internal/source/` on 2026-08-07.
 
-All adapters implement `domain.Source`.
+All adapters implement the small `domain.Source` contract:
+
+- `Discover` returns manga metadata and its chapter map.
+- `Pages` returns an ordered page transport description for one chapter.
+- adapters return values. They do not mutate caller-owned manga or chapter values.
+- `source.Select` is the single registry used by download and monitor commands.
 
 ## Matrix
 
@@ -23,7 +28,7 @@ All adapters implement `domain.Source`.
 - validate early
 - keep selectors and parsing local to the adapter
 - prefer stable attributes or embedded data over brittle DOM traversal
-- reuse `internal/sharedhttp/` and `internal/browser/` before adding new transport helpers
+- reuse `internal/sharedhttp/` before adding new transport helpers
 - when an adapter drifts, add a regression test around the parsing seam if practical
 
 ## Shared Behavior

@@ -68,7 +68,7 @@ func (m *mangaplus) ValidateInput() error {
 	return nil
 }
 
-func (m *mangaplus) GetManga(ctx context.Context) (domain.Manga, error) {
+func (m *mangaplus) Discover(ctx context.Context) (domain.Manga, error) {
 	if err := m.ensureRegistered(ctx); err != nil {
 		return domain.Manga{}, fmt.Errorf("registering Manga Plus device: %w", err)
 	}
@@ -118,13 +118,9 @@ func (m *mangaplus) GetManga(ctx context.Context) (domain.Manga, error) {
 	}, nil
 }
 
-func (m *mangaplus) GetChapters(_ context.Context, _ domain.Manga) error {
-	return nil
-}
-
-func (m *mangaplus) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
+func (m *mangaplus) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
 	if err := m.ensureRegistered(ctx); err != nil {
-		return fmt.Errorf("registering Manga Plus device: %w", err)
+		return nil, fmt.Errorf("registering Manga Plus device: %w", err)
 	}
 
 	params := url.Values{
@@ -137,19 +133,19 @@ func (m *mangaplus) GetImageURLs(ctx context.Context, chapter *domain.Chapter) e
 
 	path, err := url.JoinPath(m.baseURL, "manga_viewer")
 	if err != nil {
-		return fmt.Errorf("building URL: %w", err)
+		return nil, fmt.Errorf("building URL: %w", err)
 	}
 
 	u, err := url.Parse(path)
 	if err != nil {
-		return fmt.Errorf("parsing URL %s: %w", path, err)
+		return nil, fmt.Errorf("parsing URL %s: %w", path, err)
 	}
 
 	u.RawQuery = params.Encode()
 
 	protoResp, err := m.getProtoResponse(ctx, http.MethodGet, u.String())
 	if err != nil {
-		return fmt.Errorf("getting protobuf response: %w", err)
+		return nil, fmt.Errorf("getting protobuf response: %w", err)
 	}
 
 	var imageInfos []domain.ImageInfo
@@ -164,11 +160,10 @@ func (m *mangaplus) GetImageURLs(ctx context.Context, chapter *domain.Chapter) e
 	}
 
 	if len(imageInfos) == 0 {
-		return fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
+		return nil, fmt.Errorf("getting image URLs for chapter ID %s", chapter.ID)
 	}
 
-	chapter.ImageInfo = imageInfos
-	return nil
+	return imageInfos, nil
 }
 
 func (m *mangaplus) ensureRegistered(ctx context.Context) error {

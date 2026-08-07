@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestMangaPlusGetMangaRegistersAndUsesSecret(t *testing.T) {
+func TestMangaPlusDiscoverRegistersAndUsesSecret(t *testing.T) {
 	t.Parallel()
 
 	var registered atomic.Bool
@@ -54,13 +54,13 @@ func TestMangaPlusGetMangaRegistersAndUsesSecret(t *testing.T) {
 		baseURL: server.URL + "/api",
 	}
 
-	manga, err := src.GetManga(t.Context())
+	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "Registered Title", manga.Title)
 	require.Equal(t, "registered-secret", src.secret)
 }
 
-func TestMangaPlusGetMangaParsesChapterListV2(t *testing.T) {
+func TestMangaPlusDiscoverParsesChapterListV2(t *testing.T) {
 	t.Parallel()
 
 	titleDetail := &protobuf.TitleDetailView{
@@ -83,7 +83,7 @@ func TestMangaPlusGetMangaParsesChapterListV2(t *testing.T) {
 
 	src := newTestMangaPlus("100352", server)
 
-	manga, err := src.GetManga(t.Context())
+	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "Hero Organization", manga.Title)
 	require.Len(t, manga.Chapters, 2)
@@ -99,7 +99,7 @@ func TestMangaPlusGetMangaParsesChapterListV2(t *testing.T) {
 	require.Equal(t, "Chapter 2: HEROES", chapter2.Title)
 }
 
-func TestMangaPlusGetMangaKeepsLegacyChapterGroups(t *testing.T) {
+func TestMangaPlusDiscoverKeepsLegacyChapterGroups(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -125,14 +125,14 @@ func TestMangaPlusGetMangaKeepsLegacyChapterGroups(t *testing.T) {
 
 	src := newTestMangaPlus("100352", server)
 
-	manga, err := src.GetManga(t.Context())
+	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Len(t, manga.Chapters, 2)
 	require.Equal(t, "1001", manga.Chapters[domain.MustParseChapterNumber("1")].ID)
 	require.Equal(t, "1002", manga.Chapters[domain.MustParseChapterNumber("10")].ID)
 }
 
-func TestMangaPlusGetImageURLsParsesViewerPages(t *testing.T) {
+func TestMangaPlusPagesParsesViewerPages(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -157,12 +157,12 @@ func TestMangaPlusGetImageURLsParsesViewerPages(t *testing.T) {
 	src := newTestMangaPlus("100352", server)
 	chapter := domain.Chapter{ID: "1022325"}
 
-	err := src.GetImageURLs(t.Context(), &chapter)
+	pages, err := src.Pages(t.Context(), chapter)
 	require.NoError(t, err)
 	require.Equal(t, []domain.ImageInfo{
 		{ImageURL: "https://cdn.example/page-001.webp", EncryptionKey: "abc"},
 		{ImageURL: "https://cdn.example/page-002.webp"},
-	}, chapter.ImageInfo)
+	}, pages)
 }
 
 func newTestMangaPlus(mangaID string, server *httptest.Server) *mangaplus {

@@ -134,3 +134,16 @@ subprocess exits or live GitHub access, and local version reporting works offlin
 
 Notes/risks: Monitor source work still uses concrete production adapters. The
 next source and acquisition buckets add the remaining command test seams.
+
+## Bucket 6 - Source interface and registry - ALIGNED
+
+Built: Replaced the mutation-based source lifecycle with `Discover` and `Pages`
+return values. Both command paths now construct adapters through one tested source
+registry.
+
+Serves goal/decision because: Every adapter now implements the same useful
+operations without no-op methods, and source selection cannot drift between
+download and monitor.
+
+Notes/risks: Discovery still retrieves the full chapter list because both current
+command flows need it. The next bucket centralizes the shared per-chapter work.

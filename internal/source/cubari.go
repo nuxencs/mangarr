@@ -67,7 +67,7 @@ func (c *cubari) ValidateInput() error {
 	return nil
 }
 
-func (c *cubari) GetManga(ctx context.Context) (domain.Manga, error) {
+func (c *cubari) Discover(ctx context.Context) (domain.Manga, error) {
 	var cubariResp cubariResponse
 
 	if err := c.fetchJSON(ctx, c.MangaURL, &cubariResp); err != nil {
@@ -195,12 +195,12 @@ func (c *cubari) fetchJSON(ctx context.Context, rawURL string, target any) error
 	return nil
 }
 
-func (c *cubari) GetChapters(_ context.Context, _ domain.Manga) error {
-	return nil
-}
+func (c *cubari) Pages(_ context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
+	if len(chapter.ImageInfo) == 0 {
+		return nil, fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
+	}
 
-func (c *cubari) GetImageURLs(_ context.Context, _ *domain.Chapter) error {
-	return nil
+	return chapter.ImageInfo, nil
 }
 
 func (c *cubari) getChapterName(chapterString string) string {

@@ -72,7 +72,7 @@ func TestAtsumaruValidateInputRequiresScanID(t *testing.T) {
 	require.EqualError(t, err, "atsumaru scan ID is required")
 }
 
-func TestAtsumaruGetManga(t *testing.T) {
+func TestAtsumaruDiscover(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +94,7 @@ func TestAtsumaruGetManga(t *testing.T) {
 
 	src := newTestAtsumaru(server.URL + "/manga/Q5Mqy")
 
-	manga, err := src.GetManga(t.Context())
+	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "Q5Mqy", manga.ID)
 	require.Equal(t, server.URL+"/manga/Q5Mqy", manga.URL)
@@ -113,7 +113,7 @@ func TestAtsumaruGetManga(t *testing.T) {
 	require.Equal(t, "Chapter 7.1", ch71.Title)
 }
 
-func TestAtsumaruGetMangaErrorsWhenScanIDHasNoChapters(t *testing.T) {
+func TestAtsumaruDiscoverErrorsWhenScanIDHasNoChapters(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -129,11 +129,11 @@ func TestAtsumaruGetMangaErrorsWhenScanIDHasNoChapters(t *testing.T) {
 
 	src := newTestAtsumaru(server.URL + "/manga/Q5Mqy")
 
-	_, err := src.GetManga(t.Context())
+	_, err := src.Discover(t.Context())
 	require.EqualError(t, err, "getting chapters for manga Kagurabachi")
 }
 
-func TestAtsumaruGetMangaErrorsWhenNoChapters(t *testing.T) {
+func TestAtsumaruDiscoverErrorsWhenNoChapters(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -143,11 +143,11 @@ func TestAtsumaruGetMangaErrorsWhenNoChapters(t *testing.T) {
 
 	src := newTestAtsumaru(server.URL + "/manga/Q5Mqy")
 
-	_, err := src.GetManga(t.Context())
+	_, err := src.Discover(t.Context())
 	require.EqualError(t, err, "getting chapters for manga Kagurabachi")
 }
 
-func TestAtsumaruGetImageURLs(t *testing.T) {
+func TestAtsumaruPages(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -174,14 +174,14 @@ func TestAtsumaruGetImageURLs(t *testing.T) {
 		Number: domain.MustParseChapterNumber("121"),
 	}
 
-	err := src.GetImageURLs(t.Context(), &chapter)
+	pages, err := src.Pages(t.Context(), chapter)
 	require.NoError(t, err)
-	require.Len(t, chapter.ImageInfo, 2)
-	require.Equal(t, server.URL+"/static/pages/yzmwX4/0.webp", chapter.ImageInfo[0].ImageURL)
-	require.Equal(t, "https://cdn.atsu.test/static/pages/yzmwX4/1.webp", chapter.ImageInfo[1].ImageURL)
+	require.Len(t, pages, 2)
+	require.Equal(t, server.URL+"/static/pages/yzmwX4/0.webp", pages[0].ImageURL)
+	require.Equal(t, "https://cdn.atsu.test/static/pages/yzmwX4/1.webp", pages[1].ImageURL)
 }
 
-func TestAtsumaruGetImageURLsErrorsWhenNoPages(t *testing.T) {
+func TestAtsumaruPagesErrorsWhenNoPages(t *testing.T) {
 	t.Parallel()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -195,7 +195,7 @@ func TestAtsumaruGetImageURLsErrorsWhenNoPages(t *testing.T) {
 		Number: domain.MustParseChapterNumber("121"),
 	}
 
-	err := src.GetImageURLs(t.Context(), &chapter)
+	_, err := src.Pages(t.Context(), chapter)
 	require.EqualError(t, err, "getting image URLs for chapter ID yzmwX4")
 }
 

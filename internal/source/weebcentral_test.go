@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWeebCentralGetImageURLsExtractsChapterAssets(t *testing.T) {
+func TestWeebCentralPagesExtractsChapterAssets(t *testing.T) {
 	t.Parallel()
 
 	const chapterPath = "/chapters/01TESTCHAPTER"
@@ -46,11 +46,11 @@ func TestWeebCentralGetImageURLsExtractsChapterAssets(t *testing.T) {
 		Number: domain.MustParseChapterNumber("340.2"),
 	}
 
-	err := src.GetImageURLs(t.Context(), &chapter)
+	pages, err := src.Pages(t.Context(), chapter)
 	require.NoError(t, err)
-	require.Len(t, chapter.ImageInfo, 2)
-	require.Equal(t, "https://cdn.weebcentral.test/manga/chapter-001.png", chapter.ImageInfo[0].ImageURL)
-	require.Equal(t, server.URL+"/media/chapter-002.png", chapter.ImageInfo[1].ImageURL)
+	require.Len(t, pages, 2)
+	require.Equal(t, "https://cdn.weebcentral.test/manga/chapter-001.png", pages[0].ImageURL)
+	require.Equal(t, server.URL+"/media/chapter-002.png", pages[1].ImageURL)
 }
 
 func TestWeebCentralResolvesRelativeChapterURLs(t *testing.T) {
@@ -77,13 +77,14 @@ func TestWeebCentralResolvesRelativeChapterURLs(t *testing.T) {
 		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 	}
 
-	require.NoError(t, src.GetChapters(t.Context(), manga))
+	require.NoError(t, src.getChapters(t.Context(), manga))
 	chapter := manga.Chapters[chapterNumber]
-	require.NoError(t, src.GetImageURLs(t.Context(), &chapter))
-	require.Equal(t, server.URL+"/media/chapter-356.png", chapter.ImageInfo[0].ImageURL)
+	pages, err := src.Pages(t.Context(), chapter)
+	require.NoError(t, err)
+	require.Equal(t, server.URL+"/media/chapter-356.png", pages[0].ImageURL)
 }
 
-func TestWeebCentralGetImageURLsErrorsWhenFragmentHasNoImages(t *testing.T) {
+func TestWeebCentralPagesErrorsWhenFragmentHasNoImages(t *testing.T) {
 	t.Parallel()
 
 	const chapterPath = "/chapters/01EMPTYCHAPTER"
@@ -105,7 +106,7 @@ func TestWeebCentralGetImageURLsErrorsWhenFragmentHasNoImages(t *testing.T) {
 		Number: domain.MustParseChapterNumber("1"),
 	}
 
-	err := src.GetImageURLs(t.Context(), &chapter)
+	_, err := src.Pages(t.Context(), chapter)
 	require.EqualError(t, err, "getting image URLs for chapter 1")
 }
 

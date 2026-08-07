@@ -26,7 +26,7 @@ func TestFlameComicsFixtureFlow(t *testing.T) {
 	source.BaseURL = server.URL
 	source.CDNBaseURL = "https://cdn.example"
 
-	manga, err := source.GetManga(t.Context())
+	manga, err := source.Discover(t.Context())
 	if err != nil {
 		t.Fatalf("get manga: %v", err)
 	}
@@ -34,10 +34,11 @@ func TestFlameComicsFixtureFlow(t *testing.T) {
 		t.Fatalf("manga title = %q", manga.Title)
 	}
 	for _, chapter := range manga.Chapters {
-		if err := source.GetImageURLs(t.Context(), &chapter); err != nil {
+		pages, err := source.Pages(t.Context(), chapter)
+		if err != nil {
 			t.Fatalf("get image URLs: %v", err)
 		}
-		if got := chapter.ImageInfo[0].ImageURL; got != "https://cdn.example/uploads/images/series/7/chapter-token/001.webp" {
+		if got := pages[0].ImageURL; got != "https://cdn.example/uploads/images/series/7/chapter-token/001.webp" {
 			t.Fatalf("first image URL = %q", got)
 		}
 	}

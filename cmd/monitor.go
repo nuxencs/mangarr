@@ -139,12 +139,9 @@ func monitorManga(ctx context.Context, cfg domain.Config, mangaTitle string, mon
 		return fmt.Errorf("validating input: %w", err)
 	}
 
-	selectedManga, err := mangaSource.GetManga(ctx)
+	selectedManga, err := mangaSource.Discover(ctx)
 	if err != nil {
 		return fmt.Errorf("getting manga from %s: %w", monitoredManga.Source, err)
-	}
-	if err := mangaSource.GetChapters(ctx, selectedManga); err != nil {
-		return fmt.Errorf("getting manga chapters: %w", err)
 	}
 
 	_, latestChapterNr, err := parse.MinMaxChapterNumbers(selectedManga.Chapters)
@@ -169,9 +166,11 @@ func monitorManga(ctx context.Context, cfg domain.Config, mangaTitle string, mon
 		return nil
 	}
 
-	if err := mangaSource.GetImageURLs(ctx, &selectedChapter); err != nil {
+	pages, err := mangaSource.Pages(ctx, selectedChapter)
+	if err != nil {
 		return fmt.Errorf("getting image URLs for chapter %s: %w", selectedChapter.Number, err)
 	}
+	selectedChapter.ImageInfo = pages
 
 	mLog.Info().Msgf("downloading %q", templatedName)
 	if err := download.Chapter(ctx, mLog, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
