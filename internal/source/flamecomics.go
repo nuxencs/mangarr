@@ -15,8 +15,8 @@ import (
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
 )
 
 const (
@@ -84,8 +84,10 @@ type flamescansImage struct {
 var jsonRegex = regexp.MustCompile(`type="application/json">((?s).*?)</script>`)
 
 type flamecomics struct {
-	MangaURL  string
-	Collector colly.Collector
+	MangaURL   string
+	Collector  *colly.Collector
+	BaseURL    string
+	CDNBaseURL string
 }
 
 func NewFlamecomics(mangaURL string) domain.Source {
@@ -97,8 +99,10 @@ func NewFlamecomics(mangaURL string) domain.Source {
 	collector.SetRequestTimeout(120 * time.Second)
 
 	return &flamecomics{
-		MangaURL:  mangaURL,
-		Collector: *collector,
+		MangaURL:   mangaURL,
+		Collector:  collector,
+		BaseURL:    flamecomicsURL,
+		CDNBaseURL: flamecomicsCDNURL,
 	}
 }
 
@@ -107,18 +111,18 @@ func (f *flamecomics) String() string {
 }
 
 func (f *flamecomics) ValidateInput() error {
-	if !strings.HasPrefix(f.MangaURL, "https://flamecomics.xyz") {
-		return fmt.Errorf("the URL for Flame Comics must start with https://flamecomics.xyz")
-	}
-
-	if _, err := url.Parse(f.MangaURL); err != nil {
+	parsed, err := url.Parse(f.MangaURL)
+	if err != nil {
 		return fmt.Errorf("parsing URL %s: %w", f.MangaURL, err)
+	}
+	if parsed.Scheme != "https" || !strings.EqualFold(parsed.Host, "flamecomics.xyz") {
+		return fmt.Errorf("the URL for Flame Comics must use https://flamecomics.xyz")
 	}
 
 	return nil
 }
 
-func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
+func (f *flamecomics) GetManga(ctx context.Context) (domain.Manga, error) {
 	var responseData flamecomicsResponse
 	var errors []error
 
@@ -128,6 +132,7 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 	}
 
 	c := f.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
@@ -166,7 +171,7 @@ func (f *flamecomics) GetManga(_ context.Context) (domain.Manga, error) {
 			return domain.Manga{}, fmt.Errorf("parsing chapter number %s: %w", responseChapter.Chapter, err)
 		}
 
-		path, err := url.JoinPath(flamecomicsURL, "series", fmt.Sprintf("%d", responseChapter.SeriesID), responseChapter.Token)
+		path, err := url.JoinPath(f.BaseURL, "series", fmt.Sprintf("%d", responseChapter.SeriesID), responseChapter.Token)
 		if err != nil {
 			return domain.Manga{}, fmt.Errorf("building URL: %w", err)
 		}
@@ -193,10 +198,11 @@ func (f *flamecomics) GetChapters(_ context.Context, _ domain.Manga) error {
 	return nil
 }
 
-func (f *flamecomics) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
+func (f *flamecomics) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
 	var chapterResponse flamecomicsChapterResponse
 	var errors []error
 	c := f.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
@@ -245,7 +251,7 @@ func (f *flamecomics) GetImageURLs(_ context.Context, chapter *domain.Chapter) e
 
 		imageURLs = append(imageURLs, domain.ImageInfo{
 			ImageURL: fmt.Sprintf("%s/uploads/images/series/%d/%s/%s",
-				flamecomicsCDNURL,
+				f.CDNBaseURL,
 				chapterResponse.Props.PageProps.Chapter.SeriesId,
 				responseChapter.Token,
 				i.Name,

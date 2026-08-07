@@ -9,8 +9,8 @@ import (
 
 	"mangarr/internal/domain"
 
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -109,6 +109,13 @@ func TestWeebCentralGetImageURLsErrorsWhenFragmentHasNoImages(t *testing.T) {
 	require.EqualError(t, err, "getting image URLs for chapter 1")
 }
 
+func TestWeebCentralRejectsPrefixHostSpoofing(t *testing.T) {
+	source := NewWeebCentral("https://weebcentral.com.example/series/fixture")
+	if err := source.ValidateInput(); err == nil {
+		t.Fatal("expected spoofed host to fail validation")
+	}
+}
+
 func newTestWeebCentral(mangaURL, baseURL string) *weebcentral {
 	collector := colly.NewCollector(
 		colly.AllowURLRevisit(),
@@ -118,7 +125,7 @@ func newTestWeebCentral(mangaURL, baseURL string) *weebcentral {
 
 	return &weebcentral{
 		MangaURL:  mangaURL,
-		Collector: *collector,
+		Collector: collector,
 		BaseURL:   baseURL,
 		Client: http.Client{
 			Timeout: 10 * time.Second,

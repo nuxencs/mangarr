@@ -17,8 +17,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/avast/retry-go"
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
 )
 
 const (
@@ -29,7 +29,7 @@ var weebcentralChapterNumberPattern = regexp.MustCompile(`(?:Chapter|Ch.) ?(\d+(
 
 type weebcentral struct {
 	MangaURL  string
-	Collector colly.Collector
+	Collector *colly.Collector
 	Client    http.Client
 	BaseURL   string
 }
@@ -43,7 +43,7 @@ func NewWeebCentral(mangaURL string) domain.Source {
 	collector.SetRequestTimeout(120 * time.Second)
 
 	return &weebcentral{
-		Collector: *collector,
+		Collector: collector,
 		MangaURL:  mangaURL,
 		BaseURL:   weebcentralURL,
 		Client: http.Client{
@@ -62,22 +62,23 @@ func (w *weebcentral) ValidateInput() error {
 		return fmt.Errorf("weebcentral manga URL is required")
 	}
 
-	if !strings.HasPrefix(w.MangaURL, weebcentralURL) {
-		return fmt.Errorf("the URL for Weeb Central must start with %s", weebcentralURL)
-	}
-
-	if _, err := url.Parse(w.MangaURL); err != nil {
+	parsed, err := url.Parse(w.MangaURL)
+	if err != nil {
 		return fmt.Errorf("parsing URL %s: %w", w.MangaURL, err)
+	}
+	if parsed.Scheme != "https" || !strings.EqualFold(parsed.Host, "weebcentral.com") {
+		return fmt.Errorf("the URL for Weeb Central must use %s", weebcentralURL)
 	}
 
 	return nil
 }
 
 // GetManga gets the selected manga from Weeb Central
-func (w *weebcentral) GetManga(_ context.Context) (domain.Manga, error) {
+func (w *weebcentral) GetManga(ctx context.Context) (domain.Manga, error) {
 	var manga domain.Manga
 	var errors []error
 	c := w.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
@@ -103,9 +104,10 @@ func (w *weebcentral) GetManga(_ context.Context) (domain.Manga, error) {
 }
 
 // GetChapters gets all chapters for a manga
-func (w *weebcentral) GetChapters(_ context.Context, manga domain.Manga) error {
+func (w *weebcentral) GetChapters(ctx context.Context, manga domain.Manga) error {
 	var errors []error
 	c := w.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))

@@ -11,8 +11,8 @@ import (
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 
-	"github.com/gocolly/colly"
-	"github.com/gocolly/colly/extensions"
+	"github.com/gocolly/colly/v2"
+	"github.com/gocolly/colly/v2/extensions"
 )
 
 const (
@@ -23,7 +23,8 @@ var chapterNumberPattern = regexp.MustCompile(`Chapter (\d+(\.\d+)?)`)
 
 type tcbscans struct {
 	MangaTitle string
-	Collector  colly.Collector
+	Collector  *colly.Collector
+	BaseURL    string
 }
 
 func NewTCBScans(mangaTitle string) domain.Source {
@@ -35,8 +36,9 @@ func NewTCBScans(mangaTitle string) domain.Source {
 	collector.SetRequestTimeout(120 * time.Second)
 
 	return &tcbscans{
-		Collector:  *collector,
+		Collector:  collector,
 		MangaTitle: mangaTitle,
+		BaseURL:    tcbscansURL,
 	}
 }
 
@@ -53,10 +55,11 @@ func (t *tcbscans) ValidateInput() error {
 }
 
 // GetManga gets the selected manga from TCB Scans
-func (t *tcbscans) GetManga(_ context.Context) (domain.Manga, error) {
+func (t *tcbscans) GetManga(ctx context.Context) (domain.Manga, error) {
 	mangas := make(map[string]domain.Manga)
 	var errors []error
 	c := t.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
@@ -73,7 +76,7 @@ func (t *tcbscans) GetManga(_ context.Context) (domain.Manga, error) {
 		}
 	})
 
-	path, err := url.JoinPath(tcbscansURL, "projects")
+	path, err := url.JoinPath(t.BaseURL, "projects")
 	if err != nil {
 		return domain.Manga{}, fmt.Errorf("building URL: %w", err)
 	}
@@ -96,9 +99,10 @@ func (t *tcbscans) GetManga(_ context.Context) (domain.Manga, error) {
 }
 
 // GetChapters gets all chapters for a manga
-func (t *tcbscans) GetChapters(_ context.Context, manga domain.Manga) error {
+func (t *tcbscans) GetChapters(ctx context.Context, manga domain.Manga) error {
 	var errors []error
 	c := t.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
@@ -123,7 +127,7 @@ func (t *tcbscans) GetChapters(_ context.Context, manga domain.Manga) error {
 		}
 	})
 
-	path, err := url.JoinPath(tcbscansURL, manga.URL)
+	path, err := url.JoinPath(t.BaseURL, manga.URL)
 	if err != nil {
 		return fmt.Errorf("building URL: %w", err)
 	}
@@ -145,10 +149,11 @@ func (t *tcbscans) GetChapters(_ context.Context, manga domain.Manga) error {
 }
 
 // GetImageURLs gets all image urls for a chapter
-func (t *tcbscans) GetImageURLs(_ context.Context, chapter *domain.Chapter) error {
+func (t *tcbscans) GetImageURLs(ctx context.Context, chapter *domain.Chapter) error {
 	var imageInfos []domain.ImageInfo
 	var errors []error
 	c := t.Collector.Clone()
+	c.Context = ctx
 
 	c.OnError(func(r *colly.Response, err error) {
 		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
@@ -158,7 +163,7 @@ func (t *tcbscans) GetImageURLs(_ context.Context, chapter *domain.Chapter) erro
 		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: e.Attr("src")})
 	})
 
-	path, err := url.JoinPath(tcbscansURL, chapter.URL)
+	path, err := url.JoinPath(t.BaseURL, chapter.URL)
 	if err != nil {
 		return fmt.Errorf("building URL: %w", err)
 	}

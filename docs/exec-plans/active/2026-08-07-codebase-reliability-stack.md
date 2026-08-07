@@ -110,3 +110,15 @@ the operator contract.
 
 Notes/risks: Pprof and log destination changes remain restart-only because those
 resources are constructed once at process startup.
+
+## Bucket 4 - Adapter reliability baseline - ALIGNED
+
+Built: Added stored fixture flows for TCB Scans, Flame Comics, and MangaDex,
+fixed filtered MangaDex pagination, made title selection deterministic, tightened
+source host validation, and propagated cancellation through Colly requests.
+
+Serves goal/decision because: Every source now has an offline regression seam,
+and confirmed pagination, validation, and shutdown defects fail safely.
+
+Notes/risks: Fixtures detect parser drift after a captured response is updated.
+They do not replace scheduled live-source smoke checks.
