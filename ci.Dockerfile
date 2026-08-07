@@ -1,5 +1,5 @@
 # build base
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine3.23 AS app-base
+FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine3.23 AS app-base
 
 WORKDIR /src
 
@@ -29,12 +29,12 @@ RUN --network=none --mount=target=. \
     -o /out/bin/mangarr main.go
 
 # build runner
-FROM alpine:latest AS runner
-RUN apk add --no-cache ca-certificates curl tzdata jq tini
+FROM alpine:3.23 AS runner
+RUN apk add --no-cache ca-certificates tini tzdata
 
 LABEL org.opencontainers.image.source="https://github.com/nuxencs/mangarr" \
     org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.base.name="alpine:latest"
+    org.opencontainers.image.base.name="alpine:3.23"
 
 ENV HOME="/config" \
     XDG_CONFIG_HOME="/config" \

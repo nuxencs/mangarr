@@ -32,6 +32,19 @@ Available for:
 docker pull ghcr.io/nuxencs/mangarr:latest
 ```
 
+For Docker Compose, prepare writable host directories and start the checked-in
+sample with your user and group IDs:
+
+```bash
+mkdir -p config/mangarr downloads
+cp config.yaml config/mangarr/config.yaml
+PUID=$(id -u) PGID=$(id -g) docker compose up -d
+```
+
+The sample defaults to `./config`, `./downloads`, and the container's unprivileged
+user when the optional `DOCKERCONFDIR`, `DOWNLOADDIR`, `PUID`, or `PGID` variables
+are not set.
+
 Check the installed version:
 
 ```bash

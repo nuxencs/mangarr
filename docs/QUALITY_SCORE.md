@@ -1,25 +1,26 @@
 # QUALITY_SCORE.md
 
-Baseline captured on 2026-03-07.
+Assessment updated on 2026-08-07 after the reliability stack.
 
 ## Product Domains
 
 | Domain | Score | Why | Gap to close |
 | --- | --- | --- | --- |
-| Download CLI | B | clear flow, decent docs, core tests around parsing/files/download | broader end-to-end smoke coverage |
-| Monitor mode | B- | functional runtime model, config reload, logs | stronger runbook and operational checks |
-| Source adapters | C+ | broad coverage, shared helpers | high drift risk, limited regression fixtures |
-| Packaging/releases | B | GoReleaser + Docker CI in place | docs/CI ignore markdown-only drift; no doc checks |
+| Download CLI | A- | one acquisition policy, explicit outcomes, end-to-end archive coverage | live smoke coverage remains manual |
+| Monitor mode | B+ | immediate polling, validated reload snapshots, shared acquisition | formal operator runbook and health checks |
+| Source adapters | B | small return-value contract, one registry, fixture flow for every source | upstream drift still requires live verification |
+| Packaging/releases | A- | full CI gate, generated-code check, pinned lean runtime image | actions are not pinned to commit digests |
 
 ## Architecture Layers
 
 | Layer | Score | Why | Gap to close |
 | --- | --- | --- | --- |
-| CLI/orchestration | B | straightforward command layout | reduce some duplication between download and monitor selection flow |
-| Core helpers | B | cohesive small packages | more tests around edge cases and naming semantics |
-| Integration layer | C+ | shared retry and fixture seams help | source drift remains dominant reliability risk |
-| Output/observability | B- | logs and pprof exist | no formal health checklist or richer status summaries |
+| CLI/orchestration | A- | fresh command trees, one source registry, shared acquisition boundary | command coverage can expand around multi-chapter summaries |
+| Core helpers | B+ | cohesive packages, bounded concurrency, dead production code removed | naming syntax remains custom and lightly documented |
+| Integration layer | B | shared retry, cancellation, exact-host validation, offline fixtures | source drift remains the dominant reliability risk |
+| Output/observability | A- | atomic CBZ publication, explicit summaries, logs, pprof | no formal health checklist |
 
 ## Trend
 
-This is the first recorded baseline. Update scores when material behavior or verification changes land.
+The stack improved every recorded domain. Future score changes need code, test, or
+operational evidence, not documentation-only assertions.

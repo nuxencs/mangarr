@@ -1,6 +1,6 @@
 # PLANS.md
 
-Verified on 2026-03-07.
+Verified on 2026-08-07.
 
 Plans are first-class repo artifacts.
 
@@ -29,4 +29,5 @@ Each execution plan should capture:
 
 ## Mechanical Follow-Through
 
-This repo does not yet enforce doc freshness mechanically. Track missing linters, link checks, and doc-gardening automation in the tech debt tracker until implemented.
+CI validates Markdown links and important YAML, Compose, and GoReleaser files.
+The tech debt tracker records recurring checks that still need automation.

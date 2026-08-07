@@ -1,6 +1,6 @@
 # ARCHITECTURE.md
 
-Verified against code on 2026-03-25.
+Verified against code on 2026-08-07.
 
 ## Purpose
 
@@ -14,8 +14,8 @@ Verified against code on 2026-03-25.
 
 | Domain | Main entrypoints | Notes |
 | --- | --- | --- |
-| Download now | `cmd/download.go` | source selection, chapter selection, archive write |
-| Continuous monitor | `cmd/monitor.go` | config load, ticker loop, dynamic reload, latest-chapter fetch |
+| Download now | `cmd/download.go` | source discovery and chapter selection |
+| Continuous monitor | `cmd/monitor.go` | config load, reload-aware scheduler, latest-chapter selection |
 | Source integration | `internal/source/` | highest churn; mixed API and HTML scraping |
 | Chapter acquisition | `internal/acquire/`, `internal/download/`, `internal/files/` | naming, existing-file policy, page resolution, image fetch, CBZ creation |
 | Ops + packaging | `.github/workflows/release.yml`, `.goreleaser.yaml`, `ci.Dockerfile` | release binaries and multi-arch Docker images |
@@ -28,7 +28,7 @@ Verified against code on 2026-03-25.
 | Application orchestration | `cmd/`, `internal/acquire/`, `internal/config/` | compose sources, acquire chapters, concurrency, config/runtime lifecycle |
 | Core domain helpers | `internal/domain/`, `internal/parse/`, `internal/templater/`, `internal/sanitize/` | shared logic independent from any source |
 | Integration layer | `internal/source/`, `internal/sharedhttp/`, `internal/download/` | fetch remote data and retry transient failures |
-| Output + observability | `internal/files/`, `internal/logger/`, `internal/perf/`, `internal/buildinfo/` | archive write, logging, profiling, build metadata |
+| Output + observability | `internal/files/`, `internal/logger/`, `internal/perf/`, `internal/buildinfo/` | atomic archive publication, logging, profiling, build metadata |
 
 Rule: source-specific scraping logic stays in `internal/source/`. Generic retry, archive creation, and parsing stay shared.
 

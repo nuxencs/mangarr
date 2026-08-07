@@ -1,17 +1,11 @@
 services:
   mangarr:
     container_name: mangarr
-    image: ghcr.io/nuxencs/mangarr
+    image: ghcr.io/nuxencs/mangarr:latest
     restart: unless-stopped
-    user: ${PUID}:${PGID}  # UID and GID
+    user: "${PUID:-65534}:${PGID:-65534}"
     environment:
-      - MANGARR__DOWNLOAD_LOCATION=
-      - MANGARR__NAMING_TEMPLATE=
-      - MANGARR__CHECK_INTERVAL=
-      - MANGARR__LOG_LEVEL=
-      - MANGARR__LOG_PATH=
-      - MANGARR__LOG_MAX_SIZE=
-      - MANGARR__LOG_MAX_BACKUPS=
+      MANGARR__DOWNLOAD_LOCATION: /downloads
     volumes:
-      - ${DOCKERCONFDIR}/mangarr:/config  # location of the config file
-      - /path/to/directory:/path/to/directory  # download location
+      - "${DOCKERCONFDIR:-./config}/mangarr:/config"
+      - "${DOWNLOADDIR:-./downloads}:/downloads"

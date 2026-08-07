@@ -1,10 +1,10 @@
 # Runtime Model
 
-Verified against `cmd/download.go`, `cmd/monitor.go`, and `internal/config/config.go` on 2026-03-07.
+Verified against `cmd/download.go`, `cmd/monitor.go`, and `internal/config/config.go` on 2026-08-07.
 
 ## Commands
 
-- `download`: one-shot flow; resolves a source, selects chapters, downloads images, writes `.cbz`
+- `download`: one-shot flow; resolves a source, selects chapters, and delegates acquisition
 - `monitor`: long-running flow; loads config, watches for changes, polls sources on an interval
 - `version`: reports build metadata and latest GitHub release info
 
@@ -24,12 +24,12 @@ There is no database, queue, or remote control plane.
 - source jobs fan out per tick in `monitor`
 - image downloads fan out inside `internal/download`
 
-Semaphores cap concurrency. The code favors bounded parallelism over unbounded goroutine fan-out.
+Each layer has an explicit concurrency limit. The code favors bounded parallelism over unbounded goroutine fan-out.
 
 ## Config Lifecycle
 
 - defaults are embedded in Go structs/template text
-- config path lookup falls back through local and home-directory locations
+- config path lookup checks the user config directory, `~/.mangarr`, then the binary directory
 - env overrides use `MANGARR__` prefix
 - monitor mode publishes validated immutable config snapshots while running
 - monitored manga, naming, download location, interval, and log level reload live

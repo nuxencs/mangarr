@@ -1,6 +1,6 @@
 # New User Onboarding
 
-Verified against `README.md` and `docs/USAGE.md` on 2026-03-27.
+Verified against `README.md` and `docs/USAGE.md` on 2026-08-07.
 
 ## User Goal
 

@@ -1,6 +1,6 @@
 # Monitoring Operator
 
-Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-03-26.
+Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-08-07.
 
 ## User Goal
 
@@ -21,3 +21,4 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - source-specific runtime requirements stay documented when they appear
 - monitor checks configured manga once at startup before waiting for the interval
 - invalid reloads keep the last valid config snapshot active
+- config lookup follows the documented operating-system and binary locations

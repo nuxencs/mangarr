@@ -3,12 +3,61 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
 	"mangarr/internal/domain"
 	"mangarr/internal/logger"
 )
+
+func TestDefaultConfigLocationsFollowDocumentedOrder(t *testing.T) {
+	t.Parallel()
+
+	locations := defaultConfigLocations(
+		filepath.Join("root", "user-config"),
+		filepath.Join("root", "home"),
+		filepath.Join("root", "bin", "mangarr"),
+	)
+	want := []string{
+		filepath.Join("root", "user-config", "mangarr", "config.yaml"),
+		filepath.Join("root", "home", ".mangarr", "config.yaml"),
+		filepath.Join("root", "bin", "config.yaml"),
+	}
+	if !slices.Equal(locations, want) {
+		t.Fatalf("config locations = %v, want %v", locations, want)
+	}
+}
+
+func TestDefaultConfigLocationsOmitUnavailableDirectories(t *testing.T) {
+	t.Parallel()
+
+	locations := defaultConfigLocations("", "", filepath.Join("root", "bin", "mangarr"))
+	want := []string{filepath.Join("root", "bin", "config.yaml")}
+	if !slices.Equal(locations, want) {
+		t.Fatalf("config locations = %v, want %v", locations, want)
+	}
+}
+
+func TestFirstExistingConfigUsesLocationOrder(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	missing := filepath.Join(root, "missing", "config.yaml")
+	first := filepath.Join(root, "first.yaml")
+	second := filepath.Join(root, "second.yaml")
+	if err := os.WriteFile(first, []byte("first"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte("second"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got, ok := firstExistingConfig([]string{missing, first, second})
+	if !ok || got != first {
+		t.Fatalf("first existing config = %q, %v; want %q, true", got, ok, first)
+	}
+}
 
 func TestLoadRejectsInvalidCheckInterval(t *testing.T) {
 	dir := t.TempDir()

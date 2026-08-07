@@ -111,9 +111,13 @@ logLevel: "DEBUG"
 Config lookup order:
 
 1. If `-c` is set, mangarr reads `<config-dir>/config.yaml`.
-2. `~/.config/mangarr/config.yaml`
+2. `<user-config-dir>/mangarr/config.yaml` (for example,
+   `~/.config/mangarr/config.yaml` on Linux).
 3. `~/.mangarr/config.yaml`
 4. `config.yaml` next to the binary
+
+The current working directory is not an implicit config location. Use `-c .` to
+load `./config.yaml` explicitly.
 
 Environment overrides use the `MANGARR__` prefix:
 
@@ -223,7 +227,7 @@ go tool pprof http://127.0.0.1:6060/debug/pprof/profile?seconds=30
 
 Requirements:
 
-- Go 1.24.2 or later
+- Go 1.26.5 or later
 
 ```bash
 git clone https://github.com/nuxencs/mangarr.git
