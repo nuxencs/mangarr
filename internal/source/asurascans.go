@@ -23,8 +23,10 @@ import (
 
 const asurascansBaseURL = "https://asurascans.com"
 
-var asurascansChapterAssetPattern = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters/[^"&<]+`)
-var asurascansLockedChapterPattern = regexp.MustCompile(`"number":\[0,(\d+(?:\.\d+)?)\][^}]*"is_locked":\[0,true\]`)
+var (
+	asurascansChapterAssetPattern  = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters/[^"&<]+`)
+	asurascansLockedChapterPattern = regexp.MustCompile(`"number":\[0,(\d+(?:\.\d+)?)\][^}]*"is_locked":\[0,true\]`)
+)
 
 type asurascans struct {
 	MangaURL  string
