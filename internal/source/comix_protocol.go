@@ -263,8 +263,8 @@ func isComixProtectedPath(path string) bool {
 	if path == "/manga" || strings.HasPrefix(path, "/manga/") {
 		return true
 	}
-	if strings.HasPrefix(path, "/chapters/") {
-		chapterID := strings.TrimPrefix(path, "/chapters/")
+	if after, ok := strings.CutPrefix(path, "/chapters/"); ok {
+		chapterID := after
 		return chapterID != "" && !strings.Contains(chapterID, "/")
 	}
 	if !strings.HasPrefix(path, "/groups/") || !strings.HasSuffix(path, "/chapters") {
