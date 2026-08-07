@@ -39,7 +39,7 @@ All adapters implement the small `domain.Source` contract:
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
 - `comix` implements frontend build `35595e3de3c99889c1aa70`; it generates request tokens, decodes encrypted API envelopes, sends image request headers, and reconstructs scrambled tile images
 - `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
-- source-specific image transforms use `domain.ImageProcessor`; the downloader owns transport and output while the source adapter owns the transform
+- source-specific image transforms use `domain.ImageProcessor`; the acquisition path owns transport and output while the source adapter owns the transform
 - retry policy comes from `internal/sharedhttp/`
 - HTTP and Colly-backed requests inherit caller cancellation
 - fixture-backed parser flows cover every supported source

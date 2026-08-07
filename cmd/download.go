@@ -3,19 +3,16 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"slices"
 	"sync"
 	"time"
 
+	"mangarr/internal/acquire"
 	"mangarr/internal/domain"
-	"mangarr/internal/download"
 	"mangarr/internal/files"
 	"mangarr/internal/parse"
-	"mangarr/internal/sanitize"
 	"mangarr/internal/semaphore"
 	"mangarr/internal/source"
-	"mangarr/internal/templater"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
@@ -84,11 +81,6 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 				return fmt.Errorf("finding matching chapters in range %s for %s", options.chapterNumbers, selectedManga.Title)
 			}
 
-			overwrittenTitle := sanitize.Filename(options.overwrite)
-			if len(overwrittenTitle) != 0 {
-				selectedManga.Title = overwrittenTitle
-			}
-
 			const (
 				chapterStatusDownloaded = "downloaded"
 				chapterStatusSkipped    = "skipped"
@@ -132,34 +124,28 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 						return
 					}
 
-					t := templater.New(selectedManga, selectedChapter)
-					templatedName := t.ExecTemplate(options.naming)
+					acquisition, err := acquire.Chapter(ctx, log, acquire.Request{
+						Source:            s,
+						Manga:             selectedManga,
+						Chapter:           selectedChapter,
+						DownloadDirectory: options.downloadDirectory,
+						NamingTemplate:    options.naming,
+						TitleOverride:     options.overwrite,
+					})
+					if err != nil {
+						log.Error().Err(err).Msgf("Failed to acquire chapter %s", selectedChapter.Number)
+						return
+					}
 
-					chapterFolder := sanitize.Filename(templatedName)
-					contentPath := filepath.Join(options.downloadDirectory, selectedManga.Title, chapterFolder+".cbz")
-
-					if _, err := os.Stat(contentPath); err == nil {
-						log.Info().Msgf("Chapter has already been downloaded, skipping %q", templatedName)
+					switch acquisition.Status {
+					case acquire.Skipped:
+						log.Info().Msgf("Chapter has already been downloaded, skipping %q", acquisition.Name)
 						result.status = chapterStatusSkipped
 						shouldDelay = false
-						return
+					case acquire.Downloaded:
+						log.Info().Msgf("Finished downloading %q", acquisition.Name)
+						result.status = chapterStatusDownloaded
 					}
-
-					pages, err := s.Pages(ctx, selectedChapter)
-					if err != nil {
-						log.Error().Err(err).Msgf("Failed to get image URLs for chapter %s", selectedChapter.Number)
-						return
-					}
-					selectedChapter.ImageInfo = pages
-
-					log.Info().Msgf("Downloading %q", templatedName)
-					if err := download.Chapter(ctx, log, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
-						log.Error().Err(err).Msgf("Failed to download chapter %q", templatedName)
-						return
-					}
-
-					log.Info().Msgf("Finished downloading %q", templatedName)
-					result.status = chapterStatusDownloaded
 				})
 			}
 
