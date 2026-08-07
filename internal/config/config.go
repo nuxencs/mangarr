@@ -203,15 +203,6 @@ type AppConfig struct {
 	version    string
 }
 
-func New(configPath string, version string) *AppConfig {
-	c, err := Load(configPath, version)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return c
-}
-
 func Load(configPath string, version string) (*AppConfig, error) {
 	configFile, err := resolveConfigFile(configPath)
 	if err != nil {

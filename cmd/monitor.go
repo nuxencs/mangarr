@@ -25,72 +25,78 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var monitorCmd = &cobra.Command{
-	Use:   "monitor",
-	Short: "Monitor a specified manga for new chapters",
-	Run: func(cmd *cobra.Command, _ []string) {
-		runCtx, stop := signal.NotifyContext(
-			cmd.Context(),
-			syscall.SIGHUP,
-			syscall.SIGINT,
-			syscall.SIGQUIT,
-			syscall.SIGTERM,
-		)
-		defer stop()
+func newMonitorCommand(options *rootOptions) *cobra.Command {
+	return &cobra.Command{
+		Use:          "monitor",
+		Short:        "Monitor a specified manga for new chapters",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			runCtx, stop := signal.NotifyContext(
+				cmd.Context(),
+				syscall.SIGHUP,
+				syscall.SIGINT,
+				syscall.SIGQUIT,
+				syscall.SIGTERM,
+			)
+			defer stop()
 
-		cfg := config.New(configPath, buildinfo.Version)
-		snapshot := cfg.Snapshot()
-
-		log := logger.New(&snapshot)
-
-		if err := cfg.UpdateConfig(); err != nil {
-			log.Error().Err(err).Msg("error updating config")
-		}
-
-		reloads, err := cfg.DynamicReload(log)
-		if err != nil {
-			log.Error().Err(err).Msg("dynamic config reload disabled")
-			reloads = make(chan struct{})
-		}
-
-		if err := files.IsValidLocation(snapshot.DownloadLocation); err != nil {
-			log.Fatal().Err(err).Msgf("invalid download location")
-		}
-
-		log.Info().Msg("Starting to monitor configured manga")
-		log.Info().Msgf("Version: %s", buildinfo.Version)
-		log.Info().Msgf("Commit: %s", buildinfo.Commit)
-		log.Info().Msgf("Build date: %s", buildinfo.Date)
-		log.Info().Msgf("Log-level: %s", snapshot.LogLevel)
-
-		if snapshot.PprofEnabled {
-			pprofAddress, err := perf.StartPprofServer(runCtx, log, snapshot.PprofAddress)
+			cfg, err := config.Load(options.configPath, buildinfo.Version)
 			if err != nil {
-				log.Error().Err(err).Msg("error starting pprof endpoint")
-			} else {
-				log.Info().Msgf("pprof endpoint available at http://%s/debug/pprof/", pprofAddress)
+				return fmt.Errorf("loading config: %w", err)
 			}
-		}
+			snapshot := cfg.Snapshot()
 
-		runMonitorCycle(runCtx, snapshot, log)
+			log := logger.New(&snapshot)
 
-		timer := time.NewTimer(snapshot.CheckInterval * time.Minute)
-		defer timer.Stop()
-		for {
-			select {
-			case <-runCtx.Done():
-				log.Info().Msg("stopping monitoring")
-				return
-			case <-reloads:
-				snapshot = cfg.Snapshot()
-				resetTimer(timer, snapshot.CheckInterval*time.Minute)
-			case <-timer.C:
-				snapshot = cfg.Snapshot()
-				runMonitorCycle(runCtx, snapshot, log)
-				timer.Reset(snapshot.CheckInterval * time.Minute)
+			if err := cfg.UpdateConfig(); err != nil {
+				log.Error().Err(err).Msg("error updating config")
 			}
-		}
-	},
+
+			reloads, err := cfg.DynamicReload(log)
+			if err != nil {
+				log.Error().Err(err).Msg("dynamic config reload disabled")
+				reloads = make(chan struct{})
+			}
+
+			if err := files.IsValidLocation(snapshot.DownloadLocation); err != nil {
+				return fmt.Errorf("invalid download location: %w", err)
+			}
+
+			log.Info().Msg("Starting to monitor configured manga")
+			log.Info().Msgf("Version: %s", buildinfo.Version)
+			log.Info().Msgf("Commit: %s", buildinfo.Commit)
+			log.Info().Msgf("Build date: %s", buildinfo.Date)
+			log.Info().Msgf("Log-level: %s", snapshot.LogLevel)
+
+			if snapshot.PprofEnabled {
+				pprofAddress, err := perf.StartPprofServer(runCtx, log, snapshot.PprofAddress)
+				if err != nil {
+					log.Error().Err(err).Msg("error starting pprof endpoint")
+				} else {
+					log.Info().Msgf("pprof endpoint available at http://%s/debug/pprof/", pprofAddress)
+				}
+			}
+
+			runMonitorCycle(runCtx, snapshot, log)
+
+			timer := time.NewTimer(snapshot.CheckInterval * time.Minute)
+			defer timer.Stop()
+			for {
+				select {
+				case <-runCtx.Done():
+					log.Info().Msg("stopping monitoring")
+					return nil
+				case <-reloads:
+					snapshot = cfg.Snapshot()
+					resetTimer(timer, snapshot.CheckInterval*time.Minute)
+				case <-timer.C:
+					snapshot = cfg.Snapshot()
+					runMonitorCycle(runCtx, snapshot, log)
+					timer.Reset(snapshot.CheckInterval * time.Minute)
+				}
+			}
+		},
+	}
 }
 
 func resetTimer(timer *time.Timer, duration time.Duration) {

@@ -122,3 +122,15 @@ and confirmed pagination, validation, and shutdown defects fail safely.
 
 Notes/risks: Fixtures detect parser drift after a captured response is updated.
 They do not replace scheduled live-source smoke checks.
+
+## Bucket 5 - Command seam - ALIGNED
+
+Built: Each execution now constructs a fresh Cobra tree, commands return errors
+to `main`, config setup is nonfatal, and the injected version client treats update
+lookup as advisory.
+
+Serves goal/decision because: User-facing command outcomes are testable without
+subprocess exits or live GitHub access, and local version reporting works offline.
+
+Notes/risks: Monitor source work still uses concrete production adapters. The
+next source and acquisition buckets add the remaining command test seams.

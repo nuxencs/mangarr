@@ -1,15 +1,37 @@
 package cmd
 
 import (
-	"os"
+	"net/http"
+	"time"
 
 	"github.com/spf13/cobra"
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "mangarr",
-	Short: "Download and monitor manga chapters from various providers.",
-	Long: `Download and monitor manga chapters from various providers.
+type dependencies struct {
+	versionClient *http.Client
+	releaseURL    string
+}
+
+func defaultDependencies() dependencies {
+	return dependencies{
+		versionClient: &http.Client{Timeout: 10 * time.Second},
+		releaseURL:    githubURL,
+	}
+}
+
+func NewRootCommand() *cobra.Command {
+	return newRootCommand(defaultDependencies())
+}
+
+func newRootCommand(deps dependencies) *cobra.Command {
+	rootOptions := &rootOptions{}
+	downloadOptions := &downloadOptions{}
+
+	root := &cobra.Command{
+		Use:           "mangarr",
+		Short:         "Download and monitor manga chapters from various providers.",
+		SilenceErrors: true,
+		Long: `Download and monitor manga chapters from various providers.
 
 Provide a configuration file using one of the following methods:
 1. Use the --config <path> or -c <path> flag.
@@ -18,20 +40,18 @@ Provide a configuration file using one of the following methods:
 4. Place a config.yaml file in the directory of the binary.
 
 For more information and examples, visit https://github.com/nuxencs/mangarr`,
-}
-
-func init() {
-	initRootFlags()
-	initDownloadFlags()
-
-	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(downloadCmd)
-	rootCmd.AddCommand(monitorCmd)
-}
-
-func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
 	}
+
+	initRootFlags(root, rootOptions)
+	download := newDownloadCommand(downloadOptions)
+	initDownloadFlags(download, downloadOptions)
+	root.AddCommand(newVersionCommand(deps.versionClient, deps.releaseURL))
+	root.AddCommand(download)
+	root.AddCommand(newMonitorCommand(rootOptions))
+
+	return root
+}
+
+func Execute() error {
+	return NewRootCommand().Execute()
 }

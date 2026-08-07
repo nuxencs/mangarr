@@ -1,7 +1,15 @@
 package main
 
-import "mangarr/cmd"
+import (
+	"fmt"
+	"os"
+
+	"mangarr/cmd"
+)
 
 func main() {
-	cmd.Execute()
+	if err := cmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }
