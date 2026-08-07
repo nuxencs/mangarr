@@ -86,3 +86,14 @@ for code, generated output, dependencies, documentation, and release inputs.
 
 Notes/risks: CI installs pinned Go and YAML tools. GitHub actions follow the
 repository's existing major-version pinning convention.
+
+## Bucket 2 - Atomic archive publication - ALIGNED
+
+Built: Archive output now uses a same-directory temporary file, verifies ZIP and
+file completion, and renames only after success. Empty archives and non-directory
+destinations fail validation.
+
+Serves goal/decision because: Failed writes can no longer leave a final CBZ that
+later monitor or download runs mistake for a completed chapter.
+
+Notes/risks: Atomic replacement follows the host filesystem's rename semantics.

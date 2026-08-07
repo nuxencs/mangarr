@@ -104,13 +104,9 @@ func downloadImage(ctx context.Context, log zerolog.Logger, imageInfo domain.Ima
 
 		if imageInfo.Processor != nil {
 			filename = filenameNoExt + imageInfo.Processor.Extension()
-			out, err := os.Create(filename)
-			if err != nil {
-				return fmt.Errorf("creating file %s: %w", filename, err)
-			}
-			defer out.Close()
-
-			if err := imageInfo.Processor.Process(resp.Header, src, out); err != nil {
+			if err := writeImageFile(filename, func(out io.Writer) error {
+				return imageInfo.Processor.Process(resp.Header, src, out)
+			}); err != nil {
 				return retry.Unrecoverable(err)
 			}
 
@@ -127,19 +123,33 @@ func downloadImage(ctx context.Context, log zerolog.Logger, imageInfo domain.Ima
 			return retry.Unrecoverable(err)
 		}
 
-		out, err := os.Create(filename)
-		if err != nil {
-			return fmt.Errorf("creating file %s: %w", filename, err)
-		}
-		defer out.Close()
-
-		if _, err = io.Copy(out, src); err != nil {
-			return fmt.Errorf("writing file %s: %w", filename, err)
+		if err := writeImageFile(filename, func(out io.Writer) error {
+			_, err := io.Copy(out, src)
+			return err
+		}); err != nil {
+			return err
 		}
 
 		return nil
 	}); err != nil {
 		return wrapImageError(imageIndex, imageTotal, imageInfo.ImageURL, err)
+	}
+
+	return nil
+}
+
+func writeImageFile(filename string, write func(io.Writer) error) error {
+	out, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("creating file %s: %w", filename, err)
+	}
+
+	if err := write(out); err != nil {
+		_ = out.Close()
+		return fmt.Errorf("writing file %s: %w", filename, err)
+	}
+	if err := out.Close(); err != nil {
+		return fmt.Errorf("closing file %s: %w", filename, err)
 	}
 
 	return nil
