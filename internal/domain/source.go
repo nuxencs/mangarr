@@ -2,6 +2,8 @@ package domain
 
 import (
 	"context"
+	"io"
+	"net/http"
 )
 
 type Source interface {
@@ -29,6 +31,13 @@ type Chapter struct {
 }
 
 type ImageInfo struct {
-	ImageURL      string
-	EncryptionKey string
+	ImageURL       string
+	EncryptionKey  string
+	RequestHeaders map[string]string
+	Processor      ImageProcessor
+}
+
+type ImageProcessor interface {
+	Extension() string
+	Process(http.Header, io.Reader, io.Writer) error
 }

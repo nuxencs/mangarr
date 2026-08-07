@@ -1,6 +1,6 @@
 # Source Adapters
 
-Verified against `internal/source/` on 2026-05-24.
+Verified against `internal/source/` on 2026-08-07.
 
 All adapters implement `domain.Source`.
 
@@ -15,13 +15,8 @@ All adapters implement `domain.Source`.
 | `asurascans` | full series URL | none | `https://asurascans.com/comics/...` | server-rendered HTML; filters locked early-access chapters from discovery |
 | `cubari` | gist URL | `-g` required | valid URL + non-empty group | images listed in the payload, or fetched from the `/proxy/...` path the gist points at |
 | `weebcentral` | full series URL | none | `https://weebcentral.com` prefix | scraper + chapter image fragment fetch |
+| `comix` | full manga URL | `-g` optional | `https://comix.to/title/...` prefix; numeric group when set | private API codec + referer-protected images + tile reconstruction |
 | `atsumaru` | full manga URL | `-g` required | `https://atsu.moe/manga/...` prefix + non-empty scan ID | API-based |
-
-Deprecated:
-
-| Identifier | Status | Reason |
-| --- | --- | --- |
-| `comix` | recognized but fails fast | chapter page access requires a browser-generated token from obfuscated site JavaScript |
 
 ## Rules
 
@@ -37,6 +32,8 @@ Deprecated:
 - `mangaplus` uses the mobile API because the web protobuf endpoint rejects current unauthenticated access; chapter discovery reads the current `chapter_list_v2` field with legacy list fields kept as fallback
 - `asurascans` removes chapters marked `is_locked=true` before returning the chapter map
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
+- `comix` implements frontend build `35595e3de3c99889c1aa70`; it generates request tokens, decodes encrypted API envelopes, sends image request headers, and reconstructs scrambled tile images
 - `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
+- source-specific image transforms use `domain.ImageProcessor`; the downloader owns transport and output while the source adapter owns the transform
 - retry policy comes from `internal/sharedhttp/`
 - manhwa/long-strip handling flows through `selectedManga.IsManhwa`

@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"mangarr/internal/domain"
 	"mangarr/internal/sharedhttp"
 
 	"github.com/rs/zerolog"
@@ -31,7 +33,7 @@ func TestDownloadImageStreamsBodyToDisk(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.NoError(t, err)
 
 	got, err := os.ReadFile(outBase + ".png")
@@ -53,7 +55,10 @@ func TestDownloadImageDecryptsWhileStreaming(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, hex.EncodeToString(key), outBase, 1, 1)
+	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{
+		ImageURL:      server.URL,
+		EncryptionKey: hex.EncodeToString(key),
+	}, outBase, 1, 1)
 	require.NoError(t, err)
 
 	got, err := os.ReadFile(outBase + ".jpg")
@@ -76,11 +81,35 @@ func TestDownloadImageDetectsTypeFromMagicBytes(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.NoError(t, err)
 
 	_, statErr := os.Stat(outBase + ".png")
 	require.NoError(t, statErr)
+}
+
+func TestDownloadImageAppliesHeadersAndProcessor(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("X-Image-Test") != "present" {
+			t.Errorf("missing image request header")
+		}
+		_, _ = w.Write([]byte("payload"))
+	}))
+	defer server.Close()
+
+	outBase := filepath.Join(t.TempDir(), "img")
+	err := downloadImage(t.Context(), zerolog.Nop(), domain.ImageInfo{
+		ImageURL:       server.URL,
+		RequestHeaders: map[string]string{"X-Image-Test": "present"},
+		Processor:      testImageProcessor{},
+	}, outBase, 1, 1)
+	require.NoError(t, err)
+
+	result, err := os.ReadFile(outBase + ".processed")
+	require.NoError(t, err)
+	require.Equal(t, []byte("processed:payload"), result)
 }
 
 func TestDownloadImageRetriesTransientServerError(t *testing.T) {
@@ -100,7 +129,7 @@ func TestDownloadImageRetriesTransientServerError(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.NoError(t, err)
 
 	got, err := os.ReadFile(outBase + ".png")
@@ -120,7 +149,7 @@ func TestDownloadImageStopsAfterThreeAttemptsOnPermanentFailure(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), server.URL, "", outBase, 1, 1)
+	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.Error(t, err)
 	require.Equal(t, int32(sharedhttp.RetryAttempts), attempts.Load())
 }
@@ -132,4 +161,19 @@ func xorBytes(data, key []byte) []byte {
 	}
 
 	return out
+}
+
+type testImageProcessor struct{}
+
+func (testImageProcessor) Extension() string {
+	return ".processed"
+}
+
+func (testImageProcessor) Process(_ http.Header, reader io.Reader, writer io.Writer) error {
+	if _, err := io.WriteString(writer, "processed:"); err != nil {
+		return err
+	}
+	_, err := io.Copy(writer, reader)
+
+	return err
 }
