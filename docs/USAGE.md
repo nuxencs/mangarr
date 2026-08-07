@@ -144,11 +144,10 @@ mangarr version
 | [Asura Scans](https://asurascans.com/) | `asurascans` | current `https://asurascans.com/comics/...` series URL | locked early-access chapters are skipped until public |
 | [Cubari](https://cubari.moe/) | `cubari` | gist URL | required `-g` group such as `/r/OnePunchMan` |
 | [Weeb Central](https://weebcentral.com/) | `weebcentral` | full series URL | none |
+| [Comix](https://comix.to/) | `comix` | full `https://comix.to/title/...` URL | optional `-g` numeric group ID |
 | [Atsumaru](https://atsu.moe/) | `atsumaru` | full `https://atsu.moe/manga/...` URL | required `-g` scan ID |
 
-Deprecated sources:
-
-- `comix`: Comix chapter pages now require a browser-generated token, so mangarr fails fast instead of attempting brittle token scraping.
+Comix uses a private frontend protocol. Mangarr generates request tokens, decodes API responses, sends the required image referer, and reconstructs scrambled image tiles. A Comix frontend update can require a Mangarr update. Use `-g` when a title has duplicate chapter numbers from different groups.
 
 For implementation-level source behavior and validation rules, see [design-docs/source-adapters.md](./design-docs/source-adapters.md).
 

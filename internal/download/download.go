@@ -57,10 +57,11 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 				Str("image_url", truncateLink(img.ImageURL)).
 				Str("image_host", imageHost(img.ImageURL)).
 				Bool("encrypted", img.EncryptionKey != "").
+				Bool("processed", img.Processor != nil).
 				Str("tmp_name", filepath.Base(base)).
 				Logger()
 
-			return downloadImage(ctx, imageLog, img.ImageURL, img.EncryptionKey, base, imageIndex, len(chapter.ImageInfo))
+			return downloadImage(ctx, imageLog, img, base, imageIndex, len(chapter.ImageInfo))
 		})
 	}
 
@@ -75,25 +76,47 @@ func Chapter(ctx context.Context, log zerolog.Logger, outputPath string, chapter
 	return nil
 }
 
-// downloadImage fetches url, applies XOR–decrypt if xorKeyHex isn't empty, and stores the
-// file using the right extension that is inferred from the response headers or magic bytes.
-func downloadImage(ctx context.Context, log zerolog.Logger, imageURL, xorKeyHex, filenameNoExt string, imageIndex, imageTotal int) error {
+// downloadImage fetches an image, applies its required transform, and stores it with the right extension.
+func downloadImage(ctx context.Context, log zerolog.Logger, imageInfo domain.ImageInfo, filenameNoExt string, imageIndex, imageTotal int) error {
 	var (
 		filename string
 		key      []byte
 	)
 
-	if xorKeyHex != "" {
-		decodedKey, err := hex.DecodeString(xorKeyHex)
+	if imageInfo.EncryptionKey != "" {
+		decodedKey, err := hex.DecodeString(imageInfo.EncryptionKey)
 		if err != nil {
-			return wrapImageError(imageIndex, imageTotal, imageURL, fmt.Errorf("decoding encryption key: %w", err))
+			return wrapImageError(imageIndex, imageTotal, imageInfo.ImageURL, fmt.Errorf("decoding encryption key: %w", err))
 		}
 
 		key = decodedKey
 	}
 
-	if err := fetchWithRetry(ctx, log, imageURL, func(resp *http.Response) error {
+	if err := fetchWithRetry(ctx, log, imageInfo.ImageURL, imageInfo.RequestHeaders, func(resp *http.Response) error {
 		reader := bufio.NewReader(resp.Body)
+		var src io.Reader = reader
+		if len(key) > 0 {
+			src = &xorReader{
+				r:   reader,
+				key: key,
+			}
+		}
+
+		if imageInfo.Processor != nil {
+			filename = filenameNoExt + imageInfo.Processor.Extension()
+			out, err := os.Create(filename)
+			if err != nil {
+				return fmt.Errorf("creating file %s: %w", filename, err)
+			}
+			defer out.Close()
+
+			if err := imageInfo.Processor.Process(resp.Header, src, out); err != nil {
+				return retry.Unrecoverable(err)
+			}
+
+			return nil
+		}
+
 		contentType, err := detectContentType(resp, reader)
 		if err != nil {
 			return err
@@ -110,21 +133,13 @@ func downloadImage(ctx context.Context, log zerolog.Logger, imageURL, xorKeyHex,
 		}
 		defer out.Close()
 
-		var src io.Reader = reader
-		if len(key) > 0 {
-			src = &xorReader{
-				r:   reader,
-				key: key,
-			}
-		}
-
 		if _, err = io.Copy(out, src); err != nil {
 			return fmt.Errorf("writing file %s: %w", filename, err)
 		}
 
 		return nil
 	}); err != nil {
-		return wrapImageError(imageIndex, imageTotal, imageURL, err)
+		return wrapImageError(imageIndex, imageTotal, imageInfo.ImageURL, err)
 	}
 
 	return nil
@@ -168,12 +183,15 @@ func (r *xorReader) Read(p []byte) (int, error) {
 }
 
 // fetchWithRetry executes the GET request with a common retry strategy and passes the successful response to onSuccess.
-func fetchWithRetry(ctx context.Context, log zerolog.Logger, url string, onSuccess func(*http.Response) error) error {
+func fetchWithRetry(ctx context.Context, log zerolog.Logger, url string, headers map[string]string, onSuccess func(*http.Response) error) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("User-Agent", userAgent)
+	for name, value := range headers {
+		req.Header.Set(name, value)
+	}
 
 	client := http.Client{
 		Timeout:   60 * time.Second,

@@ -83,11 +83,10 @@ If you omit it, mangarr also checks common default locations. Full config and ov
 | [Asura Scans](https://asurascans.com/) | `asurascans` | full `https://asurascans.com/comics/...` URL | locked early-access chapters are skipped until public |
 | [Cubari](https://cubari.moe/) | `cubari` | gist URL | required `-g` group |
 | [Weeb Central](https://weebcentral.com/) | `weebcentral` | full `https://weebcentral.com/...` URL | none |
+| [Comix](https://comix.to/) | `comix` | full `https://comix.to/title/...` URL | optional `-g` numeric group ID |
 | [Atsumaru](https://atsu.moe/) | `atsumaru` | full `https://atsu.moe/manga/...` URL | required `-g` scan ID |
 
-Deprecated sources:
-
-- `comix`: Comix chapter pages now require a browser-generated token, so mangarr fails fast instead of attempting brittle token scraping.
+Comix uses a private frontend protocol. A Comix frontend update can require a Mangarr update.
 
 ## More Docs
 
