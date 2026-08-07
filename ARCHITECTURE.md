@@ -17,7 +17,7 @@ Verified against code on 2026-03-25.
 | Download now | `cmd/download.go` | source selection, chapter selection, archive write |
 | Continuous monitor | `cmd/monitor.go` | config load, ticker loop, dynamic reload, latest-chapter fetch |
 | Source integration | `internal/source/` | highest churn; mixed API, HTML scraping, browser automation |
-| Archive assembly | `internal/download/`, `internal/files/` | image fetch, retry, CBZ creation |
+| Chapter acquisition | `internal/acquire/`, `internal/download/`, `internal/files/` | naming, existing-file policy, page resolution, image fetch, CBZ creation |
 | Ops + packaging | `.github/workflows/release.yml`, `.goreleaser.yaml`, `ci.Dockerfile` | release binaries and multi-arch Docker images |
 
 ## Package Layering
@@ -25,7 +25,7 @@ Verified against code on 2026-03-25.
 | Layer | Packages | Responsibility |
 | --- | --- | --- |
 | CLI surface | `main.go`, `cmd/` | parse flags, bootstrap commands, orchestrate flows |
-| Application orchestration | `cmd/`, `internal/config/`, `internal/browser/` | compose sources, concurrency, config/runtime lifecycle |
+| Application orchestration | `cmd/`, `internal/acquire/`, `internal/config/`, `internal/browser/` | compose sources, acquire chapters, concurrency, config/runtime lifecycle |
 | Core domain helpers | `internal/domain/`, `internal/parse/`, `internal/templater/`, `internal/sanitize/`, `internal/semaphore/` | shared logic independent from any source |
 | Integration layer | `internal/source/`, `internal/sharedhttp/`, `internal/download/` | fetch remote data, retry transient failures, browser-backed scraping |
 | Output + observability | `internal/files/`, `internal/logger/`, `internal/perf/`, `internal/buildinfo/` | archive write, logging, profiling, build metadata |
@@ -40,10 +40,10 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
 2. Construct source adapter from `-s`.
 3. Fetch manga metadata and chapter list.
 4. Resolve requested chapter set.
-5. Skip existing archives.
-6. Fetch image URLs.
-7. Download images concurrently.
-8. Write `.cbz`.
+5. Pass each selected chapter to `internal/acquire/`.
+6. Apply naming and existing-file policy.
+7. Resolve and download pages concurrently.
+8. Publish the `.cbz` archive.
 
 ### `monitor`
 
@@ -52,8 +52,8 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
 3. Start config reload watcher.
 4. Tick on `checkInterval`.
 5. For each monitored manga, resolve source adapter.
-6. Fetch latest chapter and skip if archive already exists.
-7. Download and archive latest chapter.
+6. Pass the latest chapter to the shared acquisition module.
+7. Report its downloaded or skipped outcome.
 
 ## Cross-Cutting Concerns
 

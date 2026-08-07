@@ -3,23 +3,19 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
+	"mangarr/internal/acquire"
 	"mangarr/internal/buildinfo"
 	"mangarr/internal/config"
 	"mangarr/internal/domain"
-	"mangarr/internal/download"
 	"mangarr/internal/files"
 	"mangarr/internal/logger"
 	"mangarr/internal/parse"
 	"mangarr/internal/perf"
-	"mangarr/internal/sanitize"
 	"mangarr/internal/source"
-	"mangarr/internal/templater"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -153,30 +149,22 @@ func monitorManga(ctx context.Context, cfg domain.Config, mangaTitle string, mon
 		return fmt.Errorf("finding chapter with number %s", latestChapterNr)
 	}
 
-	if overwrittenTitle := sanitize.Filename(monitoredManga.Overwrite); overwrittenTitle != "" {
-		selectedManga.Title = overwrittenTitle
+	result, err := acquire.Chapter(ctx, mLog, acquire.Request{
+		Source:            mangaSource,
+		Manga:             selectedManga,
+		Chapter:           selectedChapter,
+		DownloadDirectory: cfg.DownloadLocation,
+		NamingTemplate:    cfg.NamingTemplate,
+		TitleOverride:     monitoredManga.Overwrite,
+	})
+	if err != nil {
+		return err
 	}
-
-	t := templater.New(selectedManga, selectedChapter)
-	templatedName := t.ExecTemplate(cfg.NamingTemplate)
-	chapterFolder := sanitize.Filename(templatedName)
-	contentPath := filepath.Join(cfg.DownloadLocation, selectedManga.Title, chapterFolder+".cbz")
-	if _, err := os.Stat(contentPath); err == nil {
-		mLog.Debug().Msgf("chapter has already been downloaded, skipping %s", templatedName)
+	if result.Status == acquire.Skipped {
+		mLog.Debug().Msgf("chapter has already been downloaded, skipping %s", result.Name)
 		return nil
 	}
-
-	pages, err := mangaSource.Pages(ctx, selectedChapter)
-	if err != nil {
-		return fmt.Errorf("getting image URLs for chapter %s: %w", selectedChapter.Number, err)
-	}
-	selectedChapter.ImageInfo = pages
-
-	mLog.Info().Msgf("downloading %q", templatedName)
-	if err := download.Chapter(ctx, mLog, contentPath, selectedChapter, selectedManga.IsManhwa, files.CreateCbzArchive); err != nil {
-		return fmt.Errorf("downloading chapter %s: %w", templatedName, err)
-	}
-	mLog.Info().Msgf("finished downloading %s", templatedName)
+	mLog.Info().Msgf("finished downloading %s", result.Name)
 
 	return nil
 }

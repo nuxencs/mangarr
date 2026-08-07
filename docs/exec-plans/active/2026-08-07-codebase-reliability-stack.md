@@ -147,3 +147,16 @@ download and monitor.
 
 Notes/risks: Discovery still retrieves the full chapter list because both current
 command flows need it. The next bucket centralizes the shared per-chapter work.
+
+## Bucket 7 - Chapter acquisition module - ALIGNED
+
+Built: Added one chapter-acquisition operation that owns title overrides, naming,
+archive paths, existing-file checks, page resolution, image download, atomic CBZ
+publication, and downloaded or skipped outcomes. Download and monitor both use it.
+
+Serves goal/decision because: The two user flows now share one reliability policy
+for every operation after chapter selection, with an end-to-end regression test
+across page resolution, image transport, archive creation, and skip behavior.
+
+Notes/risks: Chapter selection and caller-specific summary logging remain in the
+commands because those behaviors differ between one-shot and monitor modes.
