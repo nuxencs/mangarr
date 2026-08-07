@@ -1,6 +1,6 @@
 # Usage Reference
 
-Verified against CLI help and config/runtime code on 2026-05-19.
+Verified against CLI help and config/runtime code on 2026-08-07.
 
 Use this doc when the root README is not enough and you need command, config, or operator detail.
 
@@ -32,6 +32,8 @@ Chapter selection flags are mutually exclusive:
 - `-1`, `--first`: first chapter
 - `-C`, `--chapters`: specific chapters or ranges such as `1,3,5` or `1-10`
 - `-A`, `--all`: all available chapters
+
+The command returns status 0 when all requested chapters are downloaded or already exist. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
 
 Examples:
 
