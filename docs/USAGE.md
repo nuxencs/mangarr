@@ -1,6 +1,6 @@
 # Usage Reference
 
-Verified against CLI help and config/runtime code on 2026-08-07.
+Verified against CLI help and config/runtime code on 2026-08-09.
 
 Use this doc when the root README is not enough and you need command, config, or operator detail.
 
@@ -134,7 +134,9 @@ Environment overrides use the `MANGARR__` prefix:
 Monitor checks all configured manga once at startup. It then waits for the check
 interval. Changes to monitored manga, naming, download location, check interval,
 and log level reload while monitor runs. Environment overrides are reapplied to
-each reload. Changes to pprof and log file output settings require a restart.
+each reload. Atomic replacement and delete-then-recreate saves remain watched.
+An invalid, incomplete, or temporarily missing config keeps the last valid
+settings active. Changes to pprof and log file output settings require a restart.
 
 ### `version`
 

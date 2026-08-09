@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"mangarr/internal/domain"
 	"mangarr/internal/logger"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/providers/structs"
@@ -201,6 +203,7 @@ type AppConfig struct {
 	current    atomic.Pointer[domain.Config]
 	configFile string
 	version    string
+	watcher    *fsnotify.Watcher
 }
 
 func Load(configPath string, version string) (*AppConfig, error) {
@@ -401,19 +404,88 @@ func cloneConfig(cfg domain.Config) domain.Config {
 	return clone
 }
 
+const configReloadDebounceDelay = 100 * time.Millisecond
+
+func (c *AppConfig) watchConfigFile(log *logger.DefaultLogger, onChange func()) error {
+	watchedPath := filepath.Clean(c.configFile)
+	realPath, err := filepath.EvalSymlinks(watchedPath)
+	if err != nil {
+		return err
+	}
+	realPath = filepath.Clean(realPath)
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+	if err := watcher.Add(filepath.Dir(watchedPath)); err != nil {
+		_ = watcher.Close()
+		return err
+	}
+	c.watcher = watcher
+
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+
+				eventPath := filepath.Clean(event.Name)
+				currentRealPath, err := filepath.EvalSymlinks(watchedPath)
+				if err != nil {
+					if os.IsNotExist(err) {
+						onWatchedFile := eventPath == watchedPath || eventPath == realPath
+						if onWatchedFile && event.Has(fsnotify.Remove|fsnotify.Rename) {
+							onChange()
+						}
+					} else {
+						log.Error().Err(err).Msg("error resolving watched config file")
+					}
+					continue
+				}
+				currentRealPath = filepath.Clean(currentRealPath)
+
+				onWatchedFile := eventPath == watchedPath || eventPath == realPath
+				targetChanged := currentRealPath != realPath
+				if targetChanged || (onWatchedFile && event.Has(fsnotify.Create|fsnotify.Write)) {
+					realPath = currentRealPath
+					onChange()
+				}
+			case watchErr, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Error().Err(watchErr).Msg("error watching config file")
+			}
+		}
+	}()
+
+	return nil
+}
+
 func (c *AppConfig) DynamicReload(log *logger.DefaultLogger) (<-chan struct{}, error) {
 	reloaded := make(chan struct{}, 1)
-	f := file.Provider(c.configFile)
+	var (
+		reloadGeneration atomic.Uint64
+		reloadMu         sync.Mutex
+	)
 
-	err := f.Watch(func(_ any, watchErr error) {
-		if watchErr != nil {
-			log.Error().Err(watchErr).Msg("error watching config file")
+	reloadIfLatest := func(generation uint64) {
+		if generation != reloadGeneration.Load() {
+			return
+		}
+
+		reloadMu.Lock()
+		defer reloadMu.Unlock()
+		if generation != reloadGeneration.Load() {
 			return
 		}
 
 		snapshot, err := c.loadSnapshot()
 		if err != nil {
-			log.Error().Err(err).Msg("config reload rejected")
+			log.Error().Err(err).Msg("config reload rejected; keeping previous config")
 			return
 		}
 
@@ -424,8 +496,16 @@ func (c *AppConfig) DynamicReload(log *logger.DefaultLogger) (<-chan struct{}, e
 		default:
 		}
 		log.Debug().Msg("config file reloaded")
-	})
-	if err != nil {
+	}
+
+	scheduleReload := func() {
+		generation := reloadGeneration.Add(1)
+		time.AfterFunc(configReloadDebounceDelay, func() {
+			reloadIfLatest(generation)
+		})
+	}
+
+	if err := c.watchConfigFile(log, scheduleReload); err != nil {
 		return nil, fmt.Errorf("watching config file %s: %w", c.configFile, err)
 	}
 
