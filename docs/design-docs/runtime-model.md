@@ -1,6 +1,6 @@
 # Runtime Model
 
-Verified against `cmd/download.go`, `cmd/monitor.go`, and `internal/config/config.go` on 2026-08-07.
+Verified against `cmd/download.go`, `cmd/monitor.go`, and `internal/config/config.go` on 2026-08-09.
 
 ## Commands
 
@@ -32,6 +32,8 @@ Each layer has an explicit concurrency limit. The code favors bounded parallelis
 - config path lookup checks the user config directory, `~/.mangarr`, then the binary directory
 - env overrides use `MANGARR__` prefix
 - monitor mode publishes validated immutable config snapshots while running
+- monitor mode watches the config parent directory, so atomic replacement and delete-then-recreate saves do not stop reloads
+- invalid, incomplete, or temporarily missing config files keep the last valid snapshot active
 - monitored manga, naming, download location, interval, and log level reload live
 - pprof and log output destinations require a restart
 
