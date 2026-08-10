@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"mangarr/internal/acquire"
@@ -94,11 +95,14 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 			results := make(chan chapterResult, len(selectedChapterNumbers))
 
 			limit := make(chan struct{}, maxConcurrentChapterProcesses)
+			var queuedChapters atomic.Int64
+			queuedChapters.Store(int64(len(selectedChapterNumbers)))
 			var wg sync.WaitGroup
 
 			for _, chapterNumber := range selectedChapterNumbers {
 				wg.Go(func() {
 					limit <- struct{}{}
+					queuedChapters.Add(-1)
 
 					result := chapterResult{
 						chapterNumber: chapterNumber,
@@ -107,7 +111,8 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 					shouldDelay := true
 
 					defer func() {
-						if shouldDelay {
+						// Keep the cooldown only when another chapter is waiting for this slot.
+						if shouldDelay && queuedChapters.Load() > 0 {
 							time.Sleep(chapterDelay)
 						}
 
