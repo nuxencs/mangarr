@@ -48,7 +48,8 @@ func (comixImageProcessor) Process(headers http.Header, reader io.Reader, writer
 	if err != nil {
 		return err
 	}
-	if err := png.Encode(writer, result); err != nil {
+	encoder := png.Encoder{CompressionLevel: png.BestSpeed}
+	if err := encoder.Encode(writer, result); err != nil {
 		return fmt.Errorf("encoding descrambled Comix image: %w", err)
 	}
 
