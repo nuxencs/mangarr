@@ -35,12 +35,13 @@ All adapters implement the small `domain.Source` contract:
 
 - unknown source values fail fast in source selection
 - `mangaplus` uses the mobile API because the web protobuf endpoint rejects current unauthenticated access; chapter discovery reads the current `chapter_list_v2` field with legacy list fields kept as fallback
-- `asurascans` removes chapters marked `is_locked=true` before returning the chapter map
+- `asurascans` removes chapters marked `is_locked=true` or `is_premium=true` before returning the chapter map
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
 - `comix` implements frontend build `35595e3de3c99889c1aa70`; it generates request tokens, decodes encrypted API envelopes, sends image request headers, and reconstructs scrambled tile images
 - `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
 - source-specific image transforms use `domain.ImageProcessor`; the acquisition path owns transport and output while the source adapter owns the transform
 - retry policy comes from `internal/sharedhttp/`
+- Manga Plus request errors omit query strings so registration and device secrets do not enter logs
 - HTTP and Colly-backed requests inherit caller cancellation
 - fixture-backed parser flows cover every supported source
 - manhwa/long-strip handling flows through `selectedManga.IsManhwa`

@@ -165,6 +165,32 @@ func TestMangaPlusPagesParsesViewerPages(t *testing.T) {
 	}, pages)
 }
 
+func TestMangaPlusRequestErrorOmitsQueryValues(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeProtoResponse(t, w, &protobuf.Response{
+			Error: &protobuf.ErrorResult{
+				EnglishPopup: &protobuf.Popup_OSDefault{
+					Subject: "Unavailable",
+					Body:    "Try again later",
+				},
+			},
+		})
+	}))
+	defer server.Close()
+
+	src := newTestMangaPlus("100352", server)
+	requestURL := server.URL + "/api/register?device_token=device-value&security_key=security-value"
+
+	_, err := src.getProtoResponse(t.Context(), http.MethodPut, requestURL)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), server.URL+"/api/register")
+	require.NotContains(t, err.Error(), "device-value")
+	require.NotContains(t, err.Error(), "security-value")
+	require.NotContains(t, err.Error(), "test-secret")
+}
+
 func newTestMangaPlus(mangaID string, server *httptest.Server) *mangaplus {
 	return &mangaplus{
 		MangaID: mangaID,
