@@ -11,6 +11,7 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - predictable config lookup and reload behavior
 - visible logs and version/build context
 - low-friction way to know when chapters were skipped, downloaded, or failed
+- manga and configured source identifiers on every monitor-check failure
 - safe handling of flaky or drifting sources
 
 ## Acceptance Bar
