@@ -116,7 +116,10 @@ func runMonitorCycle(ctx context.Context, cfg domain.Config, log *logger.Default
 	for mangaTitle, monitoredManga := range cfg.MonitoredManga {
 		group.Go(func() error {
 			if err := monitorManga(groupCtx, cfg, mangaTitle, *monitoredManga, log); err != nil {
-				log.Error().Err(err).Str("manga", mangaTitle).Msg("monitor check failed")
+				log.Error().Err(err).
+					Str("manga", mangaTitle).
+					Str("source", monitoredManga.Source).
+					Msg("monitor check failed")
 			}
 			return nil
 		})
