@@ -36,7 +36,7 @@ jobs:
 
       - name: Install Go verification tools
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+          go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 
       - name: Verify generated code
