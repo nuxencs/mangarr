@@ -24,8 +24,8 @@ import (
 const asurascansBaseURL = "https://asurascans.com"
 
 var (
-	asurascansChapterAssetPattern  = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters/[^"&<]+`)
-	asurascansLockedChapterPattern = regexp.MustCompile(`"number":\[0,(\d+(?:\.\d+)?)\][^}]*"is_locked":\[0,true\]`)
+	asurascansChapterAssetPattern       = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters/[^"&<]+`)
+	asurascansUnavailableChapterPattern = regexp.MustCompile(`"number":\[0,(\d+(?:\.\d+)?)\][^}]*"(?:is_locked|is_premium)":\[0,true\]`)
 )
 
 type asurascans struct {
@@ -119,7 +119,7 @@ func (a *asurascans) Discover(ctx context.Context) (domain.Manga, error) {
 		}
 
 		props := html.UnescapeString(e.Attr("props"))
-		for _, match := range asurascansLockedChapterPattern.FindAllStringSubmatch(props, -1) {
+		for _, match := range asurascansUnavailableChapterPattern.FindAllStringSubmatch(props, -1) {
 			chapterNum, err := domain.ParseChapterNumber(match[1])
 			if err != nil {
 				continue

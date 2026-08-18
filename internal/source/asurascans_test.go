@@ -122,6 +122,58 @@ func TestAsurascansDiscoverSkipsLockedChapters(t *testing.T) {
 	require.Equal(t, "Regular Title", ch193.Title)
 }
 
+func TestAsurascansDiscoverSkipsPremiumChapters(t *testing.T) {
+	t.Parallel()
+
+	const (
+		currentSeries  = "/comics/pick-me-up-infinite-gacha-f6174291"
+		premiumChapter = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/215"
+		publicChapter  = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/214"
+	)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case currentSeries:
+			fmt.Fprint(w, `
+				<html>
+					<body>
+						<h1>Pick Me Up, Infinite Gacha</h1>
+						<astro-island component-url="/_astro/ChapterListReact.xxx.js" props="{&quot;chapters&quot;:[1,[[0,{&quot;number&quot;:[0,215],&quot;is_premium&quot;:[0,true],&quot;early_access_until&quot;:[0,&quot;2026-08-19T00:00:00Z&quot;]}],[0,{&quot;number&quot;:[0,214],&quot;is_premium&quot;:[0,false]}]]]}" ssr>
+						<a href="`+premiumChapter+`">
+							<span>Chapter 215</span>
+							<span>Premium Chapter</span>
+							<span>1 hour ago</span>
+						</a>
+						<a href="`+publicChapter+`">
+							<span>Chapter 214</span>
+							<span>Public Chapter</span>
+							<span>last week</span>
+						</a>
+						</astro-island>
+					</body>
+				</html>
+			`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	src := newTestAsurascans(server.URL+currentSeries, server.URL)
+
+	manga, err := src.Discover(t.Context())
+	require.NoError(t, err)
+	require.Equal(t, "Pick Me Up, Infinite Gacha", manga.Title)
+	require.Len(t, manga.Chapters, 1)
+
+	_, hasPremium := manga.Chapters[mustChapterNumber("215")]
+	require.False(t, hasPremium, "premium chapter 215 should be filtered out")
+
+	chapter214, ok := manga.Chapters[mustChapterNumber("214")]
+	require.True(t, ok)
+	require.Equal(t, "Public Chapter", chapter214.Title)
+}
+
 func TestAsurascansPagesExtractsChapterAssets(t *testing.T) {
 	t.Parallel()
 

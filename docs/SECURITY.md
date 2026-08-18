@@ -20,6 +20,7 @@ Verified on 2026-08-07.
 - validate source inputs before network work
 - keep archive output under explicit user-selected directories
 - prefer shared HTTP code paths over ad hoc adapter-local clients
+- omit secret-bearing query strings from request errors and logs
 - document new dependencies before adoption
 - scan reachable dependencies with `govulncheck` in CI
 - run the container as an unprivileged user with a pinned Alpine release line

@@ -249,10 +249,18 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, method string, path st
 		sharedhttp.RetryOptions(ctx)...,
 	)
 	if retryErr != nil {
-		return &protobuf.Response{}, fmt.Errorf("executing request %s: %w", req.URL, retryErr)
+		return &protobuf.Response{}, fmt.Errorf("executing request %s: %w", requestURLWithoutQuery(req), retryErr)
 	}
 
 	return &protoResp, nil
+}
+
+func requestURLWithoutQuery(req *http.Request) string {
+	clean := *req.URL
+	clean.RawQuery = ""
+	clean.ForceQuery = false
+	clean.Fragment = ""
+	return clean.String()
 }
 
 func (m *mangaplus) responseError(response *protobuf.Response) error {
