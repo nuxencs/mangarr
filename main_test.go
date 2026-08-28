@@ -36,8 +36,8 @@ func TestMainReturnsFailureForInvalidDownloadDirectory(t *testing.T) {
 		t.Fatalf("mangarr exited successfully for an invalid download directory:\n%s", output)
 	}
 
-	var exitError *exec.ExitError
-	if !errors.As(err, &exitError) {
+	exitError, ok := errors.AsType[*exec.ExitError](err)
+	if !ok {
 		t.Fatalf("running mangarr: %v", err)
 	}
 	if exitError.ExitCode() != 1 {

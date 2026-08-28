@@ -229,7 +229,7 @@ go tool pprof http://127.0.0.1:6060/debug/pprof/profile?seconds=30
 
 Requirements:
 
-- Go 1.26.5 or later
+- Go 1.27.0 or later
 
 ```bash
 git clone https://github.com/nuxencs/mangarr.git

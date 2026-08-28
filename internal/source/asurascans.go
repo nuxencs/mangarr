@@ -256,7 +256,7 @@ func (a *asurascans) chapterDetailsFromLink(href string, e *colly.HTMLElement) (
 }
 
 func stripURLQueryAndFragment(parsed *url.URL) string {
-	clean := *parsed
+	clean := parsed.Clone()
 	clean.RawQuery = ""
 	clean.Fragment = ""
 	return clean.String()

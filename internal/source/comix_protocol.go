@@ -7,7 +7,7 @@ import (
 	"io"
 	"net/url"
 	"reflect"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -126,8 +126,8 @@ func (c comixCodec) decodeResponse(reader io.Reader, encrypted bool, destination
 		if err != nil {
 			return fmt.Errorf("decoding Comix encrypted payload: %w", err)
 		}
-		for i := len(c.stages) - 1; i >= 0; i-- {
-			body = c.stages[i].decode(body)
+		for _, stage := range slices.Backward(c.stages) {
+			body = stage.decode(body)
 		}
 		if !utf8.Valid(body) {
 			return fmt.Errorf("decoding Comix encrypted payload: invalid UTF-8")
@@ -217,8 +217,8 @@ func flattenComixParams(pairs *[]string, prefix string, value reflect.Value) err
 	switch value.Kind() {
 	case reflect.Map:
 		keys := value.MapKeys()
-		sort.Slice(keys, func(i, j int) bool {
-			return fmt.Sprint(keys[i].Interface()) < fmt.Sprint(keys[j].Interface())
+		slices.SortFunc(keys, func(a, b reflect.Value) int {
+			return strings.Compare(fmt.Sprint(a.Interface()), fmt.Sprint(b.Interface()))
 		})
 		for _, key := range keys {
 			name := fmt.Sprint(key.Interface())

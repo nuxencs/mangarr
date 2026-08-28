@@ -256,7 +256,7 @@ func (m *mangaplus) getProtoResponse(ctx context.Context, method string, path st
 }
 
 func requestURLWithoutQuery(req *http.Request) string {
-	clean := *req.URL
+	clean := req.URL.Clone()
 	clean.RawQuery = ""
 	clean.ForceQuery = false
 	clean.Fragment = ""

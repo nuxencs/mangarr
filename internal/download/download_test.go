@@ -2,7 +2,6 @@ package download
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"image"
 	"image/color"
@@ -33,7 +32,7 @@ func TestDownloadImageStreamsBodyToDisk(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
+	err := downloadImage(t.Context(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.NoError(t, err)
 
 	got, err := os.ReadFile(outBase + ".png")
@@ -55,7 +54,7 @@ func TestDownloadImageDecryptsWhileStreaming(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{
+	err := downloadImage(t.Context(), zerolog.Nop(), domain.ImageInfo{
 		ImageURL:      server.URL,
 		EncryptionKey: hex.EncodeToString(key),
 	}, outBase, 1, 1)
@@ -81,7 +80,7 @@ func TestDownloadImageDetectsTypeFromMagicBytes(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
+	err := downloadImage(t.Context(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.NoError(t, err)
 
 	_, statErr := os.Stat(outBase + ".png")
@@ -129,7 +128,7 @@ func TestDownloadImageRetriesTransientServerError(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
+	err := downloadImage(t.Context(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.NoError(t, err)
 
 	got, err := os.ReadFile(outBase + ".png")
@@ -149,7 +148,7 @@ func TestDownloadImageStopsAfterThreeAttemptsOnPermanentFailure(t *testing.T) {
 	defer server.Close()
 
 	outBase := filepath.Join(t.TempDir(), "img")
-	err := downloadImage(context.Background(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
+	err := downloadImage(t.Context(), zerolog.Nop(), domain.ImageInfo{ImageURL: server.URL}, outBase, 1, 1)
 	require.Error(t, err)
 	require.Equal(t, int32(sharedhttp.RetryAttempts), attempts.Load())
 }
