@@ -3,6 +3,7 @@ package files
 import (
 	"archive/zip"
 	"bufio"
+	"cmp"
 	"errors"
 	"fmt"
 	"image"
@@ -10,7 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 
 	"github.com/rs/zerolog"
 	_ "golang.org/x/image/webp" // needed to decode webp
@@ -108,7 +109,7 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	}
 
 	// Sort images lexicographically so they stay in page order.
-	sort.Slice(images, func(i, j int) bool { return images[i].name < images[j].name })
+	slices.SortFunc(images, func(a, b imageMeta) int { return cmp.Compare(a.name, b.name) })
 
 	selectedImages := make([]imageMeta, 0, len(images))
 	for _, img := range images {

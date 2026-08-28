@@ -2,12 +2,13 @@ package source
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -235,10 +236,10 @@ func (f *flamecomics) Pages(ctx context.Context, chapter domain.Chapter) ([]doma
 	for k := range responseChapter.Images {
 		keys = append(keys, k)
 	}
-	sort.Slice(keys, func(i, j int) bool {
-		iNum, _ := strconv.ParseFloat(keys[i], 32)
-		jNum, _ := strconv.ParseFloat(keys[j], 32)
-		return iNum < jNum
+	slices.SortFunc(keys, func(a, b string) int {
+		aNum, _ := strconv.ParseFloat(a, 32)
+		bNum, _ := strconv.ParseFloat(b, 32)
+		return cmp.Compare(aNum, bNum)
 	})
 
 	imageURLs := make([]domain.ImageInfo, 0, len(responseChapter.Images))

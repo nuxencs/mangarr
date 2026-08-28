@@ -1,7 +1,6 @@
 package sharedhttp
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -117,7 +116,7 @@ func TestExecRequestRetriesOnTransportError(t *testing.T) {
 		Transport: flaky,
 	}
 
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, server.URL, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
 	require.NoError(t, err)
 
 	err = retry.Do(func() error {

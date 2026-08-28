@@ -5,17 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
-	"sort"
+	"slices"
 	"time"
+	"uuid"
 
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 	"mangarr/internal/sharedhttp"
 
 	"github.com/avast/retry-go"
-	"github.com/google/uuid"
 )
 
 const (
@@ -331,11 +332,7 @@ func (m *mangadex) getMangaTitle(titles map[string]string) string {
 		return title
 	}
 
-	languages := make([]string, 0, len(titles))
-	for language := range titles {
-		languages = append(languages, language)
-	}
-	sort.Strings(languages)
+	languages := slices.Sorted(maps.Keys(titles))
 	for _, language := range languages {
 		if titles[language] != "" {
 			return titles[language]
