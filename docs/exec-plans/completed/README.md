@@ -12,3 +12,4 @@ Completed plans kept in-repo:
 - [2026-08-07-codebase-reliability-stack.md](./2026-08-07-codebase-reliability-stack.md)
 - [2026-08-07-comix-protocol-restoration.md](./2026-08-07-comix-protocol-restoration.md)
 - [2026-08-18-asurascans-premium-locks.md](./2026-08-18-asurascans-premium-locks.md)
+- [2026-08-28-comix-scramble-drift.md](./2026-08-28-comix-scramble-drift.md)

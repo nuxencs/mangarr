@@ -28,66 +28,67 @@ func TestBuildComixScrambleOrderMatchesFrontendAlgorithms(t *testing.T) {
 func TestComixImageProcessorDescramblesTiles(t *testing.T) {
 	t.Parallel()
 
-	original := image.NewNRGBA(image.Rect(0, 0, 4, 4))
-	colors := []color.NRGBA{
-		{R: 255, A: 255},
-		{G: 255, A: 255},
-		{B: 255, A: 255},
-		{R: 255, G: 255, A: 255},
-	}
-	for tile, tileColor := range colors {
-		x := tile % 2 * 2
-		y := tile / 2 * 2
-		draw.Draw(original, image.Rect(x, y, x+2, y+2), &image.Uniform{C: tileColor}, image.Point{}, draw.Src)
+	tests := []struct {
+		name   string
+		hash   string
+		prefix uint32
+	}{
+		{name: "known hash", hash: "03632", prefix: comixScrambleHashPrefixes["03632"]},
+		{name: "unknown hash", hash: "a8284", prefix: 0},
 	}
 
-	seed := uint32(100)
-	order := buildComixScrambleOrder(seed^comixScrambleHashPrefixes["03632"], 4, true)
-	scrambled := image.NewNRGBA(original.Bounds())
-	for sourceIndex, destinationIndex := range order {
-		sourceX := sourceIndex % 2 * 2
-		sourceY := sourceIndex / 2 * 2
-		destinationX := destinationIndex % 2 * 2
-		destinationY := destinationIndex / 2 * 2
-		draw.Draw(
-			scrambled,
-			image.Rect(sourceX, sourceY, sourceX+2, sourceY+2),
-			original,
-			image.Pt(destinationX, destinationY),
-			draw.Src,
-		)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			original := image.NewNRGBA(image.Rect(0, 0, 4, 4))
+			colors := []color.NRGBA{
+				{R: 255, A: 255},
+				{G: 255, A: 255},
+				{B: 255, A: 255},
+				{R: 255, G: 255, A: 255},
+			}
+			for tile, tileColor := range colors {
+				x := tile % 2 * 2
+				y := tile / 2 * 2
+				draw.Draw(original, image.Rect(x, y, x+2, y+2), &image.Uniform{C: tileColor}, image.Point{}, draw.Src)
+			}
+
+			seed := uint32(100)
+			order := buildComixScrambleOrder(seed^test.prefix, 4, true)
+			scrambled := image.NewNRGBA(original.Bounds())
+			for sourceIndex, destinationIndex := range order {
+				sourceX := sourceIndex % 2 * 2
+				sourceY := sourceIndex / 2 * 2
+				destinationX := destinationIndex % 2 * 2
+				destinationY := destinationIndex / 2 * 2
+				draw.Draw(
+					scrambled,
+					image.Rect(sourceX, sourceY, sourceX+2, sourceY+2),
+					original,
+					image.Pt(destinationX, destinationY),
+					draw.Src,
+				)
+			}
+
+			var input bytes.Buffer
+			require.NoError(t, png.Encode(&input, scrambled))
+			var output bytes.Buffer
+			processor := comixImageProcessor{}
+			require.Equal(t, ".png", processor.Extension())
+			require.NoError(t, processor.Process(http.Header{
+				"X-Scramble-Hash": []string{test.hash},
+				"X-Scramble-Seed": []string{"100"},
+				"X-Scramble-Grid": []string{"2x2"},
+				"X-Scramble-Algo": []string{"3"},
+			}, &input, &output))
+
+			result, err := png.Decode(&output)
+			require.NoError(t, err)
+			require.Equal(t, original.Bounds(), result.Bounds())
+			for y := range original.Bounds().Dy() {
+				for x := range original.Bounds().Dx() {
+					require.Equal(t, original.NRGBAAt(x, y), color.NRGBAModel.Convert(result.At(x, y)))
+				}
+			}
+		})
 	}
-
-	var input bytes.Buffer
-	require.NoError(t, png.Encode(&input, scrambled))
-	var output bytes.Buffer
-	processor := comixImageProcessor{}
-	require.Equal(t, ".png", processor.Extension())
-	require.NoError(t, processor.Process(http.Header{
-		"X-Scramble-Hash": []string{"03632"},
-		"X-Scramble-Seed": []string{"100"},
-		"X-Scramble-Grid": []string{"2x2"},
-		"X-Scramble-Algo": []string{"3"},
-	}, &input, &output))
-
-	result, err := png.Decode(&output)
-	require.NoError(t, err)
-	require.Equal(t, original.Bounds(), result.Bounds())
-	for y := range original.Bounds().Dy() {
-		for x := range original.Bounds().Dx() {
-			require.Equal(t, original.NRGBAAt(x, y), color.NRGBAModel.Convert(result.At(x, y)))
-		}
-	}
-}
-
-func TestDescrambleComixImageRejectsUnknownHash(t *testing.T) {
-	t.Parallel()
-
-	_, err := descrambleComixImage(image.NewNRGBA(image.Rect(0, 0, 10, 10)), http.Header{
-		"X-Scramble-Hash": []string{"unknown"},
-		"X-Scramble-Seed": []string{"100"},
-		"X-Scramble-Grid": []string{"2x2"},
-		"X-Scramble-Algo": []string{"3"},
-	})
-	require.EqualError(t, err, `descrambling Comix image: unsupported hash "unknown"`)
 }
