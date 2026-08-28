@@ -58,10 +58,9 @@ func (comixImageProcessor) Process(headers http.Header, reader io.Reader, writer
 
 func descrambleComixImage(source image.Image, headers http.Header) (image.Image, error) {
 	hash := strings.ToLower(headers.Get("X-Scramble-Hash"))
-	prefix, ok := comixScrambleHashPrefixes[hash]
-	if !ok {
-		return nil, fmt.Errorf("descrambling Comix image: unsupported hash %q", hash)
-	}
+	// The frontend treats unmapped hashes as a zero prefix. Comix rotates these
+	// opaque values independently from the two explicit legacy mappings.
+	prefix := comixScrambleHashPrefixes[hash]
 
 	seedValue := headers.Get("X-Scramble-Seed")
 	seed, err := strconv.ParseUint(seedValue, 10, 32)

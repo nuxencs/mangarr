@@ -139,6 +139,10 @@ The reader imports security export `t` separately. It calls this function only f
 
 The embedded WebAssembly exports `buildOrderV1` and `buildOrderV2`. Version 1 uses a Fisher-Yates shuffle driven by the standard 32-bit LCG constants `1664525` and `1013904223`. Version 2 uses Fisher-Yates with xorshift32 shifts `13`, `17`, and `5`, with the seed forced odd. The current `X-Scramble-Algo: 3` selects version 2. The hash-prefix table contains `03632 -> 58414` and `02900 -> 117532`. The effective seed is the response seed XOR the matching prefix.
 
+### 2026-08-28 scramble-hash drift
+
+The active frontend kept build directory `35595e3de3c99889c1aa70` but changed its generated bundle suffix from `tjdqki` to `tkempc`. Live images returned new opaque hashes `a8284` and `e05d1`. The active [security bundle](https://comix.to/assets/build/35595e3de3c99889c1aa70/dist/secure-tkempc-HovQ1K40.js) still contains the two legacy mappings above. Its lookup returns prefix zero when a hash is absent from that table. Both new hashes therefore use the response seed without an XOR prefix. Mangarr must preserve this fallback instead of rejecting unknown hash values.
+
 The Go implementation reproduces the tile order and draws source tile `i` at destination tile `order[i]`. A live scrambled One Piece page reconstructed into a coherent page and passed a complete CLI archive smoke test.
 
 ## Go feasibility and gaps

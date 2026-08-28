@@ -1,6 +1,6 @@
 # Source Adapters
 
-Verified against `internal/source/` and all live sources on 2026-08-08.
+Verified against `internal/source/` and the live Comix source on 2026-08-28.
 
 All adapters implement the small `domain.Source` contract:
 
@@ -38,6 +38,7 @@ All adapters implement the small `domain.Source` contract:
 - `asurascans` removes chapters marked `is_locked=true` or `is_premium=true` before returning the chapter map
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
 - `comix` implements frontend build `35595e3de3c99889c1aa70`; it generates request tokens, decodes encrypted API envelopes, sends image request headers, and reconstructs scrambled tile images
+- Comix scramble hashes are opaque routing keys. The two known legacy hashes select explicit seed prefixes; unknown hashes use prefix zero, matching the frontend fallback.
 - `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
 - source-specific image transforms use `domain.ImageProcessor`; the acquisition path owns transport and output while the source adapter owns the transform
 - retry policy comes from `internal/sharedhttp/`
