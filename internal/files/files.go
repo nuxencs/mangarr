@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 
+	_ "github.com/gen2brain/avif" // needed for AVIF page dimensions
 	"github.com/rs/zerolog"
 	_ "golang.org/x/image/webp" // needed to decode webp
 )

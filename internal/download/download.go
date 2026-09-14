@@ -237,6 +237,8 @@ func appendImageExtension(contentType, filename string) (string, error) {
 		return filename + ".gif", nil
 	case "image/webp":
 		return filename + ".webp", nil
+	case "image/avif":
+		return filename + ".avif", nil
 	default:
 		return filename, fmt.Errorf("unsupported content type: %s", contentType)
 	}

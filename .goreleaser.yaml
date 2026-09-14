@@ -6,6 +6,8 @@ before:
 
 builds:
   - id: mangarr
+    tags:
+      - nodynamic
     env:
       - CGO_ENABLED=0
     goos:
