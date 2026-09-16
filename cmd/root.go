@@ -4,16 +4,21 @@ import (
 	"net/http"
 	"time"
 
+	"mangarr/internal/domain"
+	"mangarr/internal/source"
+
 	"github.com/spf13/cobra"
 )
 
 type dependencies struct {
+	selectSource  func(domain.MonitoredManga) (domain.Source, error)
 	versionClient *http.Client
 	releaseURL    string
 }
 
 func defaultDependencies() dependencies {
 	return dependencies{
+		selectSource:  source.Select,
 		versionClient: &http.Client{Timeout: 10 * time.Second},
 		releaseURL:    githubURL,
 	}
@@ -43,7 +48,7 @@ For more information and examples, visit https://github.com/nuxencs/mangarr`,
 	}
 
 	initRootFlags(root, rootOptions)
-	download := newDownloadCommand(downloadOptions)
+	download := newDownloadCommand(downloadOptions, rootOptions, deps.selectSource)
 	initDownloadFlags(download, downloadOptions)
 	root.AddCommand(newVersionCommand(deps.versionClient, deps.releaseURL))
 	root.AddCommand(download)

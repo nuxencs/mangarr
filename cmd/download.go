@@ -12,19 +12,24 @@ import (
 	"mangarr/internal/domain"
 	"mangarr/internal/files"
 	"mangarr/internal/parse"
-	"mangarr/internal/source"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
 
-func newDownloadCommand(options *downloadOptions) *cobra.Command {
+func newDownloadCommand(options *downloadOptions, root *rootOptions, selectSource func(domain.MonitoredManga) (domain.Source, error)) *cobra.Command {
 	return &cobra.Command{
-		Use:          "download",
-		Short:        "Download a specified chapter",
+		Use:   "download",
+		Short: "Download chapters from explicit inputs or a configured series",
+		Example: `  mangarr download -c ~/.config/mangarr --series "One Piece" -C "1-3"
+  mangarr download -d ./downloads -s tcbscans -m "One Piece"`,
+		Args:         cobra.NoArgs,
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			ctx := cmd.Context()
+			if err := resolveDownloadOptions(cmd, root.configPath, options); err != nil {
+				return err
+			}
 
 			// init new logger
 			log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Logger()
@@ -37,17 +42,23 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 				return fmt.Errorf("invalid download location: %w", err)
 			}
 
-			s, err := source.Select(domain.MonitoredManga{
+			s, err := selectSource(domain.MonitoredManga{
 				Source:   options.mangaSource,
 				Manga:    options.manga,
 				Group:    options.group,
 				Language: options.language,
 			})
 			if err != nil {
+				if cmd.Flags().Changed("series") {
+					return fmt.Errorf("configured series %q: selecting source: %w", options.series, err)
+				}
 				return fmt.Errorf("selecting source: %w", err)
 			}
 
 			if err := s.ValidateInput(); err != nil {
+				if cmd.Flags().Changed("series") {
+					return fmt.Errorf("configured series %q: invalid input: %w", options.series, err)
+				}
 				return fmt.Errorf("invalid input: %w", err)
 			}
 

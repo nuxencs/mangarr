@@ -31,6 +31,9 @@ Each layer has an explicit concurrency limit. The code favors bounded parallelis
 - defaults are embedded in Go structs/template text
 - config path lookup checks the user config directory, `~/.mangarr`, then the binary directory
 - env overrides use `MANGARR__` prefix
+- `download --series NAME` loads one validated snapshot and selects an exact `monitoredManga` key; it does not watch or rewrite config
+- named downloads inherit source inputs/title override and global output settings; explicit flags override them after config validation, and chapter selectors remain CLI-only
+- downloads without `--series` require explicit destination/source/manga and do not load config
 - monitor mode publishes validated immutable config snapshots while running
 - monitor mode watches the config parent directory, so atomic replacement and delete-then-recreate saves do not stop reloads
 - invalid, incomplete, or temporarily missing config files keep the last valid snapshot active

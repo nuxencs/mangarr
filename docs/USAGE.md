@@ -18,6 +18,7 @@ Common flags:
 
 | Flag | Meaning |
 | --- | --- |
+| `--series` | exact, case-sensitive entry name from `monitoredManga` in config |
 | `-d`, `--downloadDirectory` | directory where `.cbz` files are written |
 | `-s`, `--source` | source identifier such as `tcbscans` or `mangadex` |
 | `-m`, `--manga` | source-specific manga identifier |
@@ -35,9 +36,38 @@ Chapter selection flags are mutually exclusive:
 
 The command returns status 0 when all requested chapters are downloaded or already exist. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
 
+#### Download a configured series
+
+Reuse an existing `monitoredManga` entry without repeating its source, URL/ID, or group:
+
+```bash
+mangarr download -c ~/.config/mangarr --series "One Piece" -C "1-3"
+```
+
+Quote names containing spaces. `--series` matches the config key, not the provider's
+manga title. It uses the same config discovery, environment overrides, and full
+config validation as `monitor` (including a nonempty `downloadLocation`). It reads
+one snapshot without starting monitoring, watching, or rewriting the config.
+
+The entry supplies `source`, `manga`, `group`, `language`, and `overwrite`; global
+`downloadLocation` and `namingTemplate` supply the output settings. Omitted entry
+language defaults to `en`. Explicit download flags override these values, including
+explicit empty `--group` or `--overwrite` to clear a configured value. Precedence is
+explicit flags, then environment overrides, then YAML, then built-in defaults.
+Config validation occurs before flag overrides, so the config itself must be valid.
+Chapter selection always comes from the CLI and still defaults to latest.
+
+Unknown entries, missing effective source/manga, and invalid source inputs fail
+before provider discovery. A required entry field can be supplied by its CLI flag.
+Without `--series`, `-d`, `-s`, and `-m` remain required and no config is loaded.
+Monitor-only logging, profiling, and scheduling settings do not change download behavior.
+
 Examples:
 
 ```bash
+# Configured series with a one-off output directory
+mangarr download -c ~/.config/mangarr --series "One Piece" -C "1-3" -d ./downloads
+
 # Latest chapter from TCB Scans
 mangarr download -d ./downloads -s tcbscans -m "One Piece"
 
