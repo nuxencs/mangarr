@@ -66,7 +66,7 @@ Existing archives are skipped by default. To repair selected chapters, re-downlo
 mangarr download -d ./downloads -s tcbscans -m "One Piece" -C "6,17" --force
 ```
 
-The old archive is kept until its replacement is successfully downloaded and assembled. Force applies only to the selected chapters (the latest chapter if no selector is supplied).
+See the [download reference](./docs/USAGE.md#download) for archive matching and replacement safeguards.
 
 The command returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
 

@@ -18,12 +18,11 @@ Persistent state is file-based:
 
 There is no database, queue, or remote control plane.
 
-Chapter acquisition (`internal/acquire/`) skips an existing archive by default.
-Only `download -f/--force` bypasses this check, for the selected chapter set;
-monitoring keeps the default policy. Images download to a temporary directory,
-then `internal/files/` assembles a temporary CBZ beside the destination and
-renames it into place only after successful assembly and a cancellation check.
-A failed or cancelled replacement leaves the previous archive intact.
+Chapter acquisition (`internal/acquire/`) applies the
+[existing-archive policy](../USAGE.md#download) before page resolution.
+Images download to a temporary directory, then `internal/files/` assembles a
+temporary CBZ beside the destination. After assembly, it syncs and closes the
+temporary file, checks cancellation, and renames the file into place.
 
 ## Concurrency
 

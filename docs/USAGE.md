@@ -34,9 +34,22 @@ Chapter selection flags are mutually exclusive:
 - `-C`, `--chapters`: specific chapters or ranges such as `1,3,5` or `1-10`
 - `-A`, `--all`: all available chapters
 
-Existing archives are skipped unless `-f` / `--force` is supplied. Force works with any chapter selector and defaults to the latest chapter when none is supplied; it does not scan or replace unrelated library archives. Each old archive remains in place until the replacement is downloaded and assembled successfully. Failed or cancelled replacements preserve the old archive. Monitor mode still skips existing archives and has no force option. The `--overwrite` flag only changes the manga title; it does not force a download.
+Existing archives are skipped unless `-f` / `--force` is supplied. Force works with
+any chapter selector above. It replaces only the output paths calculated for
+those chapters; it does not search the library for old files. To repair an
+archive, use the same download directory, manga title, and naming template that
+produced its path. A changed title or template can produce a new file instead.
+The `--overwrite` flag changes the manga title used for the output directory and
+filename; it does not force a download. Monitor mode has no force option and
+continues to skip existing archives.
 
-The command returns status 0 when all requested chapters are downloaded or already exist. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
+Each old archive remains in place until the replacement is downloaded and
+assembled successfully. If replacement fails, or cancellation is detected before
+publication, the old archive is preserved. Cancellation after the final check
+can still allow publication. See the [runtime model](./design-docs/runtime-model.md#state)
+for the publication sequence.
+
+The command returns status 0 when all requested chapters are downloaded successfully or skipped. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
 
 Examples:
 
