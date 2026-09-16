@@ -1,13 +1,21 @@
 package cmd
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
+	"image/png"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"mangarr/internal/domain"
@@ -15,6 +23,67 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestDownloadConfiguredSeriesCreatesArchives(t *testing.T) {
+	var page bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 20, 30))
+	img.Set(0, 0, color.RGBA{R: 255, A: 255})
+	require.NoError(t, png.Encode(&page, img))
+	var pageRequests atomic.Int64
+	mux := http.NewServeMux()
+	server := httptest.NewServer(mux)
+	defer server.Close()
+	mux.HandleFunc("GET /series", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintf(w, `{"title":"Original Title","chapters":{
+			"1":{"groups":{"Configured Group":[%q]}},
+			"2":{"groups":{"Configured Group":[%q]}},
+			"3":{"groups":{"Configured Group":[%q]}},
+			"4":{"groups":{"Other Group":[%q]}}
+		}}`, server.URL+"/page/1", server.URL+"/page/2", server.URL+"/page/3", server.URL+"/wrong-group")
+	})
+	mux.HandleFunc("GET /page/{number}", func(w http.ResponseWriter, r *http.Request) {
+		pageRequests.Add(1)
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write(page.Bytes())
+	})
+	destination := t.TempDir()
+	configDir := writeDownloadConfig(t, fmt.Sprintf(`downloadLocation: %q
+namingTemplate: "{manga:<.>}-{num}"
+monitoredManga:
+  My Series:
+    source: cubari
+    manga: %q
+    group: Configured Group
+    overwrite: Saved Title
+`, destination, server.URL+"/series"))
+
+	for range 2 {
+		root := NewRootCommand()
+		root.SetArgs([]string{"download", "-c", configDir, "--series", "My Series", "-C", "1-2"})
+		require.NoError(t, root.ExecuteContext(t.Context()))
+	}
+	require.EqualValues(t, 2, pageRequests.Load(), "existing archives must skip page downloads")
+	archives, err := filepath.Glob(filepath.Join(destination, "*", "*.cbz"))
+	require.NoError(t, err)
+	require.Equal(t, []string{
+		filepath.Join(destination, "Saved Title", "Saved Title-1.cbz"),
+		filepath.Join(destination, "Saved Title", "Saved Title-2.cbz"),
+	}, archives)
+	for _, path := range archives {
+		archive, err := zip.OpenReader(path)
+		require.NoError(t, err)
+		t.Cleanup(func() { require.NoError(t, archive.Close()) })
+		require.Len(t, archive.File, 1)
+		require.Equal(t, "001.png", archive.File[0].Name)
+		reader, err := archive.File[0].Open()
+		require.NoError(t, err)
+		data, err := io.ReadAll(reader)
+		require.NoError(t, reader.Close())
+		require.NoError(t, err)
+		require.Equal(t, page.Bytes(), data)
+	}
+}
 
 func writeDownloadConfig(t *testing.T, body string) string {
 	t.Helper()
