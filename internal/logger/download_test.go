@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -137,64 +136,31 @@ func TestDownloadLogSizeBound(t *testing.T) {
 	}
 }
 
-func TestDownloadPersistedURLRedaction(t *testing.T) {
-	cfg := downloadConfig(t)
-	logging, err := NewDownload(cfg, io.Discard)
-	require.NoError(t, err)
-	logging.Log.Warn().Interface("details", []any{
-		map[string]any{"url": "https://name:password@example.invalid/page?token=secret#fragment"},
-		"http://bad:password@example.invalid/%zz?secret=yes",
-		"ftp://name:password@example.invalid/file?secret=yes",
-		"https://example.invalid/gist?label=O'Reilly&token=secret",
-	}).Msg("requesting https://example.invalid/series?signature=secret")
-	failure := errors.New(`Get "https://name:password@example.invalid/gist?label=O'Reilly&token=secret": offline failure`)
-	require.ErrorIs(t, logging.Close(failure), failure)
-	data, err := os.ReadFile(runLogs(t, cfg)[0])
-	require.NoError(t, err)
-	for _, secret := range []string{"name:", "password", "token=", "secret", "fragment", "signature=", "label=", "Reilly"} {
-		require.NotContains(t, string(data), secret)
-	}
-	require.Contains(t, string(data), "https://example.invalid/page")
-	require.Contains(t, string(data), "https://example.invalid/gist")
-	require.Contains(t, string(data), "[redacted URL]")
-	require.Contains(t, string(data), "Download failed")
-}
-
-func TestDownloadPersistedURLQueryRedaction(t *testing.T) {
+func TestDownloadRetainsFailureDetails(t *testing.T) {
 	for _, test := range []struct {
-		name, suffix string
+		name, path string
 	}{
-		{name: "normal URL"},
-		{name: "normal query", suffix: "?token=secret"},
-		{name: "apostrophe", suffix: "?label=O'Reilly&token=secret"},
-		{name: "double quotes", suffix: `?label="title"&token=secret`},
-		{name: "space and punctuation", suffix: "?label=a b<>\"'&token=secret"},
-		{name: "fragment", suffix: "#secret"},
+		{name: "normal URL", path: "/gist"},
+		{name: "query", path: "/gist?page=1"},
+		{name: "apostrophe", path: "/gist?label=O'Reilly"},
+		{name: "double quotes", path: `/gist?label="title"`},
+		{name: "space in path", path: "/chapter 1/page.jpg?page=1"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			cfg := downloadConfig(t)
 			var console bytes.Buffer
 			logging, err := NewDownload(cfg, &console)
 			require.NoError(t, err)
-			base := "https://example.invalid/gist"
-			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, base+test.suffix, nil)
+			rawURL := "https://example.invalid" + test.path
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, rawURL, nil)
 			require.NoError(t, err)
-			failure := &url.Error{Op: "Get", URL: req.URL.String(), Err: errors.New("offline failure")}
-			logging.Log.Warn().Str("url", req.URL.String()).Interface("details", []any{req.URL.String()}).Msg("requesting " + req.URL.String())
-			logging.Log.Error().Err(failure).Msg("request failed")
+			cause := errors.New("decoding response: unexpected EOF")
+			failure := fmt.Errorf("executing request %s: %w", req.URL, cause)
+			logging.Log.Warn().Str("image_url", rawURL).Int("image_index", 1).Err(failure).Msg("Retrying image download")
 			require.ErrorIs(t, logging.Close(failure), failure)
-			require.Contains(t, console.String(), "offline failure")
-			if test.suffix != "" {
-				require.Contains(t, console.String(), "secret")
-			}
+			require.Contains(t, console.String(), cause.Error())
 			data, err := os.ReadFile(runLogs(t, cfg)[0])
 			require.NoError(t, err)
-			wantURL := base
-			wantError := failure.Error()
-			if test.suffix != "" {
-				wantURL += " [redacted URL suffix]"
-				wantError = `Get "` + wantURL
-			}
 			scanner := bufio.NewScanner(bytes.NewReader(data))
 			var records []map[string]any
 			for scanner.Scan() {
@@ -203,12 +169,12 @@ func TestDownloadPersistedURLQueryRedaction(t *testing.T) {
 				records = append(records, record)
 			}
 			require.NoError(t, scanner.Err())
-			require.Len(t, records, 4)
-			require.Equal(t, wantURL, records[1]["url"])
-			require.Equal(t, []any{wantURL}, records[1]["details"])
-			require.Equal(t, "requesting "+wantURL, records[1]["message"])
-			require.Equal(t, wantError, records[2]["error"])
-			require.Equal(t, wantError, records[3]["error"])
+			require.Len(t, records, 3)
+			require.Equal(t, "Retrying image download", records[1]["message"])
+			require.EqualValues(t, 1, records[1]["image_index"])
+			require.Equal(t, failure.Error(), records[1]["error"])
+			require.Equal(t, "Download failed", records[2]["message"])
+			require.Equal(t, failure.Error(), records[2]["error"])
 		})
 	}
 }

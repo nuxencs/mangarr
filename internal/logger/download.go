@@ -1,14 +1,10 @@
 package logger
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -73,10 +69,7 @@ func (l *DownloadLogger) Close(commandErr error) error {
 
 const logLimitRecord = "{\"level\":\"error\",\"message\":\"Download log size limit reached; further diagnostics remain on stderr\"}\n"
 
-var (
-	errLogLimit = errors.New("logMaxSize reached; further diagnostics remain on stderr")
-	logURL      = regexp.MustCompile(`(?i)\b[a-z][a-z0-9+.-]*://[^\s<>"?#]+(?:[?#][\s\S]*)?`)
-)
+var errLogLimit = errors.New("logMaxSize reached; further diagnostics remain on stderr")
 
 type downloadLogFile struct {
 	mu       sync.Mutex
@@ -100,18 +93,16 @@ func (f *downloadLogFile) WriteLevel(level zerolog.Level, p []byte) (int, error)
 		return len(p), nil
 	}
 
-	data, err := redactLogRecord(p)
-	if err == nil {
-		if int64(len(data))+f.written+int64(len(logLimitRecord)) > f.maxBytes {
-			_, writeErr := f.file.WriteString(logLimitRecord)
-			err = errors.Join(errLogLimit, writeErr)
-		} else {
-			var n int
-			n, err = f.file.Write(data)
-			f.written += int64(n)
-			if err == nil && n != len(data) {
-				err = io.ErrShortWrite
-			}
+	var err error
+	if int64(len(p))+f.written+int64(len(logLimitRecord)) > f.maxBytes {
+		_, writeErr := f.file.WriteString(logLimitRecord)
+		err = errors.Join(errLogLimit, writeErr)
+	} else {
+		var n int
+		n, err = f.file.Write(p)
+		f.written += int64(n)
+		if err == nil && n != len(p) {
+			err = io.ErrShortWrite
 		}
 	}
 	if err != nil {
@@ -130,43 +121,4 @@ func (f *downloadLogFile) close() error {
 		f.err = errors.Join(f.err, fmt.Errorf("retaining download logs: %w", err))
 	}
 	return f.err
-}
-
-func redactLogRecord(p []byte) ([]byte, error) {
-	var record map[string]any
-	decoder := json.NewDecoder(bytes.NewReader(p))
-	decoder.UseNumber()
-	if err := decoder.Decode(&record); err != nil {
-		return nil, fmt.Errorf("decoding diagnostic record: %w", err)
-	}
-	redactLogValue(record)
-	data, err := json.Marshal(record)
-	return append(data, '\n'), err
-}
-
-func redactLogValue(value any) any {
-	switch value := value.(type) {
-	case string:
-		return logURL.ReplaceAllStringFunc(value, func(raw string) string {
-			suffix := ""
-			if i := strings.IndexAny(raw, "?#"); i >= 0 {
-				raw, suffix = raw[:i], " [redacted URL suffix]"
-			}
-			parsed, err := url.Parse(raw)
-			if err != nil {
-				return "[redacted URL]"
-			}
-			parsed.User = nil
-			return parsed.String() + suffix
-		})
-	case map[string]any:
-		for key, child := range value {
-			value[key] = redactLogValue(child)
-		}
-	case []any:
-		for i, child := range value {
-			value[i] = redactLogValue(child)
-		}
-	}
-	return value
 }

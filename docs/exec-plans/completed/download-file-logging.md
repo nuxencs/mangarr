@@ -9,20 +9,20 @@ Retain manual download diagnostics whenever the existing file-logging setting is
 - Store collision-resistant JSONL run files in `<logPath>.downloads/`. Keep the monitor's file and rotation unchanged.
 - Cap each run at `logMaxSize` MiB. Retain `logMaxBackups` completed runs plus active runs. Use OS file locks to protect active runs and serialize creation/cleanup. Process exit releases locks, so interrupted runs become eligible for cleanup.
 - Report a size limit or write failure on stderr and at command completion. Continue acquisition and preserve its errors and output files. Reject startup logging failures before discovery.
-- Redact URL user information, query strings, and fragments only in persisted records. Keep console formatting and verbosity unchanged.
+- Retain emitted diagnostics without additional record filtering. Keep existing source safeguards, console formatting, and verbosity unchanged.
 
 ## Plan
 1. Add offline command coverage for the missing retained discovery error.
 2. Add read-only download config loading and command-local logging lifecycle.
-3. Test concurrent processes, bounded retention, output separation, and sensitive errors.
+3. Test concurrent processes, bounded retention, output separation, and failure details.
 4. Update operator docs and verify affected packages, then the required Go gates.
 5. Commit the implementation and stop for Firstmate's validation instruction.
 
 ## Verification
-- Reproduced missing file diagnostics with an offline discovery failure before implementation. The command regression now passes and verifies one stderr error, a retained redacted error, and empty stdout.
+- Reproduced missing file diagnostics with an offline discovery failure before implementation. The command regression verifies one stderr error, a retained failure cause, and empty stdout.
 - Configured-series fixtures retain successful acquisitions and later skips. Partial-failure fixtures retain both the successful chapter and failed-chapter summary.
 - Automatic config and binary-adjacent symlink tests require no new logging option. Monitor settings remain independently validated.
-- Subprocess tests verify unique files, active-run protection, concurrent cleanup, and lock release after abrupt exit. Size-cap, write-failure, URL-redaction, permissions, and symlink-preservation tests pass.
+- Subprocess tests verify unique files, active-run protection, concurrent cleanup, and lock release after abrupt exit. Other coverage checks size limits, write failures, retained failure details, permissions, and symlink preservation.
 - `go test ./...`, `go test -race ./...`, and `go build ./...` passed. Affected package tests and logger race tests passed again after final file-name/path guards.
 - `go vet ./cmd ./internal/config ./internal/logger`, `go mod tidy -diff`, `yamllint config.yaml`, and `git diff --check` passed.
 - Logger tests cross-compiled for Linux, Windows, and FreeBSD. Their foreign-platform binaries were not executed.
