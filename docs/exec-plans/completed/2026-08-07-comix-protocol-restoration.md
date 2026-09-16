@@ -28,7 +28,9 @@ and scrambled-image reconstruction.
 - Add `domain.ImageProcessor` as a narrow source-owned image transform seam. The downloader
   owns transport and output, but it does not import Comix behavior.
 - Use fixed local fixtures for normal tests. Live Comix requests remain a manual smoke test.
-- Treat `403` and `429` as unrecoverable through the existing shared HTTP policy.
+- At restoration time, treat `403` and `429` as unrecoverable through the shared HTTP policy.
+  The later [bulk reliability change](./2026-09-16-bulk-rate-limit-reliability.md)
+  supersedes only the `429` decision with bounded retries.
 - Keep optional numeric group selection. Without a group, the first duplicate chapter in
   server order wins because the domain chapter map has one value per chapter number.
 

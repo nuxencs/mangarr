@@ -32,6 +32,15 @@ temporary file, checks cancellation, and renames the file into place.
 
 Each layer has an explicit concurrency limit. The code favors bounded parallelism over unbounded goroutine fan-out.
 
+## HTTP Retry Lifecycle
+
+`internal/sharedhttp/` owns bounded request retries for image downloads and direct
+HTTP adapters in both commands. HTTP 429 is retryable, alongside transient server
+and transport failures. `Retry-After` extends the backoff; guidance above five
+minutes fails without retrying early. Retry waits observe caller cancellation.
+See [usage](../USAGE.md#bulk-downloads-and-rate-limits) for the full policy and
+Colly limitations. Chapter selection, concurrency, and monitor polling are unchanged.
+
 ## Config Lifecycle
 
 - defaults are embedded in Go structs/template text

@@ -13,6 +13,8 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - low-friction way to know when chapters were skipped, downloaded, or failed
 - manga and configured source identifiers on every monitor-check failure
 - safe handling of flaky or drifting sources
+- bounded, cancellable recovery from HTTP rate limits in shared image/direct-HTTP
+  requests; see [retry policy](../USAGE.md#bulk-downloads-and-rate-limits)
 
 ## Acceptance Bar
 

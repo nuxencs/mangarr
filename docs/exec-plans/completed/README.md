@@ -17,3 +17,4 @@ Completed plans kept in-repo:
 - [2026-08-28-comix-scramble-drift.md](./2026-08-28-comix-scramble-drift.md)
 - [2026-08-28-go-1.27-modernization.md](./2026-08-28-go-1.27-modernization.md)
 - [2026-09-14-avif-downloads.md](./2026-09-14-avif-downloads.md)
+- [2026-09-16-bulk-rate-limit-reliability.md](./2026-09-16-bulk-rate-limit-reliability.md)

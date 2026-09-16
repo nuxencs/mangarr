@@ -83,3 +83,82 @@ func TestDownloadForceReplacesOnlySelectedChapters(t *testing.T) {
 		})
 	}
 }
+
+// This is a representative throttle fixture, not a capture from a live provider.
+// It exercises Cobra selection, Cubari discovery, image retries and CBZ publication.
+func TestDownloadRateLimit(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		selector      string
+		firstStatus   int
+		firstFailures int32
+		wantFirst     int32
+		chapters      []string
+		wantError     string
+	}{
+		{name: "all control", selector: "--all", firstStatus: http.StatusOK, wantFirst: 1, chapters: []string{"1", "2"}},
+		{name: "latest control", selector: "--latest", firstStatus: http.StatusTooManyRequests, firstFailures: 1, chapters: []string{"2"}},
+		{name: "all transient server error", selector: "--all", firstStatus: http.StatusServiceUnavailable, firstFailures: 1, wantFirst: 2, chapters: []string{"1", "2"}},
+		{name: "all transient rate limit", selector: "--all", firstStatus: http.StatusTooManyRequests, firstFailures: 1, wantFirst: 2, chapters: []string{"1", "2"}},
+		{name: "first transient rate limit", selector: "--first", firstStatus: http.StatusTooManyRequests, firstFailures: 1, wantFirst: 2, chapters: []string{"1"}},
+		{name: "all persistent rate limit", selector: "--all", firstStatus: http.StatusTooManyRequests, firstFailures: 10, wantFirst: 3, chapters: []string{"2"}, wantError: "failed to download chapters: 1"},
+		{name: "all permanent failure", selector: "--all", firstStatus: http.StatusNotFound, firstFailures: 10, wantFirst: 1, chapters: []string{"2"}, wantError: "failed to download chapters: 1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var imageBytes bytes.Buffer
+			require.NoError(t, png.Encode(&imageBytes, image.NewRGBA(image.Rect(0, 0, 1, 1))))
+			var firstAttempts atomic.Int32
+			var secondAttempts atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/gist":
+					fmt.Fprintf(w, `{"title":"Fixture","chapters":{
+						"1":{"groups":{"test":["http://%s/1.png"]}},
+						"2":{"groups":{"test":["http://%s/2.png"]}}
+					}}`, r.Host, r.Host)
+				case "/1.png", "/2.png":
+					if r.URL.Path == "/1.png" {
+						if firstAttempts.Add(1) <= tc.firstFailures {
+							w.Header().Set("Retry-After", "0")
+							w.WriteHeader(tc.firstStatus)
+							return
+						}
+					} else {
+						secondAttempts.Add(1)
+					}
+					w.Header().Set("Content-Type", "image/png")
+					_, _ = w.Write(imageBytes.Bytes())
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+
+			directory := t.TempDir()
+			root := NewRootCommand()
+			root.SetOut(io.Discard)
+			root.SetErr(io.Discard)
+			root.SetArgs([]string{"download", "-d", directory, "-s", "cubari", "-m", server.URL + "/gist", "-g", "test", "-n", "Chapter {num}", tc.selector})
+			err := root.ExecuteContext(t.Context())
+			if tc.wantError != "" {
+				require.EqualError(t, err, tc.wantError)
+				require.NoFileExists(t, filepath.Join(directory, "Fixture", "Chapter 1.cbz"))
+			} else {
+				require.NoError(t, err, "transient throttling must not leave selected chapters failed")
+			}
+			require.Equal(t, tc.wantFirst, firstAttempts.Load())
+			if tc.selector == "--first" {
+				require.Zero(t, secondAttempts.Load())
+			} else {
+				require.Equal(t, int32(1), secondAttempts.Load())
+			}
+			for _, number := range tc.chapters {
+				archive, err := zip.OpenReader(filepath.Join(directory, "Fixture", "Chapter "+number+".cbz"))
+				require.NoError(t, err)
+				require.Len(t, archive.File, 1)
+				require.Equal(t, "001.png", archive.File[0].Name)
+				require.NoError(t, archive.Close())
+			}
+		})
+	}
+}

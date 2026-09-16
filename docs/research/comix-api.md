@@ -134,7 +134,7 @@ Comix is served through Cloudflare. Pages include Cloudflare challenge code, and
 
 No rate-limit policy or quota was found. Sample `200`, `403`, and `404` responses did not include standard limit, remaining, reset, or `Retry-After` headers. The frontend has a generic message for HTTP `429`, but it does not document when Comix returns it. No load test was run. [Current main bundle](https://comix.to/assets/build/35595e3de3c99889c1aa70/dist/main-tjdqki-DltojfL5.js)
 
-An adapter must use low concurrency, cache title and chapter results, stop on `403` and `429`, and avoid retry storms. Mangarr already treats `403` and `429` as unrecoverable in `internal/sharedhttp`.
+At research time, the recommendation was low concurrency, caching title and chapter results, and stopping on `403` and `429` to avoid retry storms. Both statuses were then unrecoverable in `internal/sharedhttp`. The later [bulk reliability change](../exec-plans/completed/2026-09-16-bulk-rate-limit-reliability.md) keeps `403` terminal but introduces bounded, server-guided `429` retries; see the [current policy](../USAGE.md#bulk-downloads-and-rate-limits). This is a Mangarr policy change, not new evidence about Comix quotas.
 
 ## Legal and operational risks
 
@@ -172,6 +172,6 @@ Keep Comix enabled only while these conditions remain true:
 
 1. Fixed vectors continue to match the current frontend request and image algorithms.
 2. The API response shapes remain compatible with the adapter fixtures.
-3. `403` and `429` remain unrecoverable, so protocol drift and rate limits do not cause retry storms.
+3. `403` remains unrecoverable; `429` follows the bounded shared retry policy rather than unbounded retries or bypassing server guidance.
 4. A live smoke test can fetch metadata, paginate chapters, download every page, reconstruct scrambled pages, and open the final archive.
 5. User documentation continues to warn that Comix uses a private protocol and can require prompt adapter updates.

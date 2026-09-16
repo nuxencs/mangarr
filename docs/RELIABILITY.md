@@ -12,7 +12,8 @@ Verified on 2026-08-07.
 
 ## Existing Controls
 
-- shared retry policy in `internal/sharedhttp/`
+- shared retry policy in `internal/sharedhttp/`, including bounded HTTP 429 retries
+  and cancellable `Retry-After` waits (see [usage](./USAGE.md#bulk-downloads-and-rate-limits))
 - bounded chapter, source, and image concurrency
 - one shared acquisition policy for download and monitor
 - [existing-archive policy](./USAGE.md#download)
@@ -34,6 +35,8 @@ Verified on 2026-08-07.
 
 ## Reliability Gaps
 
+- retries do not coordinate a host-wide cooldown; sustained limits can exhaust the budget
+- Colly discovery/page requests do not use the shared retry policy
 - no automatic live-source smoke suite
 - no recurring docs/source drift audit
 - monitor mode lacks a formal operator runbook

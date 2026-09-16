@@ -63,8 +63,10 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
   - image downloads: `maxConcurrentImageDownloads`
 - Retry policy:
   - shared in `internal/sharedhttp/`
-  - retries transport failures and `500/502/503/504`
-  - fails fast on `404/429/401/403/405`
+  - shared direct HTTP and image requests retry transport failures and `429/500/502/503/504`
+  - three attempts total; exponential backoff with jitter respects `Retry-After`
+  - server guidance above five minutes fails rather than retrying too soon
+  - fails fast on `404/401/403/405`; Colly scraper requests have separate handling
 
 ## Hotspots
 

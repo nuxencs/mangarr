@@ -36,7 +36,7 @@ func CheckStatusCode(statusCode int) error {
 	case http.StatusOK:
 
 	case http.StatusTooManyRequests:
-		return retry.Unrecoverable(fmt.Errorf("too many requests: status code %d", statusCode))
+		return fmt.Errorf("too many requests: status code %d", statusCode)
 
 	case http.StatusUnauthorized, http.StatusForbidden:
 		return retry.Unrecoverable(fmt.Errorf("authentication error: status code %d", statusCode))
@@ -67,6 +67,16 @@ func ExecRequest(client http.Client, req *http.Request) (http.Response, error) {
 		_ = resp.Body.Close()
 		if !retry.IsRecoverable(err) {
 			return http.Response{}, err
+		}
+
+		if delay, ok := parseRetryAfter(resp.Header.Get("Retry-After"), time.Now()); ok {
+			if delay > RetryMaxDelay {
+				return http.Response{}, retry.Unrecoverable(fmt.Errorf(
+					"checking status code: %w; Retry-After %q exceeds maximum wait %s",
+					err, resp.Header.Get("Retry-After"), RetryMaxDelay,
+				))
+			}
+			err = &retryAfterError{err: err, delay: delay}
 		}
 
 		return http.Response{}, fmt.Errorf("checking status code: %w", err)

@@ -76,6 +76,31 @@ mangarr download -d ./downloads -s asurascans -m "https://asurascans.com/comics/
 mangarr download -d ./downloads -s atsumaru -m "https://atsu.moe/manga/Q5Mqy" -g "cmgzlsevifjhtm191rqugvee3" -L
 ```
 
+#### Bulk downloads and rate limits
+
+`--all` keeps the same chapter selection and skip-on-existing behavior. If a run
+fails, rerun it to download missing chapters without replacing existing archives.
+
+Image downloads and adapters using shared direct HTTP retry transport failures,
+HTTP 429, and HTTP 500/502/503/504, with **three attempts total per request**.
+Between retries, the fallback wait is one second, then two seconds, each with up
+to 250 ms of jitter. A valid `Retry-After` header (seconds or HTTP date) extends
+that wait when needed; zero, expired, missing, or malformed guidance never
+shortens the fallback wait.
+
+A server-directed wait above five minutes fails with an explanation instead of
+retrying before the server permits it or waiting indefinitely. Cancellation
+interrupts retry waits. Exhausted retries still report the failing chapter and
+make `download` return a nonzero status; partial chapters are not published.
+HTTP 401/403/404/405 and other non-retryable statuses still fail immediately.
+
+This policy also applies to shared HTTP requests in monitor mode. It adds no
+config or CLI settings and does not change concurrency or monitor polling.
+It does not coordinate a provider-wide cooldown across requests or processes;
+persistent limits can still fail after the retry budget. Colly-based HTML
+scraping has separate request handling; its discovery/page requests do not gain
+these retries, although its image downloads do.
+
 ### `monitor`
 
 Run mangarr as a long-lived watcher that checks configured series on an interval.
