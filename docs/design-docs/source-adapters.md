@@ -41,7 +41,7 @@ All adapters implement the small `domain.Source` contract:
 - Comix scramble hashes are opaque routing keys. The two known legacy hashes select explicit seed prefixes; unknown hashes use prefix zero, matching the frontend fallback.
 - `atsumaru` fetches chapter metadata from `/api/manga/info`, filters chapters by scan ID, and resolves relative page paths from `/api/read/chapter`
 - source-specific image transforms use `domain.ImageProcessor`; the acquisition path owns transport and output while the source adapter owns the transform
-- shared request retries use `internal/sharedhttp/`; see the [retry policy and scraper limitations](../USAGE.md#bulk-downloads-and-rate-limits)
+- shared request retries use `internal/sharedhttp/`; see the [retry policy and scraper limitations](./runtime-model.md#http-retry-lifecycle)
 - Manga Plus request errors omit query strings so registration and device secrets do not enter logs
 - HTTP and Colly-backed requests inherit caller cancellation
 - fixture-backed parser flows cover every supported source
