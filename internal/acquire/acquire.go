@@ -34,6 +34,7 @@ type Request struct {
 	DownloadDirectory string
 	NamingTemplate    string
 	TitleOverride     string
+	Force             bool
 }
 
 type Result struct {
@@ -54,8 +55,10 @@ func Chapter(ctx context.Context, log zerolog.Logger, request Request) (Result, 
 	result := Result{Name: name, Path: archivePath}
 
 	if _, err := os.Stat(archivePath); err == nil {
-		result.Status = Skipped
-		return result, nil
+		if !request.Force {
+			result.Status = Skipped
+			return result, nil
+		}
 	} else if !os.IsNotExist(err) {
 		return result, fmt.Errorf("checking archive %s: %w", archivePath, err)
 	}
@@ -73,7 +76,9 @@ func Chapter(ctx context.Context, log zerolog.Logger, request Request) (Result, 
 		archivePath,
 		request.Chapter,
 		manga.IsManhwa,
-		files.CreateCbzArchive,
+		func(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bool) error {
+			return files.CreateCbzArchive(ctx, log, sourceDir, cbzPath, isManhwa)
+		},
 	); err != nil {
 		return result, fmt.Errorf("downloading chapter %q: %w", name, err)
 	}

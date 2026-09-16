@@ -134,6 +134,7 @@ func newDownloadCommand(options *downloadOptions) *cobra.Command {
 						DownloadDirectory: options.downloadDirectory,
 						NamingTemplate:    options.naming,
 						TitleOverride:     options.overwrite,
+						Force:             options.force,
 					})
 					if err != nil {
 						log.Error().Err(err).Msgf("Failed to acquire chapter %s", selectedChapter.Number)

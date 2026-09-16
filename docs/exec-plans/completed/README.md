@@ -2,6 +2,8 @@
 
 Completed plans kept in-repo:
 
+- [force-download.md](./force-download.md)
+
 - [2026-03-07-chapter-number-refactor.md](./2026-03-07-chapter-number-refactor.md)
 - [2026-03-07-doc-knowledge-base-restructure.md](./2026-03-07-doc-knowledge-base-restructure.md)
 - [2026-03-22-asurascans-provider-repair.md](./2026-03-22-asurascans-provider-repair.md)

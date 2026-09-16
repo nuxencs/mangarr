@@ -87,6 +87,53 @@ func TestChapterReturnsPageResolutionErrorWithoutPublishingArchive(t *testing.T)
 	require.Empty(t, entries)
 }
 
+func TestForcedReplacementFailurePreservesArchive(t *testing.T) {
+	for _, failure := range []string{"pages", "fetch", "assembly", "cancelled"} {
+		t.Run(failure, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if failure == "cancelled" {
+					cancel()
+					<-r.Context().Done()
+					return
+				}
+				if failure == "fetch" {
+					http.NotFound(w, r)
+					return
+				}
+				w.Header().Set("Content-Type", "image/png")
+				_, _ = w.Write([]byte("invalid image data"))
+			}))
+			defer server.Close()
+			source := &pageSource{pages: []domain.ImageInfo{{ImageURL: server.URL}}}
+			if failure == "pages" {
+				source.err = context.Canceled
+			}
+			request := Request{
+				Source: source, Manga: domain.Manga{Title: "Fixture"},
+				Chapter:           domain.Chapter{Number: mustChapterNumber("1")},
+				DownloadDirectory: t.TempDir(), NamingTemplate: "{num}", Force: true,
+			}
+			path := filepath.Join(request.DownloadDirectory, "Fixture", "1.cbz")
+			require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+			require.NoError(t, os.WriteFile(path, []byte("original archive"), 0o644))
+			_, err := Chapter(ctx, zerolog.Nop(), request)
+			require.Error(t, err)
+			if failure == "cancelled" || failure == "pages" {
+				require.ErrorIs(t, err, context.Canceled)
+			}
+			require.Equal(t, 1, source.calls)
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+			require.Equal(t, "original archive", string(data))
+			entries, err := os.ReadDir(filepath.Dir(path))
+			require.NoError(t, err)
+			require.Len(t, entries, 1, "failed replacement must not leave temporary archives")
+		})
+	}
+}
+
 type pageSource struct {
 	pages []domain.ImageInfo
 	err   error

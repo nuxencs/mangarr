@@ -2,6 +2,7 @@ package files
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"image"
 	"image/color"
@@ -40,7 +41,7 @@ func TestCreateCbzArchiveFlushesOutput(t *testing.T) {
 	}
 
 	outPath := filepath.Join(tmpDir, "out.cbz")
-	if err := CreateCbzArchive(zerolog.Nop(), sourceDir, outPath, false); err != nil {
+	if err := CreateCbzArchive(t.Context(), zerolog.Nop(), sourceDir, outPath, false); err != nil {
 		t.Fatalf("create cbz: %v", err)
 	}
 
@@ -64,7 +65,7 @@ func TestCreateCbzArchiveDoesNotPublishEmptyArchive(t *testing.T) {
 		t.Fatalf("mkdir empty source: %v", err)
 	}
 	outPath := filepath.Join(tmpDir, "out.cbz")
-	err := CreateCbzArchive(zerolog.Nop(), sourceDir, outPath, false)
+	err := CreateCbzArchive(t.Context(), zerolog.Nop(), sourceDir, outPath, false)
 
 	if err == nil {
 		t.Fatal("expected empty source directory to fail")
@@ -79,7 +80,7 @@ func TestPublishFileAtomicallyRemovesPartialOutput(t *testing.T) {
 
 	destination := filepath.Join(t.TempDir(), "chapter.cbz")
 	wantErr := errors.New("simulated write failure")
-	err := publishFileAtomically(destination, func(writer io.Writer) error {
+	err := publishFileAtomically(t.Context(), destination, func(writer io.Writer) error {
 		if _, err := writer.Write([]byte("partial archive")); err != nil {
 			return err
 		}
@@ -99,6 +100,60 @@ func TestPublishFileAtomicallyRemovesPartialOutput(t *testing.T) {
 	}
 	if len(matches) != 0 {
 		t.Fatalf("temporary files remain after failure: %v", matches)
+	}
+}
+
+func TestAtomicReplacementPreservesOriginalUntilPublication(t *testing.T) {
+	for _, outcome := range []string{"success", "write failure", "cancelled"} {
+		t.Run(outcome, func(t *testing.T) {
+			destination := filepath.Join(t.TempDir(), "chapter.cbz")
+			if err := os.WriteFile(destination, []byte("original"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			writeErr := errors.New("assembly failed")
+			err := publishFileAtomically(ctx, destination, func(writer io.Writer) error {
+				if _, err := writer.Write([]byte("replacement")); err != nil {
+					return err
+				}
+				data, err := os.ReadFile(destination)
+				if err != nil || string(data) != "original" {
+					t.Fatalf("original changed during assembly: %q, %v", data, err)
+				}
+				if outcome == "write failure" {
+					return writeErr
+				}
+				if outcome == "cancelled" {
+					cancel()
+				}
+				return nil
+			})
+			want := "original"
+			switch outcome {
+			case "success":
+				want = "replacement"
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "write failure":
+				if !errors.Is(err, writeErr) {
+					t.Fatalf("error = %v", err)
+				}
+			case "cancelled":
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("error = %v", err)
+				}
+			}
+			data, err := os.ReadFile(destination)
+			if err != nil || string(data) != want {
+				t.Fatalf("archive = %q, %v; want %q", data, err, want)
+			}
+			entries, err := os.ReadDir(filepath.Dir(destination))
+			if err != nil || len(entries) != 1 {
+				t.Fatalf("temporary archives remain: %v, %v", entries, err)
+			}
+		})
 	}
 }
 

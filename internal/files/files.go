@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bufio"
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"image"
@@ -46,7 +47,12 @@ func IsValidLocation(location string) error {
 }
 
 // CreateCbzArchive creates a zip (.cbz) archive from the images in sourceDir.
-func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bool) error {
+// It preserves the destination until assembly succeeds and cancellation is
+// checked immediately before publication.
+func CreateCbzArchive(ctx context.Context, log zerolog.Logger, sourceDir, cbzPath string, isManhwa bool) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(cbzPath), os.ModePerm); err != nil {
 		return fmt.Errorf("creating destination dir: %w", err)
 	}
@@ -60,6 +66,9 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	if walkErr := filepath.WalkDir(sourceDir, func(path string, d os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
+		}
+		if err := ctx.Err(); err != nil {
+			return err
 		}
 		if d.IsDir() {
 			return nil
@@ -127,9 +136,13 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 		return fmt.Errorf("creating archive: no images to write")
 	}
 
-	if err := publishFileAtomically(cbzPath, func(destination io.Writer) error {
+	if err := publishFileAtomically(ctx, cbzPath, func(destination io.Writer) error {
 		zipWriter := zip.NewWriter(destination)
 		for _, img := range selectedImages {
+			if err := ctx.Err(); err != nil {
+				_ = zipWriter.Close()
+				return err
+			}
 			if err := addFileToZip(zipWriter, img.path, img.name); err != nil {
 				_ = zipWriter.Close()
 				return err
@@ -148,7 +161,7 @@ func CreateCbzArchive(log zerolog.Logger, sourceDir, cbzPath string, isManhwa bo
 	return nil
 }
 
-func publishFileAtomically(destinationPath string, write func(io.Writer) error) (err error) {
+func publishFileAtomically(ctx context.Context, destinationPath string, write func(io.Writer) error) (err error) {
 	destinationDir := filepath.Dir(destinationPath)
 	tmpFile, err := os.CreateTemp(destinationDir, "."+filepath.Base(destinationPath)+".tmp-*")
 	if err != nil {
@@ -177,6 +190,9 @@ func publishFileAtomically(destinationPath string, write func(io.Writer) error) 
 	}
 	if err := tmpFile.Close(); err != nil {
 		return fmt.Errorf("closing temporary file: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if err := os.Rename(tmpPath, destinationPath); err != nil {
 		return fmt.Errorf("renaming temporary file: %w", err)

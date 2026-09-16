@@ -60,6 +60,14 @@ mangarr download --help
 mangarr download -d ./downloads -s tcbscans -m "One Piece"
 ```
 
+Existing archives are skipped by default. To repair selected chapters, re-download them with `-f` / `--force`:
+
+```bash
+mangarr download -d ./downloads -s tcbscans -m "One Piece" -C "6,17" --force
+```
+
+The old archive is kept until its replacement is successfully downloaded and assembled. Force applies only to the selected chapters (the latest chapter if no selector is supplied).
+
 The command returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
 
 If you want a different source, the value you pass to `-m` changes by provider. Use the table below.

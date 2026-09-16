@@ -25,6 +25,7 @@ Common flags:
 | `-l`, `--language` | language code for sources that support it; default `en` |
 | `-n`, `--naming` | filename template |
 | `-o`, `--overwrite` | replace the parsed manga title in the output filename |
+| `-f`, `--force` | re-download selected chapters even if their archives already exist |
 
 Chapter selection flags are mutually exclusive:
 
@@ -32,6 +33,8 @@ Chapter selection flags are mutually exclusive:
 - `-1`, `--first`: first chapter
 - `-C`, `--chapters`: specific chapters or ranges such as `1,3,5` or `1-10`
 - `-A`, `--all`: all available chapters
+
+Existing archives are skipped unless `-f` / `--force` is supplied. Force works with any chapter selector and defaults to the latest chapter when none is supplied; it does not scan or replace unrelated library archives. Each old archive remains in place until the replacement is downloaded and assembled successfully. Failed or cancelled replacements preserve the old archive. Monitor mode still skips existing archives and has no force option. The `--overwrite` flag only changes the manga title; it does not force a download.
 
 The command returns status 0 when all requested chapters are downloaded or already exist. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
 
@@ -46,6 +49,9 @@ mangarr download -d ./downloads -s mangadex -m "801513ba-a712-498c-8f57-cae55b38
 
 # Specific chapters from MANGA Plus
 mangarr download -d ./downloads -s mangaplus -m "100037" -C "6,17"
+
+# Repair selected chapters already on disk
+mangarr download -d ./downloads -s tcbscans -m "One Piece" -C "6,17" --force
 
 # Chapter range from Cubari
 mangarr download -d ./downloads -s cubari -m "https://git.io/OPM" -g "/r/OnePunchMan" -C "1-3"
