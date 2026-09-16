@@ -69,6 +69,9 @@ mangarr download -d ./downloads -s tcbscans -m "One Piece" -C "6,17" --force
 See the [download reference](./docs/USAGE.md#download) for archive matching and replacement safeguards.
 
 The command returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
+Transient HTTP rate limits during image downloads are retried automatically, including
+with `--all`. Retries are bounded and respect `Retry-After`; see
+[bulk downloads and rate limits](./docs/USAGE.md#bulk-downloads-and-rate-limits).
 
 If you want a different source, the value you pass to `-m` changes by provider. Use the table below.
 

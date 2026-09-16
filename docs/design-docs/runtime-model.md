@@ -32,6 +32,12 @@ temporary file, checks cancellation, and renames the file into place.
 
 Each layer has an explicit concurrency limit. The code favors bounded parallelism over unbounded goroutine fan-out.
 
+## HTTP Retry Lifecycle
+
+`internal/sharedhttp/` owns the request retry implementation. See the
+[request retry policy and limits](../USAGE.md#bulk-downloads-and-rate-limits)
+for command coverage, cancellation, and scraper limitations.
+
 ## Config Lifecycle
 
 - defaults are embedded in Go structs/template text

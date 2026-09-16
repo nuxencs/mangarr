@@ -61,10 +61,8 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
   - chapter jobs: `maxConcurrentChapterProcesses`
   - monitor source jobs: `maxConcurrentSourceProcesses`
   - image downloads: `maxConcurrentImageDownloads`
-- Retry policy:
-  - shared in `internal/sharedhttp/`
-  - retries transport failures and `500/502/503/504`
-  - fails fast on `404/429/401/403/405`
+- Retry policy: shared in `internal/sharedhttp/`; see the
+  [request retry policy and limits](./docs/USAGE.md#bulk-downloads-and-rate-limits).
 
 ## Hotspots
 

@@ -40,7 +40,7 @@ func TestExecRequestDoesNotRetryOnNotFound(t *testing.T) {
 	require.Equal(t, int32(1), attempts.Load())
 }
 
-func TestExecRequestDoesNotRetryOnTooManyRequests(t *testing.T) {
+func TestExecRequestBoundsRetriesOnTooManyRequests(t *testing.T) {
 	t.Parallel()
 
 	var attempts atomic.Int32
@@ -65,7 +65,7 @@ func TestExecRequestDoesNotRetryOnTooManyRequests(t *testing.T) {
 	}, RetryOptions(t.Context())...)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "too many requests")
-	require.Equal(t, int32(1), attempts.Load())
+	require.Equal(t, int32(RetryAttempts), attempts.Load())
 }
 
 func TestExecRequestRetriesOnServerError(t *testing.T) {
