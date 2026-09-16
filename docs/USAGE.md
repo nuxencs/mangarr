@@ -82,7 +82,7 @@ mangarr download -d ./downloads -s atsumaru -m "https://atsu.moe/manga/Q5Mqy" -g
 fails, rerun it to download missing chapters without replacing existing archives.
 
 Image downloads and adapters using shared direct HTTP retry transport failures,
-HTTP 429, and HTTP 500/502/503/504, with **three attempts total per request**.
+HTTP 429, and HTTP 500/502/503/504, with **up to three attempts total per request**.
 Between retries, the fallback wait is one second, then two seconds, each with up
 to 250 ms of jitter. A valid `Retry-After` header (seconds or HTTP date) extends
 that wait when needed; zero, expired, missing, or malformed guidance never
