@@ -59,6 +59,28 @@ func TestFirstExistingConfigUsesLocationOrder(t *testing.T) {
 	}
 }
 
+func TestLoadCreatesSampleConfig(t *testing.T) {
+	destination := t.TempDir()
+	t.Setenv("MANGARR__DOWNLOAD_LOCATION", destination)
+	dir := filepath.Join(t.TempDir(), "new-config")
+
+	cfg, err := Load(dir, "test")
+	if err != nil {
+		t.Fatalf("load sample config: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "config.yaml")); err != nil {
+		t.Fatalf("sample config was not created: %v", err)
+	}
+	snapshot := cfg.Snapshot()
+	if snapshot.DownloadLocation != destination {
+		t.Fatalf("download location = %q, want %q", snapshot.DownloadLocation, destination)
+	}
+	entry := snapshot.MonitoredManga["One Piece"]
+	if entry == nil || entry.Source != "tcbscans" || entry.Manga != "One Piece" {
+		t.Fatalf("sample entry = %#v, want One Piece from tcbscans", entry)
+	}
+}
+
 func TestLoadRejectsInvalidCheckInterval(t *testing.T) {
 	dir := t.TempDir()
 	writeTestConfig(t, dir, `downloadLocation: "`+dir+`"

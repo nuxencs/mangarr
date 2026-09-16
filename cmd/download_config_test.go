@@ -173,6 +173,42 @@ func TestDownloadConfiguredSeriesInvalidInput(t *testing.T) {
 	}
 }
 
+func TestDownloadConfiguredSeriesRequiresExistingConfig(t *testing.T) {
+	for _, withEnvironment := range []bool{false, true} {
+		for _, missingDirectory := range []bool{false, true} {
+			t.Run(fmt.Sprintf("environment=%t/missingDirectory=%t", withEnvironment, missingDirectory), func(t *testing.T) {
+				destination := t.TempDir()
+				t.Setenv("MANGARR__DOWNLOAD_LOCATION", "")
+				if withEnvironment {
+					t.Setenv("MANGARR__DOWNLOAD_LOCATION", destination)
+				}
+				configDir := t.TempDir()
+				if missingDirectory {
+					configDir = filepath.Join(configDir, "typo")
+				}
+				selected := false
+				deps := defaultDependencies()
+				deps.selectSource = func(domain.MonitoredManga) (domain.Source, error) {
+					selected = true
+					return nil, errors.New("unexpected source selection")
+				}
+				root := newRootCommand(deps)
+				root.SetErr(io.Discard)
+				root.SetArgs([]string{"download", "-c", configDir, "--series", "One Piece", "-C", "1"})
+				err := root.Execute()
+				require.ErrorIs(t, err, os.ErrNotExist)
+				require.ErrorContains(t, err, `loading config for series "One Piece"`)
+				require.ErrorContains(t, err, filepath.Join(configDir, "config.yaml"))
+				require.False(t, selected)
+				require.NoFileExists(t, filepath.Join(configDir, "config.yaml"))
+				if missingDirectory {
+					require.NoDirExists(t, configDir)
+				}
+			})
+		}
+	}
+}
+
 func TestDownloadExplicitInputsIgnoreConfig(t *testing.T) {
 	fake := &configuredDownloadSource{discoveryError: errors.New("offline discovery reached")}
 	deps := defaultDependencies()
@@ -218,6 +254,7 @@ func (s *configuredDownloadSource) Discover(context.Context) (domain.Manga, erro
 	}
 	return manga, s.discoveryError
 }
+
 func (*configuredDownloadSource) Pages(context.Context, domain.Chapter) ([]domain.ImageInfo, error) {
 	return nil, errors.New("unexpected page resolution")
 }

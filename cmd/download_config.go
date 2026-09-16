@@ -18,7 +18,7 @@ func resolveDownloadOptions(cmd *cobra.Command, configPath string, options *down
 		return fmt.Errorf("--series requires a configured entry name")
 	}
 
-	cfg, err := config.Load(configPath, buildinfo.Version)
+	cfg, err := config.LoadExisting(configPath, buildinfo.Version)
 	if err != nil {
 		return fmt.Errorf("loading config for series %q: %w", options.series, err)
 	}

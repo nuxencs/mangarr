@@ -48,6 +48,8 @@ Quote names containing spaces. `--series` matches the config key, not the provid
 manga title. It uses the same config discovery, environment overrides, and full
 config validation as `monitor` (including a nonempty `downloadLocation`). It reads
 one snapshot without starting monitoring, watching, or rewriting the config.
+The config file must already exist. A missing selected config causes an error
+without creating a sample config, even when `MANGARR__DOWNLOAD_LOCATION` is set.
 
 The entry supplies `source`, `manga`, `group`, `language`, and `overwrite`; global
 `downloadLocation` and `namingTemplate` supply the output settings. Omitted entry

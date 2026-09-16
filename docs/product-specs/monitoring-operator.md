@@ -25,3 +25,4 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - atomic replacement and delete-then-recreate saves do not stop future reloads
 - config lookup follows the documented operating-system and binary locations
 - operators can reuse a `monitoredManga` entry for one-shot downloads with `download --series "Name" -C "1-3"`; explicit flags override entry/output settings without changing the config or starting monitoring
+- one-shot downloads require an existing config; missing configs fail without creating sample presets, including when environment overrides are set
