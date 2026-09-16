@@ -110,15 +110,14 @@ mangarr download -d ./downloads -s atsumaru -m "https://atsu.moe/manga/Q5Mqy" -g
 
 #### Bulk downloads and rate limits
 
-`--all` keeps the same chapter selection and skip-on-existing behavior. Without
-`--force`, completed archives are skipped. If a run fails, wait and rerun the
-same command to download missing chapters without replacing existing archives.
+If a bulk download fails because a source is busy or temporarily unavailable,
+wait and rerun the command without `--force` to fetch missing chapters. See the
+[existing-archive rules](#download) for skip and replacement behavior.
 
 Sources can limit traffic or become temporarily unavailable. Rate-limit handling
 varies by source and request type, so a persistent limit or a failure during
-source discovery may still require waiting before you try again. A failed
-`download` reports the affected chapter and returns a nonzero status; partial
-chapters are not published.
+source discovery may still require waiting before you try again. A chapter
+download failure reports the affected chapter; partial chapters are not published.
 
 ### `monitor`
 

@@ -14,7 +14,7 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - manga and configured source identifiers on every monitor-check failure
 - safe handling of flaky or drifting sources
 - bounded, cancellable recovery from HTTP rate limits in shared image/direct-HTTP
-  requests; see [retry policy](../USAGE.md#bulk-downloads-and-rate-limits)
+  requests; see [retry policy](../design-docs/runtime-model.md#http-retry-lifecycle)
 
 ## Acceptance Bar
 

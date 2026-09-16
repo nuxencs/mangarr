@@ -68,7 +68,7 @@ mangarr download -d ./downloads -s tcbscans -m "One Piece" -C "6,17" --force
 
 See the [download reference](./docs/USAGE.md#download) for archive matching and replacement safeguards.
 
-The command returns a nonzero status when setup, discovery, selection, or any requested chapter download fails. If a bulk download fails because a source is busy or temporarily unavailable, wait and rerun the same command. Without `--force`, completed archives are skipped, so reruns fetch missing chapters without replacing existing files. See the [bulk download and rate-limit guidance](./docs/USAGE.md#bulk-downloads-and-rate-limits) for recovery steps.
+If a bulk download fails, see the [bulk download and rate-limit guidance](./docs/USAGE.md#bulk-downloads-and-rate-limits) for recovery steps.
 
 If you want a different source, the value you pass to `-m` changes by provider. Use the table below.
 
@@ -118,7 +118,7 @@ If you omit it, mangarr also checks common default locations. Full config and ov
 | [Comix](https://comix.to/) | `comix` | full `https://comix.to/title/...` URL | optional `-g` numeric group ID |
 | [Atsumaru](https://atsu.moe/) | `atsumaru` | full `https://atsu.moe/manga/...` URL | required `-g` scan ID |
 
-Comix depends on the provider's current frontend. A Comix frontend update can require a Mangarr update.
+See [Comix source guidance](./docs/USAGE.md#source-inputs) for update limitations and group selection.
 
 ## More Docs
 
