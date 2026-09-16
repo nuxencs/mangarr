@@ -110,28 +110,15 @@ mangarr download -d ./downloads -s atsumaru -m "https://atsu.moe/manga/Q5Mqy" -g
 
 #### Bulk downloads and rate limits
 
-`--all` keeps the same chapter selection and skip-on-existing behavior. If a run
-fails, rerun it to download missing chapters without replacing existing archives.
+`--all` keeps the same chapter selection and skip-on-existing behavior. Without
+`--force`, completed archives are skipped. If a run fails, wait and rerun the
+same command to download missing chapters without replacing existing archives.
 
-Image downloads and adapters using shared direct HTTP retry transport failures,
-HTTP 429, and HTTP 500/502/503/504, with **up to three attempts total per request**.
-Between retries, the fallback wait is one second, then two seconds, each with up
-to 250 ms of jitter. A valid `Retry-After` header (seconds or HTTP date) extends
-that wait when needed; zero, expired, missing, or malformed guidance never
-shortens the fallback wait.
-
-A server-directed wait above five minutes fails with an explanation instead of
-retrying before the server permits it or waiting indefinitely. Cancellation
-interrupts retry waits. Exhausted retries still report the failing chapter and
-make `download` return a nonzero status; partial chapters are not published.
-HTTP 401/403/404/405 and other non-retryable statuses still fail immediately.
-
-This policy also applies to shared HTTP requests in monitor mode. It adds no
-config or CLI settings and does not change concurrency or monitor polling.
-It does not coordinate a provider-wide cooldown across requests or processes;
-persistent limits can still fail after the retry budget. Colly-based HTML
-scraping has separate request handling; its discovery/page requests do not gain
-these retries, although its image downloads do.
+Sources can limit traffic or become temporarily unavailable. Rate-limit handling
+varies by source and request type, so a persistent limit or a failure during
+source discovery may still require waiting before you try again. A failed
+`download` reports the affected chapter and returns a nonzero status; partial
+chapters are not published.
 
 ### `monitor`
 
@@ -237,9 +224,7 @@ mangarr version
 | [Comix](https://comix.to/) | `comix` | full `https://comix.to/title/...` URL | optional `-g` numeric group ID |
 | [Atsumaru](https://atsu.moe/) | `atsumaru` | full `https://atsu.moe/manga/...` URL | required `-g` scan ID |
 
-Comix uses a private frontend protocol. Mangarr generates request tokens, decodes API responses, sends the required image referer, and reconstructs scrambled image tiles. A Comix frontend update can require a Mangarr update. Use `-g` when a title has duplicate chapter numbers from different groups.
-
-For implementation-level source behavior and validation rules, see [design-docs/source-adapters.md](./design-docs/source-adapters.md).
+Comix depends on the provider's current frontend. A Comix frontend update can require a Mangarr update. Use `-g` when a title has duplicate chapter numbers from different groups.
 
 ## Naming Templates
 
