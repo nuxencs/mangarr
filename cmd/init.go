@@ -12,6 +12,7 @@ type rootOptions struct {
 }
 
 type downloadOptions struct {
+	series            string
 	naming            string
 	downloadDirectory string
 	mangaSource       string
@@ -37,6 +38,7 @@ func initRootFlags(root *cobra.Command, options *rootOptions) {
 }
 
 func initDownloadFlags(download *cobra.Command, options *downloadOptions) {
+	download.Flags().StringVar(&options.series, "series", "", "select a monitoredManga config entry by exact name; explicit flags override its settings")
 	download.Flags().StringVarP(
 		&options.downloadDirectory,
 		"downloadDirectory",
@@ -132,7 +134,7 @@ func initDownloadFlags(download *cobra.Command, options *downloadOptions) {
 	download.MarkFlagsMutuallyExclusive("all", "first")
 	download.MarkFlagsMutuallyExclusive("all", "latest")
 
-	_ = download.MarkFlagRequired("downloadDirectory")
-	_ = download.MarkFlagRequired("source")
-	_ = download.MarkFlagRequired("manga")
+	download.MarkFlagsOneRequired("series", "downloadDirectory")
+	download.MarkFlagsOneRequired("series", "source")
+	download.MarkFlagsOneRequired("series", "manga")
 }

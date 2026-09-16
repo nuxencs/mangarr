@@ -92,6 +92,15 @@ Run the monitor:
 mangarr monitor -c ~/.config/mangarr
 ```
 
+Reuse a configured entry for a one-off chapter range:
+
+```bash
+mangarr download -c ~/.config/mangarr --series "One Piece" -C "1-3"
+```
+
+See [configured series downloads](./docs/USAGE.md#download-a-configured-series)
+for config requirements and flag overrides.
+
 `-c` should point to the directory that contains `config.yaml`.
 If you omit it, mangarr also checks common default locations. Full config and override details live in [docs/USAGE.md](./docs/USAGE.md).
 

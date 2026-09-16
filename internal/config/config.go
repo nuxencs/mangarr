@@ -58,7 +58,8 @@ pprofEnabled: false
 pprofAddress: "127.0.0.1:6060"
 
 # Monitored Manga
-# Here you can define which manga you want to monitor
+# Define manga to monitor or select by name for a one-off download:
+# mangarr download -c . --series "One Piece" -C "1-3"
 #
 monitoredManga:
   # Custom name you can give the entry to easily distinguish between them
@@ -207,6 +208,16 @@ type AppConfig struct {
 }
 
 func Load(configPath string, version string) (*AppConfig, error) {
+	if configPath != "" {
+		if err := writeConfig(filepath.Clean(configPath), "config.yaml"); err != nil {
+			return nil, fmt.Errorf("writing config template: %w", err)
+		}
+	}
+
+	return LoadExisting(configPath, version)
+}
+
+func LoadExisting(configPath string, version string) (*AppConfig, error) {
 	configFile, err := resolveConfigFile(configPath)
 	if err != nil {
 		return nil, err
@@ -238,12 +249,7 @@ func defaultConfig(version, configFile string) domain.Config {
 
 func resolveConfigFile(configPath string) (string, error) {
 	if configPath != "" {
-		cleanPath := filepath.Clean(configPath)
-		if err := writeConfig(cleanPath, "config.yaml"); err != nil {
-			return "", fmt.Errorf("writing config template: %w", err)
-		}
-
-		return filepath.Join(cleanPath, "config.yaml"), nil
+		return filepath.Join(filepath.Clean(configPath), "config.yaml"), nil
 	}
 
 	var userConfigDir, homeDir, executablePath string

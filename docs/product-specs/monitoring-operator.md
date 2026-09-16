@@ -24,3 +24,4 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - invalid reloads keep the last valid config snapshot active
 - atomic replacement and delete-then-recreate saves do not stop future reloads
 - config lookup follows the documented operating-system and binary locations
+- operators can reuse entries for one-shot downloads as specified in [configured series downloads](../USAGE.md#download-a-configured-series)

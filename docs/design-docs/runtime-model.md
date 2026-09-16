@@ -37,6 +37,7 @@ Each layer has an explicit concurrency limit. The code favors bounded parallelis
 - defaults are embedded in Go structs/template text
 - config path lookup checks the user config directory, `~/.mangarr`, then the binary directory
 - env overrides use `MANGARR__` prefix
+- configured downloads use `config.LoadExisting` and one snapshot; see [configured series downloads](../USAGE.md#download-a-configured-series) for requirements, selection, and override rules
 - monitor mode publishes validated immutable config snapshots while running
 - monitor mode watches the config parent directory, so atomic replacement and delete-then-recreate saves do not stop reloads
 - invalid, incomplete, or temporarily missing config files keep the last valid snapshot active
