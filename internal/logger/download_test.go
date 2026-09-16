@@ -143,15 +143,17 @@ func TestDownloadPersistedURLRedaction(t *testing.T) {
 		map[string]any{"url": "https://name:password@example.invalid/page?token=secret#fragment"},
 		"http://bad:password@example.invalid/%zz?secret=yes",
 		"ftp://name:password@example.invalid/file?secret=yes",
+		"https://example.invalid/gist?label=O'Reilly&token=secret",
 	}).Msg("requesting https://example.invalid/series?signature=secret")
-	failure := errors.New(`Get "https://name:password@example.invalid/image?token=secret": offline failure`)
+	failure := errors.New(`Get "https://name:password@example.invalid/gist?label=O'Reilly&token=secret": offline failure`)
 	require.ErrorIs(t, logging.Close(failure), failure)
 	data, err := os.ReadFile(runLogs(t, cfg)[0])
 	require.NoError(t, err)
-	for _, secret := range []string{"name:", "password", "token=", "secret", "fragment", "signature="} {
+	for _, secret := range []string{"name:", "password", "token=", "secret", "fragment", "signature=", "label=", "Reilly"} {
 		require.NotContains(t, string(data), secret)
 	}
 	require.Contains(t, string(data), "https://example.invalid/page")
+	require.Contains(t, string(data), "https://example.invalid/gist")
 	require.Contains(t, string(data), "[redacted URL]")
 	require.Contains(t, string(data), "offline failure")
 }

@@ -22,7 +22,7 @@ import (
 func TestDownloadRetainsDiscoveryFailure(t *testing.T) {
 	logPath := filepath.Join(t.TempDir(), "monitor.log")
 	configDir := writeDownloadConfig(t, fmt.Sprintf("logPath: %q\n", logPath))
-	failure := &url.Error{Op: "Get", URL: "https://user:password@example.invalid/series?token=secret#fragment", Err: errors.New("offline failure")}
+	failure := &url.Error{Op: "Get", URL: "https://user:password@example.invalid/series?label=O'Reilly&token=secret#fragment", Err: errors.New("offline failure")}
 	fake := &configuredDownloadSource{discoveryError: failure}
 	deps := defaultDependencies()
 	deps.selectSource = func(domain.MonitoredManga) (domain.Source, error) { return fake, nil }
@@ -47,8 +47,64 @@ func TestDownloadRetainsDiscoveryFailure(t *testing.T) {
 	require.Contains(t, string(data), "offline failure")
 	require.Contains(t, string(data), "https://example.invalid/series")
 	require.Equal(t, 1, strings.Count(string(data), "offline failure"))
-	for _, secret := range []string{"password", "user:", "token=", "secret", "fragment"} {
+	for _, secret := range []string{"password", "user:", "token=", "secret", "fragment", "label=", "Reilly"} {
 		require.NotContains(t, string(data), secret)
+	}
+}
+
+func TestDownloadConfiguredSeriesValidationAndLogging(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		interval int
+		logging  bool
+	}{
+		{name: "invalid config", interval: 0, logging: true},
+		{name: "valid config with file logging", interval: 15, logging: true},
+		{name: "valid config without file logging", interval: 15},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			logPath := filepath.Join(t.TempDir(), "monitor.log")
+			body := fmt.Sprintf("downloadLocation: %q\ncheckInterval: %d\nmonitoredManga:\n  My Series:\n    source: cubari\n    manga: https://example.invalid/gist\n    group: fixture\n", t.TempDir(), test.interval)
+			if test.logging {
+				body += fmt.Sprintf("logPath: %q\n", logPath)
+			}
+			configDir := writeDownloadConfig(t, body)
+			failure := errors.New("configured series discovery failure")
+			fake := &configuredDownloadSource{discoveryError: failure}
+			selected := false
+			deps := defaultDependencies()
+			deps.selectSource = func(domain.MonitoredManga) (domain.Source, error) {
+				selected = true
+				return fake, nil
+			}
+			root := newRootCommand(deps)
+			var console bytes.Buffer
+			root.SetErr(&console)
+			root.SetArgs([]string{"download", "-c", configDir, "--series", "My Series"})
+			err := root.Execute()
+			if test.interval == 0 {
+				require.ErrorContains(t, err, `loading config for series "My Series"`)
+				require.ErrorContains(t, err, "checkInterval must be greater than zero")
+				require.False(t, selected)
+				require.False(t, fake.discovered)
+			} else {
+				require.ErrorIs(t, err, failure)
+				require.True(t, fake.discovered)
+			}
+			logs, err := filepath.Glob(logPath + ".downloads/*.jsonl")
+			require.NoError(t, err)
+			if test.interval > 0 && test.logging {
+				require.Len(t, logs, 1)
+				require.Contains(t, console.String(), logs[0])
+				data, err := os.ReadFile(logs[0])
+				require.NoError(t, err)
+				require.Contains(t, string(data), failure.Error())
+			} else {
+				require.Empty(t, logs)
+				require.NotContains(t, console.String(), "Download log:")
+			}
+			require.NoFileExists(t, logPath)
+		})
 	}
 }
 

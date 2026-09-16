@@ -43,8 +43,8 @@ for command coverage, cancellation, and scraper limitations.
 - defaults are embedded in Go structs/template text
 - config path lookup checks the user config directory, `~/.mangarr`, then the binary directory
 - env overrides use `MANGARR__` prefix
-- downloads use `config.LoadDownload` and one read-only snapshot; missing implicit config is allowed, and only relevant logging/download settings are validated
-- configured series reuse that snapshot; see [configured series downloads](../USAGE.md#download-a-configured-series) for selection and override rules
+- ordinary downloads use `config.LoadDownload` and one read-only snapshot; missing implicit config is allowed, and only enabled logging settings are validated
+- configured series use `config.LoadExisting` and require full config validation before flag overrides; see [configured series downloads](../USAGE.md#download-a-configured-series) for selection and override rules
 - enabled file logging creates bounded per-run download files with OS locks for safe retention; see [download logs](../USAGE.md#download-logs)
 - the Docker image links its config into binary-adjacent discovery so manual exec commands find the same settings as monitor
 - monitor mode publishes validated immutable config snapshots while running

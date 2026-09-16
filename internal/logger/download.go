@@ -75,7 +75,7 @@ const logLimitRecord = "{\"level\":\"error\",\"message\":\"Download log size lim
 
 var (
 	errLogLimit = errors.New("logMaxSize reached; further diagnostics remain on stderr")
-	logURL      = regexp.MustCompile(`(?i)\b[a-z][a-z0-9+.-]*://[^\s<>"']+`)
+	logURL      = regexp.MustCompile(`(?i)\b[a-z][a-z0-9+.-]*://[^\s<>"]+`)
 )
 
 type downloadLogFile struct {

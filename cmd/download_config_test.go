@@ -206,9 +206,9 @@ monitoredManga:
 				args = append(args, "-s", "mangadex", "-m", "cli-id", "-g", "", "-l", "en", "-o", "", "-d", "/cli-downloads", "-n", "cli-naming")
 			}
 			require.NoError(t, command.ParseFlags(args))
-			cfg, err := config.LoadDownload(configDir, "test", true)
+			cfg, err := config.LoadExisting(configDir, "test")
 			require.NoError(t, err)
-			require.NoError(t, resolveDownloadOptions(command, cfg, options))
+			require.NoError(t, resolveDownloadOptions(command, cfg.Snapshot(), options))
 			require.Equal(t, "1-3", options.chapterNumbers)
 			if explicit {
 				require.Equal(t, "mangadex", options.mangaSource)

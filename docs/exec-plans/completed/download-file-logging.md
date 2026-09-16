@@ -4,7 +4,7 @@
 Retain manual download diagnostics whenever the existing file-logging setting is enabled. Preserve terminal output and keep monitor files separate.
 
 ## Scope and decisions
-- Read config once through `internal/config`, including default discovery and environment overrides. Require an existing config for explicit selection or `--series`; allow ordinary downloads without config. Validate only download-relevant settings.
+- Read config once through `internal/config`, including default discovery and environment overrides. Require an existing config for explicit selection or `--series`; allow ordinary downloads without config. Validate only enabled logging settings for ordinary downloads. Preserve full config validation for `--series`.
 - Keep the image's existing config layout. Expose its config through the existing binary-adjacent discovery location with a symlink, rather than adding global lookup rules or another enable setting.
 - Store collision-resistant JSONL run files in `<logPath>.downloads/`. Keep the monitor's file and rotation unchanged.
 - Cap each run at `logMaxSize` MiB. Retain `logMaxBackups` completed runs plus active runs. Use OS file locks to protect active runs and serialize creation/cleanup. Process exit releases locks, so interrupted runs become eligible for cleanup.

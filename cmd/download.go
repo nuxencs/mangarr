@@ -28,13 +28,19 @@ func newDownloadCommand(options *downloadOptions, root *rootOptions, selectSourc
 		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 			ctx := cmd.Context()
-			requireConfig := cmd.Flags().Changed("series") || cmd.Flags().Changed("config")
-			cfg, err := config.LoadDownload(root.configPath, buildinfo.Version, requireConfig)
-			if err != nil {
-				if cmd.Flags().Changed("series") {
+			var cfg domain.Config
+			if cmd.Flags().Changed("series") {
+				loaded, err := config.LoadExisting(root.configPath, buildinfo.Version)
+				if err != nil {
 					return fmt.Errorf("loading config for series %q: %w", options.series, err)
 				}
-				return fmt.Errorf("loading download config: %w", err)
+				cfg = loaded.Snapshot()
+			} else {
+				var err error
+				cfg, err = config.LoadDownload(root.configPath, buildinfo.Version, cmd.Flags().Changed("config"))
+				if err != nil {
+					return fmt.Errorf("loading download config: %w", err)
+				}
 			}
 			logging, err := logger.NewDownload(cfg, cmd.ErrOrStderr())
 			if err != nil {

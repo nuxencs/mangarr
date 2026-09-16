@@ -63,7 +63,7 @@ mangarr download -c ~/.config/mangarr --series "One Piece" -C "1-3"
 Quote names containing spaces. `--series` matches the config key, not the provider's
 manga title. It uses the same config discovery and environment overrides as
 `monitor`. It reads one snapshot without starting monitoring, watching, or
-rewriting the config. Unused monitor settings do not need to pass monitor validation.
+rewriting the config. The config must pass the same validation as `monitor`.
 The config file must already exist. A missing selected config causes an error
 without creating a sample config, even when `MANGARR__DOWNLOAD_LOCATION` is set.
 
@@ -72,8 +72,9 @@ The entry supplies `source`, `manga`, `group`, `language`, and `overwrite`; glob
 language defaults to `en`. Explicit download flags override these values, including
 explicit empty `--group` or `--overwrite` to clear a configured value. Precedence is
 explicit flags, then environment overrides, then YAML, then built-in defaults.
-Config syntax and enabled logging settings must be valid. Download inputs are
-validated after flag overrides, so flags can supply missing entry/output values.
+Config validation runs before flag overrides. Download inputs are then validated,
+so flags can supply missing entry values. Global output settings must be valid
+in the config even when flags override them.
 Chapter selection always comes from the CLI and still defaults to latest.
 
 Unknown entries, missing effective source/manga, and invalid source inputs fail

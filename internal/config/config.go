@@ -234,7 +234,7 @@ func LoadExisting(configPath string, version string) (*AppConfig, error) {
 }
 
 // LoadDownload reads one snapshot without monitor validation or filesystem writes.
-// required rejects a missing config for --series or explicit config selection.
+// required rejects a missing config for explicit config selection.
 func LoadDownload(configPath, version string, required bool) (domain.Config, error) {
 	configFile, err := resolveConfigFile(configPath)
 	if err != nil && (required || !errors.Is(err, errConfigNotFound)) {
