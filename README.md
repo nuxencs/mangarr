@@ -73,6 +73,10 @@ Transient HTTP rate limits during image downloads are retried automatically, inc
 with `--all`. Retries are bounded and respect `Retry-After`; see
 [bulk downloads and rate limits](./docs/USAGE.md#bulk-downloads-and-rate-limits).
 
+If your config enables file logging with `logPath`, manual downloads also retain
+[separate run logs](./docs/USAGE.md#download-logs). Terminal output stays visible,
+and the command prints the run-log path. No additional logging flag is needed.
+
 If you want a different source, the value you pass to `-m` changes by provider. Use the table below.
 
 ## Monitor Mode

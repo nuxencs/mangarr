@@ -133,8 +133,8 @@ monitoredManga:
     #
     group: "/r/OnePunchMan"
 
-# mangarr logs file
-# If not defined, logs to stdout
+# Optional file logging, in addition to stderr.
+# Monitor writes this file; downloads write private run files in <logPath>.downloads/.
 # Make sure to use forward slashes and include the filename with extension. e.g. "logs/mangarr.log", "C:/mangarr/logs/mangarr.log"
 #
 # Optional
@@ -153,7 +153,7 @@ logLevel: "DEBUG"
 #
 # Default: 50
 #
-# Max log size in megabytes
+# Maximum monitor log size and download run-file size, in MiB.
 #
 #logMaxSize: 50
 
@@ -161,9 +161,9 @@ logLevel: "DEBUG"
 #
 # Default: 3
 #
-# Max amount of old log files
+# Maximum monitor backups and retained completed download runs.
 #
-#logMaxBackups = 3
+#logMaxBackups: 3
 `
 
 func writeConfig(configPath string, configFile string) error {
@@ -233,6 +233,34 @@ func LoadExisting(configPath string, version string) (*AppConfig, error) {
 	return c, nil
 }
 
+// LoadDownload reads one snapshot without monitor validation or filesystem writes.
+// required rejects a missing config for --series or explicit config selection.
+func LoadDownload(configPath, version string, required bool) (domain.Config, error) {
+	configFile, err := resolveConfigFile(configPath)
+	if err != nil && (required || !errors.Is(err, errConfigNotFound)) {
+		return domain.Config{}, err
+	}
+
+	cfg := defaultConfig(version, configFile)
+	if configFile != "" {
+		cfg, err = readConfig(configFile, version)
+		if err != nil {
+			return domain.Config{}, err
+		}
+	} else {
+		applyEnvironment(&cfg)
+	}
+	if cfg.LogPath != "" {
+		if err := validateLogging(cfg); err != nil {
+			return domain.Config{}, fmt.Errorf("validating download logging: %w", err)
+		}
+		if int64(cfg.LogMaxSize) > (1<<63-1)/(1024*1024) {
+			return domain.Config{}, fmt.Errorf("logMaxSize is too large")
+		}
+	}
+	return cfg, nil
+}
+
 func defaultConfig(version, configFile string) domain.Config {
 	return domain.Config{
 		Version:        version,
@@ -246,6 +274,8 @@ func defaultConfig(version, configFile string) domain.Config {
 		LogMaxBackups:  3,
 	}
 }
+
+var errConfigNotFound = errors.New("could not find config file in default locations")
 
 func resolveConfigFile(configPath string) (string, error) {
 	if configPath != "" {
@@ -268,7 +298,7 @@ func resolveConfigFile(configPath string) (string, error) {
 		return location, nil
 	}
 
-	return "", fmt.Errorf("could not find config file in default locations")
+	return "", errConfigNotFound
 }
 
 func firstExistingConfig(locations []string) (string, bool) {
@@ -296,25 +326,32 @@ func defaultConfigLocations(userConfigDir, homeDir, executablePath string) []str
 }
 
 func (c *AppConfig) loadSnapshot() (*domain.Config, error) {
-	cfg := defaultConfig(c.version, c.configFile)
-	k := koanf.New(".")
-	if err := k.Load(structs.Provider(&cfg, "yaml"), nil); err != nil {
-		return nil, fmt.Errorf("loading config defaults: %w", err)
+	cfg, err := readConfig(c.configFile, c.version)
+	if err != nil {
+		return nil, err
 	}
-	if err := k.Load(file.Provider(c.configFile), yaml.Parser()); err != nil {
-		return nil, fmt.Errorf("reading config file %s: %w", c.configFile, err)
-	}
-	if err := k.Unmarshal("", &cfg); err != nil {
-		return nil, fmt.Errorf("decoding config file %s: %w", c.configFile, err)
-	}
-
-	applyEnvironment(&cfg)
 	if err := validate(cfg); err != nil {
 		return nil, fmt.Errorf("validating config file %s: %w", c.configFile, err)
 	}
-
 	snapshot := cloneConfig(cfg)
 	return &snapshot, nil
+}
+
+func readConfig(configFile, version string) (domain.Config, error) {
+	cfg := defaultConfig(version, configFile)
+	k := koanf.New(".")
+	if err := k.Load(structs.Provider(&cfg, "yaml"), nil); err != nil {
+		return domain.Config{}, fmt.Errorf("loading config defaults: %w", err)
+	}
+	if err := k.Load(file.Provider(configFile), yaml.Parser()); err != nil {
+		return domain.Config{}, fmt.Errorf("reading config file %s: %w", configFile, err)
+	}
+	if err := k.Unmarshal("", &cfg); err != nil {
+		return domain.Config{}, fmt.Errorf("decoding config file %s: %w", configFile, err)
+	}
+
+	applyEnvironment(&cfg)
+	return cfg, nil
 }
 
 func applyEnvironment(cfg *domain.Config) {
@@ -375,6 +412,19 @@ func validate(cfg domain.Config) error {
 	if cfg.PprofEnabled && cfg.PprofAddress == "" {
 		return fmt.Errorf("pprofAddress cannot be empty when pprof is enabled")
 	}
+	if err := validateLogging(cfg); err != nil {
+		return err
+	}
+	for name, manga := range cfg.MonitoredManga {
+		if manga == nil {
+			return fmt.Errorf("monitoredManga %q cannot be null", name)
+		}
+	}
+
+	return nil
+}
+
+func validateLogging(cfg domain.Config) error {
 	switch cfg.LogLevel {
 	case "ERROR", "DEBUG", "INFO", "WARN", "TRACE":
 	default:
@@ -386,12 +436,6 @@ func validate(cfg domain.Config) error {
 	if cfg.LogMaxBackups <= 0 {
 		return fmt.Errorf("logMaxBackups must be greater than zero")
 	}
-	for name, manga := range cfg.MonitoredManga {
-		if manga == nil {
-			return fmt.Errorf("monitoredManga %q cannot be null", name)
-		}
-	}
-
 	return nil
 }
 

@@ -139,10 +139,22 @@ func TestDownloadRateLimit(t *testing.T) {
 			root.SetOut(io.Discard)
 			root.SetErr(io.Discard)
 			root.SetArgs([]string{"download", "-d", directory, "-s", "cubari", "-m", server.URL + "/gist", "-g", "test", "-n", "Chapter {num}", tc.selector})
+			logPath := filepath.Join(t.TempDir(), "monitor.log")
+			if tc.wantError != "" {
+				t.Setenv("MANGARR__LOG_PATH", logPath)
+			}
 			err := root.ExecuteContext(t.Context())
 			if tc.wantError != "" {
 				require.EqualError(t, err, tc.wantError)
 				require.NoFileExists(t, filepath.Join(directory, "Fixture", "Chapter 1.cbz"))
+				logs, err := filepath.Glob(logPath + ".downloads/*.jsonl")
+				require.NoError(t, err)
+				require.Len(t, logs, 1)
+				data, err := os.ReadFile(logs[0])
+				require.NoError(t, err)
+				require.Contains(t, string(data), "Failed to acquire chapter 1")
+				require.Contains(t, string(data), "Finished downloading")
+				require.Contains(t, string(data), "Summary: downloaded=1 skipped=0 failed=1")
 			} else {
 				require.NoError(t, err, "transient throttling must not leave selected chapters failed")
 			}

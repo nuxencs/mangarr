@@ -1,6 +1,6 @@
 # Usage Reference
 
-Verified against CLI help and config/runtime code on 2026-08-09.
+Verified against CLI help and config/runtime code on 2026-09-16.
 
 Use this doc when the root README is not enough and you need command, config, or operator detail.
 
@@ -50,7 +50,7 @@ publication, the old archive is preserved. Cancellation after the final check
 can still allow publication. See the [runtime model](./design-docs/runtime-model.md#state)
 for the publication sequence.
 
-The command returns status 0 when all requested chapters are downloaded successfully or skipped. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
+The command returns status 0 when all requested chapters are downloaded successfully or skipped and enabled logging succeeds. It returns a nonzero status when setup, discovery, selection, any requested chapter download, or file logging fails.
 
 #### Download a configured series
 
@@ -61,9 +61,9 @@ mangarr download -c ~/.config/mangarr --series "One Piece" -C "1-3"
 ```
 
 Quote names containing spaces. `--series` matches the config key, not the provider's
-manga title. It uses the same config discovery, environment overrides, and full
-config validation as `monitor` (including a nonempty `downloadLocation`). It reads
-one snapshot without starting monitoring, watching, or rewriting the config.
+manga title. It uses the same config discovery and environment overrides as
+`monitor`. It reads one snapshot without starting monitoring, watching, or
+rewriting the config. Unused monitor settings do not need to pass monitor validation.
 The config file must already exist. A missing selected config causes an error
 without creating a sample config, even when `MANGARR__DOWNLOAD_LOCATION` is set.
 
@@ -72,13 +72,15 @@ The entry supplies `source`, `manga`, `group`, `language`, and `overwrite`; glob
 language defaults to `en`. Explicit download flags override these values, including
 explicit empty `--group` or `--overwrite` to clear a configured value. Precedence is
 explicit flags, then environment overrides, then YAML, then built-in defaults.
-Config validation occurs before flag overrides, so the config itself must be valid.
+Config syntax and enabled logging settings must be valid. Download inputs are
+validated after flag overrides, so flags can supply missing entry/output values.
 Chapter selection always comes from the CLI and still defaults to latest.
 
 Unknown entries, missing effective source/manga, and invalid source inputs fail
 before provider discovery. A required entry field can be supplied by its CLI flag.
-Without `--series`, `-d`, `-s`, and `-m` remain required and no config is loaded.
-Monitor-only logging, profiling, and scheduling settings do not change download behavior.
+Without `--series`, `-d`, `-s`, and `-m` remain required. Config supplies logging
+settings only; it does not replace explicit download inputs. Profiling and
+scheduling settings do not change download behavior.
 
 Examples:
 
@@ -107,6 +109,56 @@ mangarr download -d ./downloads -s asurascans -m "https://asurascans.com/comics/
 # Latest chapter from Atsumaru
 mangarr download -d ./downloads -s atsumaru -m "https://atsu.moe/manga/Q5Mqy" -g "cmgzlsevifjhtm191rqugvee3" -L
 ```
+
+#### Download logs
+
+The existing `logPath` setting enables file logging for both commands. Monitor
+writes that file; each manual download writes a separate JSONL file under
+`<logPath>.downloads/`. Downloads never append to the monitor's active file or
+backups. The terminal prints the actual run-log path and keeps its current
+human-readable diagnostics. Stdout is not captured.
+
+Download reads an available config using the [lookup order below](#monitor),
+with the same `MANGARR__` environment overrides. Use `-c` to select another config,
+not to enable logging. Ordinary downloads still work without a config; logging
+environment settings can also supply a destination when no config is found.
+A missing explicitly selected config, or a missing config for `--series`, fails
+without creating a sample. An empty log path keeps downloads console-only.
+
+The published Docker image exposes `/config/config.yaml` through the existing
+binary-adjacent lookup location. Thus an ordinary exec command uses its logging
+settings without an extra flag:
+
+```bash
+docker exec mangarr mangarr download -d /downloads -s tcbscans -m "One Piece"
+```
+
+Relative log paths are relative to the process working directory, not the config
+directory. `logLevel` filters the download file only; it does not hide terminal
+summaries. Run files use owner-only permissions on Unix. Check directory access
+permissions on other platforms. Persisted diagnostics remove URL credentials,
+query strings, and fragments. They can still contain series names, URL paths,
+and local paths. Review logs before sharing them.
+
+Retention uses the existing settings, without another enable option:
+
+- `logMaxSize` bounds each run file in MiB. At the limit, the file records a size
+  warning and stops accepting diagnostics. Downloads continue with terminal
+  output, but the command returns a logging error when it finishes.
+- `logMaxBackups` bounds completed run files, keeping the most recently started
+  runs. Active runs are additional and are never deleted by cleanup. Each active
+  run has the same per-file size bound.
+- Cleanup runs at startup and completion. An interrupted process releases its
+  run lock, so its file becomes eligible for the next cleanup. Only generated
+  `download-<timestamp>-<random>.jsonl` files in this dedicated directory are
+  managed. Other files, monitor logs, and monitor backups are left alone.
+- Use a local filesystem that supports OS file locks for the run-log directory.
+
+If logging cannot initialize, the command fails before provider work. Later
+write, sync, or cleanup failures are reported and return a nonzero status;
+existing download errors are preserved. A logging failure does not undo completed
+archives. Config parsing errors and command-line parsing errors can occur before
+a destination is available and therefore remain terminal-only.
 
 #### Bulk downloads and rate limits
 

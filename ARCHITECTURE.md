@@ -36,7 +36,7 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
 
 ### `download`
 
-1. Resolve optional `--series` defaults from a validated config snapshot, apply explicit flag overrides, and validate CLI input and destination path.
+1. Read available config and initialize separate run logging when file logging is enabled. Resolve optional `--series` defaults, apply explicit flag overrides, and validate CLI input and destination path.
 2. Construct source adapter from `-s`.
 3. Fetch manga metadata and chapter list.
 4. Resolve requested chapter set.

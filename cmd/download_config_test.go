@@ -18,6 +18,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"mangarr/internal/config"
 	"mangarr/internal/domain"
 	"mangarr/internal/source"
 
@@ -48,7 +49,9 @@ func TestDownloadConfiguredSeriesCreatesArchives(t *testing.T) {
 		_, _ = w.Write(page.Bytes())
 	})
 	destination := t.TempDir()
+	logPath := filepath.Join(t.TempDir(), "monitor.log")
 	configDir := writeDownloadConfig(t, fmt.Sprintf(`downloadLocation: %q
+logPath: %q
 namingTemplate: "{manga:<.>}-{num}"
 monitoredManga:
   My Series:
@@ -56,13 +59,23 @@ monitoredManga:
     manga: %q
     group: Configured Group
     overwrite: Saved Title
-`, destination, server.URL+"/series"))
+`, destination, logPath, server.URL+"/series"))
 
 	for range 2 {
 		root := NewRootCommand()
 		root.SetArgs([]string{"download", "-c", configDir, "--series", "My Series", "-C", "1-2"})
 		require.NoError(t, root.ExecuteContext(t.Context()))
 	}
+	logs, err := filepath.Glob(logPath + ".downloads/*.jsonl")
+	require.NoError(t, err)
+	require.Len(t, logs, 2)
+	firstRun, err := os.ReadFile(logs[0])
+	require.NoError(t, err)
+	require.Contains(t, string(firstRun), "Finished downloading")
+	secondRun, err := os.ReadFile(logs[1])
+	require.NoError(t, err)
+	require.Contains(t, string(secondRun), "skipping")
+	require.Contains(t, string(secondRun), "Summary: downloaded=0 skipped=2 failed=0")
 	require.EqualValues(t, 2, pageRequests.Load(), "existing archives must skip page downloads")
 	archives, err := filepath.Glob(filepath.Join(destination, "*", "*.cbz"))
 	require.NoError(t, err)
@@ -193,7 +206,9 @@ monitoredManga:
 				args = append(args, "-s", "mangadex", "-m", "cli-id", "-g", "", "-l", "en", "-o", "", "-d", "/cli-downloads", "-n", "cli-naming")
 			}
 			require.NoError(t, command.ParseFlags(args))
-			require.NoError(t, resolveDownloadOptions(command, configDir, options))
+			cfg, err := config.LoadDownload(configDir, "test", true)
+			require.NoError(t, err)
+			require.NoError(t, resolveDownloadOptions(command, cfg, options))
 			require.Equal(t, "1-3", options.chapterNumbers)
 			if explicit {
 				require.Equal(t, "mangadex", options.mangaSource)
@@ -278,7 +293,8 @@ func TestDownloadConfiguredSeriesRequiresExistingConfig(t *testing.T) {
 	}
 }
 
-func TestDownloadExplicitInputsIgnoreConfig(t *testing.T) {
+func TestDownloadExplicitInputsDoNotUseSeriesDefaults(t *testing.T) {
+	configDir := writeDownloadConfig(t, "downloadLocation: unused\ncheckInterval: 0\nmonitoredManga:\n  Unused: null\n")
 	fake := &configuredDownloadSource{discoveryError: errors.New("offline discovery reached")}
 	deps := defaultDependencies()
 	deps.selectSource = func(input domain.MonitoredManga) (domain.Source, error) {
@@ -286,7 +302,7 @@ func TestDownloadExplicitInputsIgnoreConfig(t *testing.T) {
 		return fake, nil
 	}
 	root := newRootCommand(deps)
-	root.SetArgs([]string{"download", "-c", filepath.Join(t.TempDir(), "unused"), "-d", t.TempDir(), "-s", "tcbscans", "-m", "One Piece", "-C", "1-3"})
+	root.SetArgs([]string{"download", "-c", configDir, "-d", t.TempDir(), "-s", "tcbscans", "-m", "One Piece", "-C", "1-3"})
 	require.ErrorIs(t, root.Execute(), fake.discoveryError)
 	require.True(t, fake.discovered)
 }

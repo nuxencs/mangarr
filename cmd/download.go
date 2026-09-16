@@ -2,18 +2,19 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"mangarr/internal/acquire"
+	"mangarr/internal/buildinfo"
+	"mangarr/internal/config"
 	"mangarr/internal/domain"
 	"mangarr/internal/files"
+	"mangarr/internal/logger"
 	"mangarr/internal/parse"
 
-	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 )
 
@@ -25,14 +26,26 @@ func newDownloadCommand(options *downloadOptions, root *rootOptions, selectSourc
   mangarr download -d ./downloads -s tcbscans -m "One Piece"`,
 		Args:         cobra.NoArgs,
 		SilenceUsage: true,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) (runErr error) {
 			ctx := cmd.Context()
-			if err := resolveDownloadOptions(cmd, root.configPath, options); err != nil {
+			requireConfig := cmd.Flags().Changed("series") || cmd.Flags().Changed("config")
+			cfg, err := config.LoadDownload(root.configPath, buildinfo.Version, requireConfig)
+			if err != nil {
+				if cmd.Flags().Changed("series") {
+					return fmt.Errorf("loading config for series %q: %w", options.series, err)
+				}
+				return fmt.Errorf("loading download config: %w", err)
+			}
+			logging, err := logger.NewDownload(cfg, cmd.ErrOrStderr())
+			if err != nil {
 				return err
 			}
+			defer func() { runErr = logging.Close(runErr) }()
+			log := logging.Log
 
-			// init new logger
-			log := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: time.RFC3339}).With().Timestamp().Logger()
+			if err := resolveDownloadOptions(cmd, cfg, options); err != nil {
+				return err
+			}
 
 			if !cmd.Flags().Changed("first") && !cmd.Flags().Changed("chapters") && !cmd.Flags().Changed("all") {
 				options.latest = true

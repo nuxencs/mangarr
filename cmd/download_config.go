@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"mangarr/internal/buildinfo"
-	"mangarr/internal/config"
+	"mangarr/internal/domain"
 
 	"github.com/spf13/cobra"
 )
 
-func resolveDownloadOptions(cmd *cobra.Command, configPath string, options *downloadOptions) error {
+func resolveDownloadOptions(cmd *cobra.Command, snapshot domain.Config, options *downloadOptions) error {
 	if !cmd.Flags().Changed("series") {
 		return nil
 	}
@@ -18,14 +17,12 @@ func resolveDownloadOptions(cmd *cobra.Command, configPath string, options *down
 		return fmt.Errorf("--series requires a configured entry name")
 	}
 
-	cfg, err := config.LoadExisting(configPath, buildinfo.Version)
-	if err != nil {
-		return fmt.Errorf("loading config for series %q: %w", options.series, err)
-	}
-	snapshot := cfg.Snapshot()
 	entry, ok := snapshot.MonitoredManga[options.series]
 	if !ok {
 		return fmt.Errorf("unknown configured series %q: no matching monitoredManga entry", options.series)
+	}
+	if entry == nil {
+		return fmt.Errorf("monitoredManga %q cannot be null", options.series)
 	}
 
 	defaults := []struct {
@@ -47,6 +44,9 @@ func resolveDownloadOptions(cmd *cobra.Command, configPath string, options *down
 	}
 	if !cmd.Flags().Changed("language") && entry.Language != "" {
 		options.language = entry.Language
+	}
+	if options.naming == "" {
+		return fmt.Errorf("configured series %q: naming template cannot be empty (set namingTemplate or --naming)", options.series)
 	}
 	if strings.TrimSpace(options.mangaSource) == "" {
 		return fmt.Errorf("configured series %q: source is required (set source or --source)", options.series)

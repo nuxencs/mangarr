@@ -1,6 +1,6 @@
 # Monitoring Operator
 
-Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-08-09.
+Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-09-16.
 
 ## User Goal
 
@@ -27,3 +27,4 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - atomic replacement and delete-then-recreate saves do not stop future reloads
 - config lookup follows the documented operating-system and binary locations
 - operators can reuse entries for one-shot downloads as specified in [configured series downloads](../USAGE.md#download-a-configured-series)
+- enabled file logging retains [manual download diagnostics](../USAGE.md#download-logs) in separate bounded run files, without sharing the monitor's rotating file or hiding terminal output

@@ -109,8 +109,8 @@ monitoredManga:
     #
     group: "/r/OnePunchMan"
 
-# mangarr logs file
-# If not defined, logs to stdout
+# Optional file logging, in addition to stderr.
+# Monitor writes this file; downloads write private run files in <logPath>.downloads/.
 # Make sure to use forward slashes and include the filename with extension. e.g. "logs/mangarr.log", "C:/mangarr/logs/mangarr.log"
 #
 # Optional
@@ -129,7 +129,7 @@ logLevel: "DEBUG"
 #
 # Default: 50
 #
-# Max log size in megabytes
+# Maximum monitor log size and download run-file size, in MiB.
 #
 # logMaxSize: 50
 
@@ -137,6 +137,6 @@ logLevel: "DEBUG"
 #
 # Default: 3
 #
-# Max amount of old log files
+# Maximum monitor backups and retained completed download runs.
 #
-# logMaxBackups = 3
+# logMaxBackups: 3

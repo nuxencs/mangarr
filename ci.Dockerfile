@@ -41,6 +41,8 @@ ENV HOME="/config" \
     XDG_DATA_HOME="/config"
 
 COPY --link --from=mangarr /out/bin/mangarr /usr/bin/
+# Exec commands use the same config through binary-adjacent discovery.
+RUN ln -s /config/config.yaml /usr/bin/config.yaml
 
 USER nobody:nogroup
 WORKDIR /config
