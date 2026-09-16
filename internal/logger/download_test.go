@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -155,7 +157,60 @@ func TestDownloadPersistedURLRedaction(t *testing.T) {
 	require.Contains(t, string(data), "https://example.invalid/page")
 	require.Contains(t, string(data), "https://example.invalid/gist")
 	require.Contains(t, string(data), "[redacted URL]")
-	require.Contains(t, string(data), "offline failure")
+	require.Contains(t, string(data), "Download failed")
+}
+
+func TestDownloadPersistedURLQueryRedaction(t *testing.T) {
+	for _, test := range []struct {
+		name, suffix string
+	}{
+		{name: "normal URL"},
+		{name: "normal query", suffix: "?token=secret"},
+		{name: "apostrophe", suffix: "?label=O'Reilly&token=secret"},
+		{name: "double quotes", suffix: `?label="title"&token=secret`},
+		{name: "space and punctuation", suffix: "?label=a b<>\"'&token=secret"},
+		{name: "fragment", suffix: "#secret"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			cfg := downloadConfig(t)
+			var console bytes.Buffer
+			logging, err := NewDownload(cfg, &console)
+			require.NoError(t, err)
+			base := "https://example.invalid/gist"
+			req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, base+test.suffix, nil)
+			require.NoError(t, err)
+			failure := &url.Error{Op: "Get", URL: req.URL.String(), Err: errors.New("offline failure")}
+			logging.Log.Warn().Str("url", req.URL.String()).Interface("details", []any{req.URL.String()}).Msg("requesting " + req.URL.String())
+			logging.Log.Error().Err(failure).Msg("request failed")
+			require.ErrorIs(t, logging.Close(failure), failure)
+			require.Contains(t, console.String(), "offline failure")
+			if test.suffix != "" {
+				require.Contains(t, console.String(), "secret")
+			}
+			data, err := os.ReadFile(runLogs(t, cfg)[0])
+			require.NoError(t, err)
+			wantURL := base
+			wantError := failure.Error()
+			if test.suffix != "" {
+				wantURL += " [redacted URL suffix]"
+				wantError = `Get "` + wantURL
+			}
+			scanner := bufio.NewScanner(bytes.NewReader(data))
+			var records []map[string]any
+			for scanner.Scan() {
+				var record map[string]any
+				require.NoError(t, json.Unmarshal(scanner.Bytes(), &record))
+				records = append(records, record)
+			}
+			require.NoError(t, scanner.Err())
+			require.Len(t, records, 4)
+			require.Equal(t, wantURL, records[1]["url"])
+			require.Equal(t, []any{wantURL}, records[1]["details"])
+			require.Equal(t, "requesting "+wantURL, records[1]["message"])
+			require.Equal(t, wantError, records[2]["error"])
+			require.Equal(t, wantError, records[3]["error"])
+		})
+	}
 }
 
 func TestDownloadRetentionPreservesActiveAndUnrelatedFiles(t *testing.T) {

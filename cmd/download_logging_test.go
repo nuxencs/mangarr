@@ -44,9 +44,9 @@ func TestDownloadRetainsDiscoveryFailure(t *testing.T) {
 	require.Contains(t, stderr.String(), logs[0])
 	data, err := os.ReadFile(logs[0])
 	require.NoError(t, err)
-	require.Contains(t, string(data), "offline failure")
+	require.Contains(t, string(data), "Download failed")
 	require.Contains(t, string(data), "https://example.invalid/series")
-	require.Equal(t, 1, strings.Count(string(data), "offline failure"))
+	require.Equal(t, 1, strings.Count(string(data), "Download failed"))
 	for _, secret := range []string{"password", "user:", "token=", "secret", "fragment", "label=", "Reilly"} {
 		require.NotContains(t, string(data), secret)
 	}

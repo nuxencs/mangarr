@@ -45,9 +45,6 @@ func resolveDownloadOptions(cmd *cobra.Command, snapshot domain.Config, options 
 	if !cmd.Flags().Changed("language") && entry.Language != "" {
 		options.language = entry.Language
 	}
-	if options.naming == "" {
-		return fmt.Errorf("configured series %q: naming template cannot be empty (set namingTemplate or --naming)", options.series)
-	}
 	if strings.TrimSpace(options.mangaSource) == "" {
 		return fmt.Errorf("configured series %q: source is required (set source or --source)", options.series)
 	}

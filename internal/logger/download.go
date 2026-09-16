@@ -75,7 +75,7 @@ const logLimitRecord = "{\"level\":\"error\",\"message\":\"Download log size lim
 
 var (
 	errLogLimit = errors.New("logMaxSize reached; further diagnostics remain on stderr")
-	logURL      = regexp.MustCompile(`(?i)\b[a-z][a-z0-9+.-]*://[^\s<>"]+`)
+	logURL      = regexp.MustCompile(`(?i)\b[a-z][a-z0-9+.-]*://[^\s<>"?#]+(?:[?#][\s\S]*)?`)
 )
 
 type downloadLogFile struct {
@@ -148,14 +148,16 @@ func redactLogValue(value any) any {
 	switch value := value.(type) {
 	case string:
 		return logURL.ReplaceAllStringFunc(value, func(raw string) string {
+			suffix := ""
+			if i := strings.IndexAny(raw, "?#"); i >= 0 {
+				raw, suffix = raw[:i], " [redacted URL suffix]"
+			}
 			parsed, err := url.Parse(raw)
 			if err != nil {
 				return "[redacted URL]"
 			}
 			parsed.User = nil
-			parsed.RawQuery, parsed.Fragment, parsed.RawFragment = "", "", ""
-			parsed.ForceQuery = false
-			return parsed.String()
+			return parsed.String() + suffix
 		})
 	case map[string]any:
 		for key, child := range value {

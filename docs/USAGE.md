@@ -138,8 +138,11 @@ Relative log paths are relative to the process working directory, not the config
 directory. `logLevel` filters the download file only; it does not hide terminal
 summaries. Run files use owner-only permissions on Unix. Check directory access
 permissions on other platforms. Persisted diagnostics remove URL credentials,
-query strings, and fragments. They can still contain series names, URL paths,
-and local paths. Review logs before sharing them.
+query strings, and fragments. In each text field, a URL query or fragment also
+removes all subsequent text because it can contain query secrets. The file marks
+this text as `[redacted URL suffix]`. Terminal output stays unchanged. Logs can
+still contain series names, URL paths, and local paths. Review logs before sharing
+them.
 
 Retention uses the existing settings, without another enable option:
 

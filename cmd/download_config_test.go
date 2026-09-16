@@ -157,6 +157,12 @@ func TestDownloadConfiguredSeriesSourceInputs(t *testing.T) {
 			want:  domain.MonitoredManga{Source: "mangaplus", Manga: "100274", Language: "en"},
 		},
 		{
+			name:  "empty naming override",
+			entry: "source: cubari\n    manga: https://git.io/OPM\n    group: /r/OnePunchMan",
+			flags: []string{"--naming", ""},
+			want:  domain.MonitoredManga{Source: "cubari", Manga: "https://git.io/OPM", Group: "/r/OnePunchMan", Language: "en"},
+		},
+		{
 			name:  "CLI supplies missing entry fields",
 			entry: "overwrite: Saved Title",
 			flags: []string{"-s", "tcbscans", "-m", "One Piece"},
