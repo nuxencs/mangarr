@@ -18,6 +18,12 @@ Persistent state is file-based:
 
 There is no database, queue, or remote control plane.
 
+Chapter acquisition (`internal/acquire/`) applies the
+[existing-archive policy](../USAGE.md#download) before page resolution.
+Images download to a temporary directory, then `internal/files/` assembles a
+temporary CBZ beside the destination. After assembly, it syncs and closes the
+temporary file, checks cancellation, and renames the file into place.
+
 ## Concurrency
 
 - chapter jobs fan out in `download`

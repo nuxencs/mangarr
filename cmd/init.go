@@ -23,6 +23,7 @@ type downloadOptions struct {
 	first             bool
 	latest            bool
 	downloadAll       bool
+	force             bool
 }
 
 func initRootFlags(root *cobra.Command, options *rootOptions) {
@@ -114,6 +115,14 @@ func initDownloadFlags(download *cobra.Command, options *downloadOptions) {
 		"A",
 		false,
 		"download all available chapters",
+	)
+
+	download.Flags().BoolVarP(
+		&options.force,
+		"force",
+		"f",
+		false,
+		"re-download selected chapters even if their archives already exist",
 	)
 
 	download.MarkFlagsMutuallyExclusive("first", "chapters")

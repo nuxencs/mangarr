@@ -25,6 +25,7 @@ Common flags:
 | `-l`, `--language` | language code for sources that support it; default `en` |
 | `-n`, `--naming` | filename template |
 | `-o`, `--overwrite` | replace the parsed manga title in the output filename |
+| `-f`, `--force` | re-download selected chapters even if their archives already exist |
 
 Chapter selection flags are mutually exclusive:
 
@@ -33,7 +34,22 @@ Chapter selection flags are mutually exclusive:
 - `-C`, `--chapters`: specific chapters or ranges such as `1,3,5` or `1-10`
 - `-A`, `--all`: all available chapters
 
-The command returns status 0 when all requested chapters are downloaded or already exist. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
+Existing archives are skipped unless `-f` / `--force` is supplied. Force works with
+any chapter selector above. It replaces only the output paths calculated for
+those chapters; it does not search the library for old files. To repair an
+archive, use the same download directory, manga title, and naming template that
+produced its path. A changed title or template can produce a new file instead.
+The `--overwrite` flag changes the manga title used for the output directory and
+filename; it does not force a download. Monitor mode has no force option and
+continues to skip existing archives.
+
+Each old archive remains in place until the replacement is downloaded and
+assembled successfully. If replacement fails, or cancellation is detected before
+publication, the old archive is preserved. Cancellation after the final check
+can still allow publication. See the [runtime model](./design-docs/runtime-model.md#state)
+for the publication sequence.
+
+The command returns status 0 when all requested chapters are downloaded successfully or skipped. It returns a nonzero status when setup, discovery, selection, or any requested chapter download fails.
 
 Examples:
 
@@ -46,6 +62,9 @@ mangarr download -d ./downloads -s mangadex -m "801513ba-a712-498c-8f57-cae55b38
 
 # Specific chapters from MANGA Plus
 mangarr download -d ./downloads -s mangaplus -m "100037" -C "6,17"
+
+# Repair selected chapters already on disk
+mangarr download -d ./downloads -s tcbscans -m "One Piece" -C "6,17" --force
 
 # Chapter range from Cubari
 mangarr download -d ./downloads -s cubari -m "https://git.io/OPM" -g "/r/OnePunchMan" -C "1-3"

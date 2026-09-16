@@ -15,8 +15,8 @@ Verified on 2026-08-07.
 - shared retry policy in `internal/sharedhttp/`
 - bounded chapter, source, and image concurrency
 - one shared acquisition policy for download and monitor
-- skip-on-existing archive behavior before page resolution
-- atomic archive publication after ZIP writers and files close successfully
+- [existing-archive policy](./USAGE.md#download)
+- [archive publication sequence](./design-docs/runtime-model.md#state)
 - optional `pprof` endpoint for runtime inspection
 - immediate first monitor poll and reload-aware scheduling
 - validated, immutable config snapshots without full process restart
