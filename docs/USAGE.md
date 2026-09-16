@@ -158,8 +158,9 @@ Retention uses the existing settings, without another enable option:
 If logging cannot initialize, the command fails before provider work. Later
 write, sync, or cleanup failures are reported and return a nonzero status;
 existing download errors are preserved. A logging failure does not undo completed
-archives. Config parsing errors and command-line parsing errors can occur before
-a destination is available and therefore remain terminal-only.
+archives. Config loading and validation errors, including invalid `--series`
+config, occur before run-file creation and remain terminal-only. Command-line
+parsing errors also remain terminal-only.
 
 #### Bulk downloads and rate limits
 

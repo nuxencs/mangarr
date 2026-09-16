@@ -5,7 +5,7 @@ Reuse `monitoredManga` entries from the existing download command by name, prese
 
 ## Decisions
 - Add `--series` for an exact, case-sensitive config key (quote names with spaces).
-- Load one snapshot through the existing config loader only when `--series` is supplied.
+- Current config loading rules are documented in the [runtime model](../../design-docs/runtime-model.md#config-lifecycle).
 - Explicit download flags override entry fields and global download/naming settings; environment overrides remain handled by the config loader. An omitted entry language retains the download default `en`.
 - Existing full config validation still applies before download overrides; no monitor watcher or config rewrite.
 
