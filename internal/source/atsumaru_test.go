@@ -177,7 +177,7 @@ func TestAtsumaruPages(t *testing.T) {
 	pages, err := src.Pages(t.Context(), chapter)
 	require.NoError(t, err)
 	require.Len(t, pages, 2)
-	require.Equal(t, server.URL+"/static/pages/yzmwX4/0.webp", pages[0].ImageURL)
+	require.Equal(t, "https://cdn.atsu.moe/static/pages/yzmwX4/0.webp", pages[0].ImageURL)
 	require.Equal(t, "https://cdn.atsu.test/static/pages/yzmwX4/1.webp", pages[1].ImageURL)
 }
 

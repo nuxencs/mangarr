@@ -16,7 +16,10 @@ import (
 	"github.com/avast/retry-go"
 )
 
-const atsumaruURL = "https://atsu.moe"
+const (
+	atsumaruURL    = "https://atsu.moe"
+	atsumaruCDNURL = "https://cdn.atsu.moe"
+)
 
 type atsumaru struct {
 	MangaURL string
@@ -240,7 +243,7 @@ func (a *atsumaru) getJSON(ctx context.Context, rawURL string, target any) error
 }
 
 func (a *atsumaru) resolveImageURL(rawImageURL string) (string, error) {
-	base, err := url.Parse(a.BaseURL)
+	base, err := url.Parse(atsumaruCDNURL)
 	if err != nil {
 		return "", err
 	}
