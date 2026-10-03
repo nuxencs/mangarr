@@ -2,6 +2,7 @@ package sharedhttp
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +12,9 @@ import (
 )
 
 var ErrNotFound = fmt.Errorf("not found: status code %d", http.StatusNotFound)
+
+// ErrCloudflareChallenge reports that Cloudflare served a challenge page instead of the upstream response.
+var ErrCloudflareChallenge = errors.New("blocked by Cloudflare challenge")
 
 var Transport = &http.Transport{
 	Proxy: http.ProxyFromEnvironment,
@@ -61,6 +65,12 @@ func ExecRequest(client http.Client, req *http.Request) (http.Response, error) {
 	resp, err := client.Do(req)
 	if err != nil {
 		return http.Response{}, fmt.Errorf("doing request: %w", err)
+	}
+
+	// Plain HTTP cannot solve a Cloudflare challenge, so fail fast with the real cause instead of a generic 403.
+	if resp.Header.Get("Cf-Mitigated") == "challenge" {
+		_ = resp.Body.Close()
+		return http.Response{}, retry.Unrecoverable(fmt.Errorf("%w: status code %d", ErrCloudflareChallenge, resp.StatusCode))
 	}
 
 	if err := CheckStatusCode(resp.StatusCode); err != nil {
