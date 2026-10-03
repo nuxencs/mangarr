@@ -147,3 +147,34 @@ func (f *flakyRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 	return f.base.RoundTrip(req)
 }
+
+func TestExecRequestReportsCloudflareChallenge(t *testing.T) {
+	t.Parallel()
+
+	var attempts atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempts.Add(1)
+		w.Header().Set("Cf-Mitigated", "challenge")
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer server.Close()
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL, nil)
+	require.NoError(t, err)
+
+	client := server.Client()
+	err = retry.Do(func() error {
+		resp, reqErr := ExecRequest(*client, req)
+		if reqErr != nil {
+			return reqErr
+		}
+		defer resp.Body.Close()
+
+		return nil
+	}, RetryOptions(t.Context())...)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), ErrCloudflareChallenge.Error())
+	require.Contains(t, err.Error(), "status code 403")
+	require.NotContains(t, err.Error(), "authentication error")
+	require.Equal(t, int32(1), attempts.Load())
+}
