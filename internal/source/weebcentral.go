@@ -180,7 +180,7 @@ func (w *weebcentral) Pages(ctx context.Context, chapter domain.Chapter) ([]doma
 
 	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
 	for _, imageURL := range imageURLs {
-		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
+		imageInfos = append(imageInfos, browserImage(imageURL))
 	}
 
 	return imageInfos, nil

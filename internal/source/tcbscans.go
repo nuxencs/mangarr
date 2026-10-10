@@ -165,7 +165,7 @@ func (t *tcbscans) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.
 	})
 
 	c.OnHTML("img.fixed-ratio-content", func(e *colly.HTMLElement) {
-		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: e.Attr("src")})
+		imageInfos = append(imageInfos, browserImage(e.Attr("src")))
 	})
 
 	path, err := url.JoinPath(t.BaseURL, chapter.URL)

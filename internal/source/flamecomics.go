@@ -236,23 +236,22 @@ func (f *flamecomics) Pages(ctx context.Context, chapter domain.Chapter) ([]doma
 		return cmp.Compare(aNum, bNum)
 	})
 
-	imageURLs := make([]domain.ImageInfo, 0, len(responseChapter.Images))
+	images := make([]domain.ImageInfo, 0, len(responseChapter.Images))
 	for _, key := range keys {
 		i := responseChapter.Images[key]
 
-		imageURLs = append(imageURLs, domain.ImageInfo{
-			ImageURL: fmt.Sprintf("%s/uploads/images/series/%d/%s/%s",
-				f.CDNBaseURL,
-				chapterResponse.Props.PageProps.Chapter.SeriesId,
-				responseChapter.Token,
-				i.Name,
-			),
-		})
+		imageURL := fmt.Sprintf("%s/uploads/images/series/%d/%s/%s",
+			f.CDNBaseURL,
+			chapterResponse.Props.PageProps.Chapter.SeriesId,
+			responseChapter.Token,
+			i.Name,
+		)
+		images = append(images, browserImage(imageURL))
 	}
 
-	if len(imageURLs) == 0 {
+	if len(images) == 0 {
 		return nil, fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
 	}
 
-	return imageURLs, nil
+	return images, nil
 }

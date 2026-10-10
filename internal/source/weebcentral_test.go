@@ -49,6 +49,9 @@ func TestWeebCentralPagesExtractsChapterAssets(t *testing.T) {
 	require.Len(t, pages, 2)
 	require.Equal(t, "https://cdn.weebcentral.test/manga/chapter-001.png", pages[0].ImageURL)
 	require.Equal(t, server.URL+"/media/chapter-002.png", pages[1].ImageURL)
+	for _, page := range pages {
+		require.Equal(t, browserUserAgent, page.RequestHeaders["User-Agent"])
+	}
 }
 
 func TestWeebCentralResolvesRelativeChapterURLs(t *testing.T) {

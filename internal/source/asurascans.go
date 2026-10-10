@@ -182,7 +182,7 @@ func (a *asurascans) Pages(ctx context.Context, chapter domain.Chapter) ([]domai
 
 	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
 	for _, imageURL := range imageURLs {
-		imageInfos = append(imageInfos, domain.ImageInfo{ImageURL: imageURL})
+		imageInfos = append(imageInfos, browserImage(imageURL))
 	}
 
 	return imageInfos, nil
