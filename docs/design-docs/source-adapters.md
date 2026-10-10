@@ -37,6 +37,7 @@ All adapters implement the small `domain.Source` contract:
 - unknown source values fail fast in source selection
 - `mangaplus` uses the mobile API because the web protobuf endpoint rejects current unauthenticated access; chapter discovery reads the current `chapter_list_v2` field with legacy list fields kept as fallback
 - `asurascans` removes chapters marked `is_locked=true` or `is_premium=true` before returning the chapter map
+- `asurascans` reads page images from `asura-images/chapters/` and from `asura-images/chapters-merged/`, which some chapters use instead
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
 - `comix` implements frontend build `35595e3de3c99889c1aa70`; it generates request tokens, decodes encrypted API envelopes, sends image request headers, and reconstructs scrambled tile images
 - Comix scramble hashes are opaque routing keys. The two known legacy hashes select explicit seed prefixes; unknown hashes use prefix zero, matching the frontend fallback.
