@@ -213,6 +213,9 @@ func TestAsurascansPagesExtractsChapterAssets(t *testing.T) {
 	require.Len(t, pages, 2)
 	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/001.webp", pages[0].ImageURL)
 	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/002.webp", pages[1].ImageURL)
+	for _, page := range pages {
+		require.Equal(t, browserUserAgent, page.RequestHeaders["User-Agent"])
+	}
 }
 
 func newTestAsurascans(mangaURL, baseURL string) *asurascans {

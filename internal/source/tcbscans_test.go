@@ -45,6 +45,11 @@ func TestTCBScansFixtureFlow(t *testing.T) {
 		if len(pages) != 2 {
 			t.Fatalf("image count = %d, want 2", len(pages))
 		}
+		for _, page := range pages {
+			if got := page.RequestHeaders["User-Agent"]; got != browserUserAgent {
+				t.Fatalf("image User-Agent = %q, want browser user agent", got)
+			}
+		}
 	}
 }
 

@@ -111,6 +111,43 @@ func TestDownloadImageAppliesHeadersAndProcessor(t *testing.T) {
 	require.Equal(t, []byte("processed:payload"), result)
 }
 
+// Scraping sources rely on RequestHeaders to replace the default user agent on Cloudflare-fronted image hosts.
+func TestDownloadImageRequestHeadersOverrideUserAgent(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		headers map[string]string
+		want    string
+	}{
+		"default":         {want: userAgent},
+		"source override": {headers: map[string]string{"User-Agent": "Browser/1.0"}, want: "Browser/1.0"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var got atomic.Pointer[string]
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				received := r.UserAgent()
+				got.Store(&received)
+				w.Header().Set("Content-Type", "image/png")
+				_, _ = w.Write([]byte("payload"))
+			}))
+			defer server.Close()
+
+			outBase := filepath.Join(t.TempDir(), "img")
+			err := downloadImage(t.Context(), zerolog.Nop(), domain.ImageInfo{
+				ImageURL:       server.URL,
+				RequestHeaders: tt.headers,
+			}, outBase, 1, 1)
+			require.NoError(t, err)
+			require.NotNil(t, got.Load())
+			require.Equal(t, tt.want, *got.Load())
+		})
+	}
+}
+
 func TestDownloadImageRetriesTransientServerError(t *testing.T) {
 	t.Parallel()
 

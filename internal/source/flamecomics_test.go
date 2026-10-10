@@ -41,6 +41,11 @@ func TestFlameComicsFixtureFlow(t *testing.T) {
 		if got := pages[0].ImageURL; got != "https://cdn.example/uploads/images/series/7/chapter-token/001.webp" {
 			t.Fatalf("first image URL = %q", got)
 		}
+		for _, page := range pages {
+			if got := page.RequestHeaders["User-Agent"]; got != browserUserAgent {
+				t.Fatalf("image User-Agent = %q, want browser user agent", got)
+			}
+		}
 	}
 }
 
