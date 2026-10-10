@@ -218,6 +218,43 @@ func TestAsurascansPagesExtractsChapterAssets(t *testing.T) {
 	}
 }
 
+// Some chapters, such as Solo Max-Level Newbie Ch. 0, store pages under chapters-merged/<chapter ID>/.
+func TestAsurascansPagesExtractsMergedChapterAssets(t *testing.T) {
+	t.Parallel()
+
+	const chapterPath = "/comics/solo-max-level-newbie-bd5bdaf8/chapter/0"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case chapterPath:
+			fmt.Fprint(w, `
+				<html>
+					<body>
+						<img src="https://cdn.asurascans.com/asura-images/covers/solo-max-level-newbie.bac83f.webp" />
+						<img src="https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/001.webp?v=1791412460" />
+						<img src="https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/002.webp?v=1791412460" />
+						<img src="https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/001.webp?v=1791412460" />
+					</body>
+				</html>
+			`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	src := newTestAsurascans(server.URL+chapterPath, server.URL)
+
+	pages, err := src.Pages(t.Context(), domain.Chapter{
+		URL:    server.URL + chapterPath,
+		Number: mustChapterNumber("0"),
+	})
+	require.NoError(t, err)
+	require.Len(t, pages, 2)
+	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/001.webp?v=1791412460", pages[0].ImageURL)
+	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/002.webp?v=1791412460", pages[1].ImageURL)
+}
+
 func newTestAsurascans(mangaURL, baseURL string) *asurascans {
 	collector := newScrapeCollector(10 * time.Second)
 

@@ -21,7 +21,8 @@ import (
 const asurascansBaseURL = "https://asurascans.com"
 
 var (
-	asurascansChapterAssetPattern       = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters/[^"&<]+`)
+	// Most chapters use chapters/<number>/; some, such as Solo Max-Level Newbie Ch. 0, use chapters-merged/<chapter ID>/.
+	asurascansChapterAssetPattern       = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters(?:-merged)?/[^"&<]+`)
 	asurascansUnavailableChapterPattern = regexp.MustCompile(`"number":\[0,(\d+(?:\.\d+)?)\][^}]*"(?:is_locked|is_premium)":\[0,true\]`)
 )
 
