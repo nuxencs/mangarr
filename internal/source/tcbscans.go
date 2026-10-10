@@ -12,7 +12,6 @@ import (
 	"mangarr/internal/sanitize"
 
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/extensions"
 )
 
 const (
@@ -28,12 +27,7 @@ type tcbscans struct {
 }
 
 func NewTCBScans(mangaTitle string) domain.Source {
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-	)
-	extensions.RandomUserAgent(collector)
-
-	collector.SetRequestTimeout(120 * time.Second)
+	collector := newScrapeCollector(120 * time.Second)
 
 	return &tcbscans{
 		Collector:  collector,

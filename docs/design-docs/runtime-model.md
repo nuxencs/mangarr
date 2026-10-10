@@ -49,9 +49,9 @@ constraints.
 The policy adds no config or CLI settings and does not change concurrency or
 monitor polling. It does not coordinate a provider-wide cooldown across requests
 or processes. Persistent limits can still exhaust the retry budget. Colly-based
-discovery and page requests have separate handling, although their image downloads
-use shared retries. For user recovery steps, see
-[bulk downloads and rate limits](../USAGE.md#bulk-downloads-and-rate-limits).
+discovery and page requests have separate retry handling, although their image
+downloads use shared retries. Both paths share Cloudflare block detection. For
+user recovery steps, see [bulk downloads and rate limits](../USAGE.md#bulk-downloads-and-rate-limits).
 
 ## Config Lifecycle
 

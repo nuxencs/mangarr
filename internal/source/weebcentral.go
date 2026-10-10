@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -16,9 +15,7 @@ import (
 	"mangarr/internal/sharedhttp"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/avast/retry-go"
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/extensions"
 )
 
 const (
@@ -35,12 +32,7 @@ type weebcentral struct {
 }
 
 func NewWeebCentral(mangaURL string) domain.Source {
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-	)
-	extensions.RandomUserAgent(collector)
-
-	collector.SetRequestTimeout(120 * time.Second)
+	collector := newScrapeCollector(120 * time.Second)
 
 	return &weebcentral{
 		Collector: collector,
@@ -151,7 +143,7 @@ func (w *weebcentral) getChapters(ctx context.Context, manga domain.Manga) error
 
 	err = c.Visit(path)
 	if err != nil {
-		return fmt.Errorf("visiting URL %s: %w", w.MangaURL, err)
+		return fmt.Errorf("visiting URL %s: %w", path, err)
 	}
 
 	if len(errors) > 0 {
@@ -172,7 +164,7 @@ func (w *weebcentral) Pages(ctx context.Context, chapter domain.Chapter) ([]doma
 		return nil, fmt.Errorf("building chapter images URL from %s: %w", chapter.URL, err)
 	}
 
-	body, err := w.fetch(ctx, imageURL)
+	body, err := fetchPage(ctx, w.Client, imageURL, "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	if err != nil {
 		return nil, fmt.Errorf("fetching chapter images %s: %w", imageURL, err)
 	}
@@ -220,38 +212,6 @@ func (w *weebcentral) chapterImagesURL(chapterURL string) (string, error) {
 	u.RawQuery = params.Encode()
 
 	return u.String(), nil
-}
-
-func (w *weebcentral) fetch(ctx context.Context, rawURL string) ([]byte, error) {
-	var body []byte
-
-	err := retry.Do(func() error {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-		if err != nil {
-			return fmt.Errorf("creating request for %s: %w", rawURL, err)
-		}
-
-		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; mangarr/1.0; +https://github.com/nuxencs/mangarr)")
-		req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-
-		resp, err := sharedhttp.ExecRequest(w.Client, req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("reading response body from %s: %w", rawURL, err)
-		}
-
-		return nil
-	}, sharedhttp.RetryOptions(ctx)...)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
 }
 
 func (w *weebcentral) extractImageURLs(body []byte) ([]string, error) {

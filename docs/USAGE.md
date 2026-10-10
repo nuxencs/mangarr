@@ -119,6 +119,11 @@ varies by source and request type, so a persistent limit or a failure during
 source discovery may still require waiting before you try again. A chapter
 download failure reports the affected chapter; partial chapters are not published.
 
+If an error says `blocked by Cloudflare` or `blocked by Cloudflare challenge`,
+the Cloudflare protection of the source site rejected the request. Retrying does
+not help. Update Mangarr, and report an issue if the error continues on the
+latest version.
+
 ### `monitor`
 
 Run mangarr as a long-lived watcher that checks configured series on an interval.

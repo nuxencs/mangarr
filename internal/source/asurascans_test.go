@@ -9,8 +9,6 @@ import (
 
 	"mangarr/internal/domain"
 
-	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/extensions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -218,11 +216,7 @@ func TestAsurascansPagesExtractsChapterAssets(t *testing.T) {
 }
 
 func newTestAsurascans(mangaURL, baseURL string) *asurascans {
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-	)
-	extensions.RandomUserAgent(collector)
-	collector.SetRequestTimeout(10 * time.Second)
+	collector := newScrapeCollector(10 * time.Second)
 
 	return &asurascans{
 		MangaURL:  mangaURL,
