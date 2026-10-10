@@ -45,5 +45,7 @@ All adapters implement the small `domain.Source` contract:
 - shared request retries use `internal/sharedhttp/`; see the [retry policy and scraper limitations](./runtime-model.md#http-retry-lifecycle)
 - Manga Plus request errors omit query strings so registration and device secrets do not enter logs
 - HTTP and Colly-backed requests inherit caller cancellation
+- HTML-scraping adapters (`asurascans`, `flamecomics`, `tcbscans`, `weebcentral`) send a fixed browser user agent from `internal/source/scrape.go`, because Cloudflare WAF rules block non-browser user agents. Set it with `colly.UserAgent`, not `extensions.RandomUserAgent`: `Collector.Clone` drops callbacks.
+- Cloudflare challenge and WAF block pages fail fast with `sharedhttp.ErrCloudflareChallenge` or `sharedhttp.ErrCloudflareBlock`. `sharedhttp.ExecRequest` checks them for plain HTTP requests, and the Colly collector from `newScrapeCollector` uses `sharedhttp.CloudflareTransport`.
 - fixture-backed parser flows cover every supported source
 - manhwa/long-strip handling flows through `selectedManga.IsManhwa`

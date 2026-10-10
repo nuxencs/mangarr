@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"html"
-	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -16,9 +15,7 @@ import (
 	"mangarr/internal/sharedhttp"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/avast/retry-go"
 	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/extensions"
 )
 
 const asurascansBaseURL = "https://asurascans.com"
@@ -36,11 +33,7 @@ type asurascans struct {
 }
 
 func NewAsurascans(mangaURL string) domain.Source {
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-	)
-	extensions.RandomUserAgent(collector)
-	collector.SetRequestTimeout(120 * time.Second)
+	collector := newScrapeCollector(120 * time.Second)
 
 	return &asurascans{
 		MangaURL:  mangaURL,
@@ -176,7 +169,7 @@ func (a *asurascans) Discover(ctx context.Context) (domain.Manga, error) {
 }
 
 func (a *asurascans) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
-	body, err := a.fetch(ctx, chapter.URL)
+	body, err := fetchPage(ctx, a.Client, chapter.URL, "text/html,application/json;q=0.9,*/*;q=0.8")
 	if err != nil {
 		return nil, fmt.Errorf("fetching chapter page %s: %w", chapter.URL, err)
 	}
@@ -193,38 +186,6 @@ func (a *asurascans) Pages(ctx context.Context, chapter domain.Chapter) ([]domai
 	}
 
 	return imageInfos, nil
-}
-
-func (a *asurascans) fetch(ctx context.Context, rawURL string) ([]byte, error) {
-	var body []byte
-
-	err := retry.Do(func() error {
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-		if err != nil {
-			return fmt.Errorf("creating request for %s: %w", rawURL, err)
-		}
-
-		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; mangarr/1.0; +https://github.com/nuxencs/mangarr)")
-		req.Header.Set("Accept", "text/html,application/json;q=0.9,*/*;q=0.8")
-
-		resp, err := sharedhttp.ExecRequest(a.Client, req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-
-		body, err = io.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("reading response body from %s: %w", rawURL, err)
-		}
-
-		return nil
-	}, sharedhttp.RetryOptions(ctx)...)
-	if err != nil {
-		return nil, err
-	}
-
-	return body, nil
 }
 
 func (a *asurascans) chapterDetailsFromLink(href string, e *colly.HTMLElement) (domain.ChapterNumber, string, error) {

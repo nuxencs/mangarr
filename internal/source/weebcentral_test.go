@@ -9,8 +9,6 @@ import (
 
 	"mangarr/internal/domain"
 
-	"github.com/gocolly/colly/v2"
-	"github.com/gocolly/colly/v2/extensions"
 	"github.com/stretchr/testify/require"
 )
 
@@ -118,11 +116,7 @@ func TestWeebCentralRejectsPrefixHostSpoofing(t *testing.T) {
 }
 
 func newTestWeebCentral(mangaURL, baseURL string) *weebcentral {
-	collector := colly.NewCollector(
-		colly.AllowURLRevisit(),
-	)
-	extensions.RandomUserAgent(collector)
-	collector.SetRequestTimeout(10 * time.Second)
+	collector := newScrapeCollector(10 * time.Second)
 
 	return &weebcentral{
 		MangaURL:  mangaURL,
