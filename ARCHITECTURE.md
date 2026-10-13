@@ -15,7 +15,7 @@ Verified against code on 2026-08-07.
 | Domain | Main entrypoints | Notes |
 | --- | --- | --- |
 | Download now | `cmd/download.go` | source discovery and chapter selection |
-| Continuous monitor | `cmd/monitor.go` | config load, reload-aware scheduler, latest-chapter selection |
+| Continuous monitor | `cmd/monitor.go` | config load, reload-aware scheduler, new-chapter selection |
 | Source integration | `internal/source/` | highest churn; mixed API and HTML scraping |
 | Chapter acquisition | `internal/acquire/`, `internal/download/`, `internal/files/` | naming, existing-file policy, page resolution, image fetch, CBZ creation |
 | Ops + packaging | `.github/workflows/release.yml`, `.goreleaser.yaml`, `ci.Dockerfile` | release binaries and multi-arch Docker images |
@@ -52,8 +52,8 @@ Rule: source-specific scraping logic stays in `internal/source/`. Generic retry,
 3. Start config reload watcher.
 4. Tick on `checkInterval`.
 5. For each monitored manga, resolve source adapter.
-6. Pass the latest chapter to the shared acquisition module.
-7. Report its downloaded or skipped outcome.
+6. Select the latest chapter plus every chapter above the in-memory mark from the last successful check.
+7. Pass the selection to the shared chapter pipeline (`cmd/chapters.go`); move the mark only when no chapter failed.
 
 ## Cross-Cutting Concerns
 
