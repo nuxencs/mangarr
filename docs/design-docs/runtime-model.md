@@ -1,6 +1,6 @@
 # Runtime Model
 
-Verified against `cmd/download.go`, `cmd/monitor.go`, and `internal/config/config.go` on 2026-08-09.
+Verified against `cmd/download.go`, `cmd/monitor.go`, and `internal/config/config.go` on 2026-10-13.
 
 ## Commands
 
@@ -18,6 +18,12 @@ Persistent state is file-based:
 
 There is no database, queue, or remote control plane.
 
+Monitor keeps one in-memory value for each series: the highest chapter number
+from its last successful check. Each check selects the latest chapter plus every
+chapter above that value. The value resets on restart, on removal of the entry,
+and on a change to the entry's source, manga, group, or language. See
+[monitor chapter selection](../USAGE.md#monitor).
+
 Chapter acquisition (`internal/acquire/`) applies the
 [existing-archive policy](../USAGE.md#download) before page resolution.
 Images download to a temporary directory, then `internal/files/` assembles a
@@ -26,8 +32,8 @@ temporary file, checks cancellation, and renames the file into place.
 
 ## Concurrency
 
-- chapter jobs fan out in `download`
-- source jobs fan out per tick in `monitor`
+- chapter jobs fan out in `download`, and in `monitor` for each series (`cmd/chapters.go`)
+- source jobs fan out per check in `monitor`
 - image downloads fan out inside `internal/download`
 
 Each layer has an explicit concurrency limit. The code favors bounded parallelism over unbounded goroutine fan-out.

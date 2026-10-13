@@ -1,6 +1,6 @@
 # Monitoring Operator
 
-Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-08-09.
+Verified against `cmd/monitor.go` and `internal/config/config.go` on 2026-10-13.
 
 ## User Goal
 
@@ -23,6 +23,8 @@ Run `mangarr monitor` unattended and trust it to fetch new chapters without cons
 - failure handling does not corrupt already-downloaded archives
 - source-specific runtime requirements stay documented when they appear
 - monitor checks configured manga once at startup before waiting for the interval
+- every chapter released between two checks downloads, not only the latest; a
+  failed chapter is retried on the next check
 - invalid reloads keep the last valid config snapshot active
 - atomic replacement and delete-then-recreate saves do not stop future reloads
 - config lookup follows the documented operating-system and binary locations

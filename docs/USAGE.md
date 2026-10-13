@@ -205,6 +205,19 @@ each reload. Atomic replacement and delete-then-recreate saves remain watched.
 An invalid, incomplete, or temporarily missing config keeps the last valid
 settings active. Changes to pprof and log file output settings require a restart.
 
+On the first check of a series, monitor downloads only the latest chapter. It
+then remembers the highest chapter number that the source lists. Each later
+check downloads the latest chapter and every chapter above that number, so
+several chapters released in one check interval all download. Existing archives
+are skipped. If a chapter fails, monitor keeps the old number and tries the
+chapter again on the next check. A change to the `source`, `manga`, `group`, or
+`language` of an entry starts the series again from latest only.
+
+Monitor keeps this number in memory only. After a restart, chapters released
+while monitor was stopped do not download automatically. Use a configured
+download to fill the gap, for example
+`mangarr download -c <config-dir> --series "One Piece" -C "1101-1103"`.
+
 ### `version`
 
 Show local build/version info and attempt an advisory update check. Local version
