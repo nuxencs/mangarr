@@ -254,3 +254,36 @@ func (w *weebcentral) getChapterNumber(name string) (domain.ChapterNumber, error
 
 	return number, nil
 }
+
+func resolveAgainstBase(baseURL, ref string) (string, error) {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+
+	relative, err := url.Parse(ref)
+	if err != nil {
+		return "", err
+	}
+
+	return base.ResolveReference(relative).String(), nil
+}
+
+func dedupeStrings(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+
+	return result
+}

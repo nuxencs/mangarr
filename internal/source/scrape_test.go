@@ -13,10 +13,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// scrapingSources builds each HTML-scraping adapter against a test server.
+// scrapingSources builds each adapter of a Cloudflare-protected site against a test server.
 var scrapingSources = []struct {
 	name      string
 	newSource func(serverURL string) domain.Source
+	// discoverWrapsErrors is set when Discover fetches through retry-go, whose aggregate error does not unwrap.
+	discoverWrapsErrors bool
 }{
 	{
 		name: "weebcentral",
@@ -30,9 +32,10 @@ var scrapingSources = []struct {
 		name: "asurascans",
 		newSource: func(serverURL string) domain.Source {
 			src := NewAsurascans(serverURL + "/comics/fixture").(*asurascans)
-			src.BaseURL = serverURL
+			src.APIURL = serverURL
 			return src
 		},
+		discoverWrapsErrors: true,
 	},
 	{
 		name: "flamecomics",
@@ -101,7 +104,11 @@ func TestScrapingSourcesReportCloudflareBlock(t *testing.T) {
 
 			src := tt.newSource(server.URL)
 			_, err := src.Discover(t.Context())
-			require.ErrorIs(t, err, sharedhttp.ErrCloudflareBlock)
+			if tt.discoverWrapsErrors {
+				require.ErrorContains(t, err, sharedhttp.ErrCloudflareBlock.Error()+": status code 403")
+			} else {
+				require.ErrorIs(t, err, sharedhttp.ErrCloudflareBlock)
+			}
 
 			// Some adapters fetch pages through retry-go, whose aggregate error does not unwrap.
 			_, err = src.Pages(t.Context(), domain.Chapter{URL: server.URL + "/chapters/fixture", Number: mustChapterNumber("1")})

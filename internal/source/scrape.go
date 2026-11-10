@@ -14,7 +14,7 @@ import (
 	"github.com/gocolly/colly/v2"
 )
 
-// browserUserAgent is sent on page and image requests of HTML-scraping adapters, because Cloudflare WAF rules on those sites block non-browser user agents.
+// browserUserAgent is sent on page, API, and image requests of adapters for Cloudflare-protected sites, because Cloudflare WAF rules on those sites block non-browser user agents.
 const browserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36"
 
 // newScrapeCollector returns the base collector for HTML-scraping adapters.
@@ -32,7 +32,7 @@ func newScrapeCollector(timeout time.Duration) *colly.Collector {
 	return collector
 }
 
-// browserImage sends the browser user agent with an image download, because scraping sources' image hosts are behind Cloudflare too.
+// browserImage sends the browser user agent with an image download, because the image hosts of these sites are behind Cloudflare too.
 func browserImage(imageURL string) domain.ImageInfo {
 	return domain.ImageInfo{
 		ImageURL:       imageURL,
@@ -40,7 +40,7 @@ func browserImage(imageURL string) domain.ImageInfo {
 	}
 }
 
-// fetchPage gets rawURL with the browser user agent and shared retries, for adapters that parse a page without Colly.
+// fetchPage gets rawURL with the browser user agent and shared retries, for adapters that read a page or API response without Colly.
 func fetchPage(ctx context.Context, client http.Client, rawURL, accept string) ([]byte, error) {
 	var body []byte
 

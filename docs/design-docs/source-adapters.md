@@ -18,7 +18,7 @@ All adapters implement the small `domain.Source` contract:
 | `mangadex` | manga UUID | `-g` optional, `-l` optional | valid manga UUID | API-based |
 | `mangaplus` | numeric title ID | none | strict numeric regex | mobile protobuf API; lazily registers a deterministic device secret |
 | `flamecomics` | full series URL | none | `https://flamecomics.xyz` prefix | HTML + embedded JSON |
-| `asurascans` | full series URL | none | `https://asurascans.com/comics/...` | server-rendered HTML; filters locked early-access chapters from discovery |
+| `asurascans` | full series URL | none | `https://asurascans.com/comics/...` | JSON API at `https://api.asurascans.com`; filters premium early-access chapters from discovery |
 | `cubari` | gist URL | `-g` required | valid URL + non-empty group | images listed in the payload, or fetched from the `/proxy/...` path the gist points at |
 | `weebcentral` | full series URL | none | `https://weebcentral.com` prefix | scraper + chapter image fragment fetch |
 | `comix` | full manga URL | `-g` optional | `https://comix.to/title/...` prefix; numeric group when set | private API codec + referer-protected images + tile reconstruction |
@@ -36,8 +36,8 @@ All adapters implement the small `domain.Source` contract:
 
 - unknown source values fail fast in source selection
 - `mangaplus` uses the mobile API because the web protobuf endpoint rejects current unauthenticated access; chapter discovery reads the current `chapter_list_v2` field with legacy list fields kept as fallback
-- `asurascans` removes chapters marked `is_locked=true` or `is_premium=true` before returning the chapter map
-- `asurascans` reads page images from `asura-images/chapters/` and from `asura-images/chapters-merged/`, which some chapters use instead
+- `asurascans` reads `/api/series/<slug>` and `/api/series/<slug>/chapters` from `https://api.asurascans.com`, because Cloudflare has challenged every `asurascans.com` page since 2026-11-10. The slug comes from the configured `/comics/<slug>` URL. The API accepts a slug with an outdated hash suffix (the series endpoint redirects it to the current slug), so old URLs keep working.
+- `asurascans` removes chapters marked `is_premium=true` before returning the chapter map, and takes page image URLs from the `pages` list of `/api/series/<slug>/chapters/<chapter slug>`.
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
 - `comix` implements frontend build `35595e3de3c99889c1aa70`; it generates request tokens, decodes encrypted API envelopes, sends image request headers, and reconstructs scrambled tile images
 - Comix scramble hashes are opaque routing keys. The two known legacy hashes select explicit seed prefixes; unknown hashes use prefix zero, matching the frontend fallback.
@@ -46,7 +46,7 @@ All adapters implement the small `domain.Source` contract:
 - shared request retries use `internal/sharedhttp/`; see the [retry policy and scraper limitations](./runtime-model.md#http-retry-lifecycle)
 - Manga Plus request errors omit query strings so registration and device secrets do not enter logs
 - HTTP and Colly-backed requests inherit caller cancellation
-- HTML-scraping adapters (`asurascans`, `flamecomics`, `tcbscans`, `weebcentral`) send a fixed browser user agent from `internal/source/scrape.go`, because Cloudflare WAF rules block non-browser user agents. Set the collector user agent with `colly.UserAgent`, not `extensions.RandomUserAgent`, because `Collector.Clone` drops callbacks. The image hosts of these adapters are behind Cloudflare too, so each image carries the same user agent in `ImageInfo.RequestHeaders`. API sources keep the default `mangarr` user agent of the downloader.
+- HTML-scraping adapters (`flamecomics`, `tcbscans`, `weebcentral`) and the `asurascans` API adapter send a fixed browser user agent from `internal/source/scrape.go`, because Cloudflare WAF rules block non-browser user agents. Set the collector user agent with `colly.UserAgent`, not `extensions.RandomUserAgent`, because `Collector.Clone` drops callbacks. The image hosts of these adapters are behind Cloudflare too, so each image carries the same user agent in `ImageInfo.RequestHeaders`. API sources keep the default `mangarr` user agent of the downloader.
 - Cloudflare challenge and WAF block pages fail fast with `sharedhttp.ErrCloudflareChallenge` or `sharedhttp.ErrCloudflareBlock`. `sharedhttp.ExecRequest` checks them for plain HTTP requests, and the Colly collector from `newScrapeCollector` uses `sharedhttp.CloudflareTransport`.
 - fixture-backed parser flows cover every supported source
 - manhwa/long-strip handling flows through `selectedManga.IsManhwa`
