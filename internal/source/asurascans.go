@@ -1,50 +1,69 @@
 package source
 
 import (
+	"cmp"
 	"context"
+	"encoding/json/v2"
 	"fmt"
-	"html"
 	"net/http"
 	"net/url"
-	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	"mangarr/internal/domain"
 	"mangarr/internal/sanitize"
 	"mangarr/internal/sharedhttp"
-
-	"github.com/PuerkitoBio/goquery"
-	"github.com/gocolly/colly/v2"
 )
 
-const asurascansBaseURL = "https://asurascans.com"
-
-var (
-	// Most chapters use chapters/<number>/; some, such as Solo Max-Level Newbie Ch. 0, use chapters-merged/<chapter ID>/.
-	asurascansChapterAssetPattern       = regexp.MustCompile(`https://cdn\.asurascans\.com/asura-images/chapters(?:-merged)?/[^"&<]+`)
-	asurascansUnavailableChapterPattern = regexp.MustCompile(`"number":\[0,(\d+(?:\.\d+)?)\][^}]*"(?:is_locked|is_premium)":\[0,true\]`)
+const (
+	asurascansBaseURL = "https://asurascans.com"
+	// Since 2026-11-10, Cloudflare has challenged every asurascans.com page. The JSON API of the site is still public.
+	asurascansAPIURL = "https://api.asurascans.com"
 )
 
 type asurascans struct {
-	MangaURL  string
-	Collector *colly.Collector
-	Client    http.Client
-	BaseURL   string
+	MangaURL string
+	Client   http.Client
+	APIURL   string
 }
 
 func NewAsurascans(mangaURL string) domain.Source {
-	collector := newScrapeCollector(120 * time.Second)
-
 	return &asurascans{
-		MangaURL:  mangaURL,
-		Collector: collector,
-		BaseURL:   asurascansBaseURL,
+		MangaURL: mangaURL,
+		APIURL:   asurascansAPIURL,
 		Client: http.Client{
 			Timeout:   120 * time.Second,
 			Transport: sharedhttp.Transport,
 		},
 	}
+}
+
+// Unlike the chapter endpoints, the series endpoint has no "data" wrapper.
+type asurascansSeriesResponse struct {
+	Series struct {
+		Title string `json:"title"`
+	} `json:"series"`
+}
+
+type asurascansChapterListResponse struct {
+	Data []struct {
+		Number     float64 `json:"number"`
+		Title      string  `json:"title"`
+		Slug       string  `json:"slug"`
+		SeriesSlug string  `json:"series_slug"`
+		IsPremium  bool    `json:"is_premium"`
+	} `json:"data"`
+}
+
+type asurascansChapterResponse struct {
+	Data struct {
+		Chapter struct {
+			Pages []struct {
+				URL string `json:"url"`
+			} `json:"pages"`
+		} `json:"chapter"`
+	} `json:"data"`
 }
 
 func (a *asurascans) String() string {
@@ -65,8 +84,8 @@ func (a *asurascans) ValidateInput() error {
 		return fmt.Errorf("the URL for Asura Scans must start with %s", asurascansBaseURL)
 	}
 
-	if !strings.HasPrefix(parsed.Path, "/comics/") {
-		return fmt.Errorf("the URL for Asura Scans must point to /comics/...")
+	if _, err := asurascansSeriesSlug(parsed); err != nil {
+		return err
 	}
 
 	return nil
@@ -78,88 +97,50 @@ func (a *asurascans) Discover(ctx context.Context) (domain.Manga, error) {
 		return domain.Manga{}, fmt.Errorf("parsing URL %s: %w", a.MangaURL, err)
 	}
 
-	resolvedURL := stripURLQueryAndFragment(parsed)
+	slug, err := asurascansSeriesSlug(parsed)
+	if err != nil {
+		return domain.Manga{}, err
+	}
+
+	var series asurascansSeriesResponse
+	if err := a.getJSON(ctx, a.seriesAPIURL(slug), &series); err != nil {
+		return domain.Manga{}, fmt.Errorf("getting series %s: %w", slug, err)
+	}
+
+	title := sanitize.Filename(strings.TrimSpace(series.Series.Title))
+	if len(title) == 0 {
+		return domain.Manga{}, fmt.Errorf("getting title for series %s", slug)
+	}
+
+	var chapterList asurascansChapterListResponse
+	if err := a.getJSON(ctx, a.seriesAPIURL(slug, "chapters"), &chapterList); err != nil {
+		return domain.Manga{}, fmt.Errorf("getting chapters for series %s: %w", slug, err)
+	}
+
 	manga := domain.Manga{
-		URL:      resolvedURL,
+		URL:      stripURLQueryAndFragment(parsed),
+		Title:    title,
 		Chapters: make(map[domain.ChapterNumber]domain.Chapter),
 		IsManhwa: true,
 	}
 
-	var errors []error
-	c := a.Collector.Clone()
-	c.Context = ctx
-
-	c.OnError(func(r *colly.Response, err error) {
-		errors = append(errors, fmt.Errorf("requesting URL %s: %w", r.Request.URL, err))
-	})
-
-	c.OnHTML("h1", func(e *colly.HTMLElement) {
-		if len(manga.Title) != 0 {
-			return
+	for _, item := range chapterList.Data {
+		// Premium chapters are early access: their pages are not public yet.
+		if item.IsPremium || len(item.Slug) == 0 {
+			continue
 		}
 
-		title := sanitize.Filename(strings.TrimSpace(html.UnescapeString(e.Text)))
-		if len(title) != 0 {
-			manga.Title = title
-		}
-	})
-
-	lockedChapters := make(map[domain.ChapterNumber]struct{})
-
-	c.OnHTML("astro-island", func(e *colly.HTMLElement) {
-		componentURL := e.Attr("component-url")
-		if !strings.Contains(componentURL, "ChapterList") {
-			return
-		}
-
-		props := html.UnescapeString(e.Attr("props"))
-		for _, match := range asurascansUnavailableChapterPattern.FindAllStringSubmatch(props, -1) {
-			chapterNum, err := domain.ParseChapterNumber(match[1])
-			if err != nil {
-				continue
-			}
-			lockedChapters[chapterNum] = struct{}{}
-		}
-	})
-
-	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
-		href := strings.TrimSpace(e.Attr("href"))
-		if !strings.HasPrefix(href, "/comics/") || !strings.Contains(href, "/chapter/") {
-			return
-		}
-
-		chapterNum, title, err := a.chapterDetailsFromLink(href, e)
+		chapterNum, err := domain.ParseChapterNumber(strconv.FormatFloat(item.Number, 'f', -1, 64))
 		if err != nil {
-			return
+			continue
 		}
 
-		chapterURL, err := resolveAgainstBase(a.BaseURL, href)
-		if err != nil {
-			errors = append(errors, fmt.Errorf("building chapter URL from %s: %w", href, err))
-			return
-		}
-
+		// The chapter list gives the series slug without the hash suffix, which Asura changes from time to time.
 		manga.Chapters[chapterNum] = domain.Chapter{
-			URL:    chapterURL,
+			URL:    a.seriesAPIURL(cmp.Or(item.SeriesSlug, slug), "chapters", item.Slug),
 			Number: chapterNum,
-			Title:  sanitize.Filename(title),
+			Title:  sanitize.Filename(strings.TrimSpace(item.Title)),
 		}
-	})
-
-	if err := c.Visit(resolvedURL); err != nil {
-		return domain.Manga{}, fmt.Errorf("visiting URL %s: %w", resolvedURL, err)
-	}
-
-	if len(errors) > 0 {
-		return domain.Manga{}, fmt.Errorf("processing %d URLs: %w", len(errors), errors[0])
-	}
-
-	for num := range lockedChapters {
-		delete(manga.Chapters, num)
-	}
-
-	if len(manga.Title) == 0 {
-		return domain.Manga{}, fmt.Errorf("getting manga for URL %s", resolvedURL)
 	}
 
 	if len(manga.Chapters) == 0 {
@@ -170,51 +151,58 @@ func (a *asurascans) Discover(ctx context.Context) (domain.Manga, error) {
 }
 
 func (a *asurascans) Pages(ctx context.Context, chapter domain.Chapter) ([]domain.ImageInfo, error) {
-	body, err := fetchPage(ctx, a.Client, chapter.URL, "text/html,application/json;q=0.9,*/*;q=0.8")
-	if err != nil {
-		return nil, fmt.Errorf("fetching chapter page %s: %w", chapter.URL, err)
+	var response asurascansChapterResponse
+	if err := a.getJSON(ctx, chapter.URL, &response); err != nil {
+		return nil, fmt.Errorf("getting chapter %s: %w", chapter.Number, err)
 	}
 
-	matches := asurascansChapterAssetPattern.FindAllString(string(body), -1)
-	imageURLs := dedupeStrings(matches)
-	if len(imageURLs) == 0 {
+	imageInfos := make([]domain.ImageInfo, 0, len(response.Data.Chapter.Pages))
+	for _, page := range response.Data.Chapter.Pages {
+		if len(page.URL) != 0 {
+			imageInfos = append(imageInfos, browserImage(page.URL))
+		}
+	}
+
+	if len(imageInfos) == 0 {
 		return nil, fmt.Errorf("getting image URLs for chapter %s", chapter.Number)
-	}
-
-	imageInfos := make([]domain.ImageInfo, 0, len(imageURLs))
-	for _, imageURL := range imageURLs {
-		imageInfos = append(imageInfos, browserImage(imageURL))
 	}
 
 	return imageInfos, nil
 }
 
-func (a *asurascans) chapterDetailsFromLink(href string, e *colly.HTMLElement) (domain.ChapterNumber, string, error) {
-	title := strings.TrimSpace(html.UnescapeString(e.DOM.Find("span.block.truncate").First().Text()))
-
-	texts := make([]string, 0, 3)
-	e.DOM.Find("span").Each(func(_ int, s *goquery.Selection) {
-		text := strings.TrimSpace(html.UnescapeString(s.Text()))
-		if len(text) != 0 {
-			texts = append(texts, text)
-		}
-	})
-
-	if len(title) == 0 && len(texts) >= 3 {
-		title = texts[1]
+// seriesAPIURL returns the API URL for the series slug, followed by the escaped path segments in rest.
+func (a *asurascans) seriesAPIURL(slug string, rest ...string) string {
+	path := a.APIURL + "/api/series/" + url.PathEscape(slug)
+	for _, segment := range rest {
+		path += "/" + url.PathEscape(segment)
 	}
 
-	if len(texts) == 0 {
-		return domain.ChapterNumber{}, "", fmt.Errorf("missing chapter text for %s", href)
-	}
+	return path
+}
 
-	headline := strings.TrimSpace(strings.TrimPrefix(texts[0], "Chapter "))
-	chapterNum, err := domain.ParseChapterNumber(headline)
+func (a *asurascans) getJSON(ctx context.Context, rawURL string, target any) error {
+	body, err := fetchPage(ctx, a.Client, rawURL, "application/json")
 	if err != nil {
-		return domain.ChapterNumber{}, "", fmt.Errorf("parsing chapter number from %s: %w", headline, err)
+		return fmt.Errorf("fetching %s: %w", rawURL, err)
 	}
 
-	return chapterNum, title, nil
+	if err := json.Unmarshal(body, target); err != nil {
+		return fmt.Errorf("decoding response from %s: %w", rawURL, err)
+	}
+
+	return nil
+}
+
+// asurascansSeriesSlug returns <slug> from a /comics/<slug> URL.
+// The API accepts a slug with an outdated hash suffix (the series endpoint redirects it), so old configured URLs keep working.
+func asurascansSeriesSlug(parsed *url.URL) (string, error) {
+	rest, ok := strings.CutPrefix(parsed.Path, "/comics/")
+	slug, _, _ := strings.Cut(rest, "/")
+	if !ok || len(slug) == 0 {
+		return "", fmt.Errorf("the URL for Asura Scans must point to /comics/<series>")
+	}
+
+	return slug, nil
 }
 
 func stripURLQueryAndFragment(parsed *url.URL) string {
@@ -222,37 +210,4 @@ func stripURLQueryAndFragment(parsed *url.URL) string {
 	clean.RawQuery = ""
 	clean.Fragment = ""
 	return clean.String()
-}
-
-func resolveAgainstBase(baseURL, ref string) (string, error) {
-	base, err := url.Parse(baseURL)
-	if err != nil {
-		return "", err
-	}
-
-	relative, err := url.Parse(ref)
-	if err != nil {
-		return "", err
-	}
-
-	return base.ResolveReference(relative).String(), nil
-}
-
-func dedupeStrings(values []string) []string {
-	if len(values) == 0 {
-		return nil
-	}
-
-	seen := make(map[string]struct{}, len(values))
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		if _, ok := seen[value]; ok {
-			continue
-		}
-
-		seen[value] = struct{}{}
-		result = append(result, value)
-	}
-
-	return result
 }

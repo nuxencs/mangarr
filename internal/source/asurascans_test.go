@@ -5,163 +5,77 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
-
-	"mangarr/internal/domain"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestAsurascansDiscoverParsesCurrentSeriesURL(t *testing.T) {
+// Since 2026-11-10, Cloudflare challenges every asurascans.com page, but api.asurascans.com stays public.
+func TestAsurascansReadsAPIWhenSitePagesAreChallenged(t *testing.T) {
 	t.Parallel()
-
-	const (
-		currentSeries   = "/comics/solo-max-level-newbie-7f873ca6"
-		currentChapter1 = "/comics/solo-max-level-newbie-7f873ca6/chapter/249"
-		currentChapter2 = "/comics/solo-max-level-newbie-7f873ca6/chapter/248"
-	)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case currentSeries:
-			fmt.Fprint(w, `
-				<html>
-					<body>
-						<h1>Solo Max-Level Newbie</h1>
-						<astro-island component-url="/_astro/ChapterListReact.xxx.js" props="{&quot;chapters&quot;:[1,[[0,{&quot;number&quot;:[0,249],&quot;is_locked&quot;:[0,false]}],[0,{&quot;number&quot;:[0,248],&quot;is_locked&quot;:[0,false]}]]]}" ssr>
-						<a href="`+currentChapter1+`">
-							<span>Chapter 249</span>
-							<span>Tangled Threads (2)</span>
-							<span>last week</span>
-						</a>
-						<a href="`+currentChapter2+`">
-							<span>Chapter 248</span>
-							<span>Tangled Threads (1)</span>
-							<span>two weeks ago</span>
-						</a>
-						</astro-island>
-					</body>
-				</html>
-			`)
+		case "/api/series/solo-max-level-newbie-7f873ca6":
+			fmt.Fprint(w, `{"series":{"id":1896,"slug":"solo-max-level-newbie","title":"Solo Max-Level Newbie","public_url":"/comics/solo-max-level-newbie-f212c582"},"recommended_series":[]}`)
+		case "/api/series/solo-max-level-newbie-7f873ca6/chapters":
+			fmt.Fprint(w, `{"data":[
+				{"id":262769,"series_id":1896,"number":284,"title":"Passage of Trials","slug":"chapter-284","page_count":2,"is_premium":false,"series_slug":"solo-max-level-newbie"},
+				{"id":143802,"series_id":1896,"number":0,"title":"","slug":"chapter-0","page_count":2,"is_premium":false,"series_slug":"solo-max-level-newbie"}
+			]}`)
+		case "/api/series/solo-max-level-newbie/chapters/chapter-284":
+			fmt.Fprint(w, `{"data":{"access_gate":"","chapter":{"number":284,"slug":"chapter-284","pages":[
+				{"url":"https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/284/be6022.webp?v=1794162325","width":1532,"height":1024},
+				{"url":"https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/284/0c11aa.webp?v=1794162325","width":1532,"height":1024}
+			]}}}`)
 		default:
-			http.NotFound(w, r)
+			// The challenge page that real asurascans.com pages return.
+			w.Header().Set("Cf-Mitigated", "challenge")
+			w.WriteHeader(http.StatusForbidden)
 		}
 	}))
 	defer server.Close()
 
-	src := newTestAsurascans(server.URL+currentSeries, server.URL)
+	src := newTestAsurascans(server.URL+"/comics/solo-max-level-newbie-7f873ca6", server.URL)
 
 	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, "Solo Max-Level Newbie", manga.Title)
-	require.Equal(t, server.URL+currentSeries, manga.URL)
 	require.Len(t, manga.Chapters, 2)
 
-	ch249, ok := manga.Chapters[mustChapterNumber("249")]
+	chapter284, ok := manga.Chapters[mustChapterNumber("284")]
 	require.True(t, ok)
-	require.Equal(t, "Tangled Threads (2)", ch249.Title)
-	require.Equal(t, server.URL+currentChapter1, ch249.URL)
+	require.Equal(t, "Passage of Trials", chapter284.Title)
+	require.Equal(t, server.URL+"/api/series/solo-max-level-newbie/chapters/chapter-284", chapter284.URL)
 
-	ch248, ok := manga.Chapters[mustChapterNumber("248")]
-	require.True(t, ok)
-	require.Equal(t, "Tangled Threads (1)", ch248.Title)
-	require.Equal(t, server.URL+currentChapter2, ch248.URL)
-}
-
-func TestAsurascansDiscoverSkipsLockedChapters(t *testing.T) {
-	t.Parallel()
-
-	const (
-		currentSeries  = "/comics/pick-me-up-infinite-gacha-f6174291"
-		lockedChapter  = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/194"
-		regularChapter = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/193"
-	)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case currentSeries:
-			fmt.Fprint(w, `
-				<html>
-					<body>
-						<h1>Pick Me Up, Infinite Gacha</h1>
-						<astro-island component-url="/_astro/ChapterListReact.xxx.js" props="{&quot;chapters&quot;:[1,[[0,{&quot;number&quot;:[0,194],&quot;is_locked&quot;:[0,true]}],[0,{&quot;number&quot;:[0,193],&quot;is_locked&quot;:[0,false]}]]]}" ssr>
-						<a href="`+lockedChapter+`">
-							<span>Chapter 194</span>
-							<span>Early Access Title</span>
-							<span>1 hour ago</span>
-						</a>
-						<a href="`+regularChapter+`">
-							<span>Chapter 193</span>
-							<span>Regular Title</span>
-							<span>last week</span>
-						</a>
-						</astro-island>
-					</body>
-				</html>
-			`)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-
-	src := newTestAsurascans(server.URL+currentSeries, server.URL)
-
-	manga, err := src.Discover(t.Context())
+	pages, err := src.Pages(t.Context(), chapter284)
 	require.NoError(t, err)
-	require.Equal(t, "Pick Me Up, Infinite Gacha", manga.Title)
-	require.Len(t, manga.Chapters, 1)
-
-	_, hasLocked := manga.Chapters[mustChapterNumber("194")]
-	require.False(t, hasLocked, "locked chapter 194 should be filtered out")
-
-	ch193, ok := manga.Chapters[mustChapterNumber("193")]
-	require.True(t, ok)
-	require.Equal(t, "Regular Title", ch193.Title)
+	require.Len(t, pages, 2)
+	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/284/be6022.webp?v=1794162325", pages[0].ImageURL)
+	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/284/0c11aa.webp?v=1794162325", pages[1].ImageURL)
 }
 
 func TestAsurascansDiscoverSkipsPremiumChapters(t *testing.T) {
 	t.Parallel()
 
-	const (
-		currentSeries  = "/comics/pick-me-up-infinite-gacha-f6174291"
-		premiumChapter = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/215"
-		publicChapter  = "/comics/pick-me-up-infinite-gacha-f6174291/chapter/214"
-	)
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case currentSeries:
-			fmt.Fprint(w, `
-				<html>
-					<body>
-						<h1>Pick Me Up, Infinite Gacha</h1>
-						<astro-island component-url="/_astro/ChapterListReact.xxx.js" props="{&quot;chapters&quot;:[1,[[0,{&quot;number&quot;:[0,215],&quot;is_premium&quot;:[0,true],&quot;early_access_until&quot;:[0,&quot;2026-08-19T00:00:00Z&quot;]}],[0,{&quot;number&quot;:[0,214],&quot;is_premium&quot;:[0,false]}]]]}" ssr>
-						<a href="`+premiumChapter+`">
-							<span>Chapter 215</span>
-							<span>Premium Chapter</span>
-							<span>1 hour ago</span>
-						</a>
-						<a href="`+publicChapter+`">
-							<span>Chapter 214</span>
-							<span>Public Chapter</span>
-							<span>last week</span>
-						</a>
-						</astro-island>
-					</body>
-				</html>
-			`)
+		case "/api/series/pick-me-up-infinite-gacha-f6174291":
+			fmt.Fprint(w, `{"series":{"slug":"pick-me-up-infinite-gacha","title":"Pick Me Up, Infinite Gacha"},"recommended_series":[]}`)
+		case "/api/series/pick-me-up-infinite-gacha-f6174291/chapters":
+			fmt.Fprint(w, `{"data":[
+				{"number":215,"title":"Premium Chapter","slug":"chapter-215","is_premium":true,"early_access_until":"2026-08-19T00:00:00Z","series_slug":"pick-me-up-infinite-gacha"},
+				{"number":214,"title":"Public Chapter","slug":"chapter-214","is_premium":false,"early_access_until":null,"series_slug":"pick-me-up-infinite-gacha"}
+			]}`)
 		default:
 			http.NotFound(w, r)
 		}
 	}))
 	defer server.Close()
 
-	src := newTestAsurascans(server.URL+currentSeries, server.URL)
+	src := newTestAsurascans(server.URL+"/comics/pick-me-up-infinite-gacha-f6174291", server.URL)
 
 	manga, err := src.Discover(t.Context())
 	require.NoError(t, err)
-	require.Equal(t, "Pick Me Up, Infinite Gacha", manga.Title)
 	require.Len(t, manga.Chapters, 1)
 
 	_, hasPremium := manga.Chapters[mustChapterNumber("215")]
@@ -172,96 +86,10 @@ func TestAsurascansDiscoverSkipsPremiumChapters(t *testing.T) {
 	require.Equal(t, "Public Chapter", chapter214.Title)
 }
 
-func TestAsurascansPagesExtractsChapterAssets(t *testing.T) {
-	t.Parallel()
-
-	const chapterPath = "/comics/solo-max-level-newbie-7f873ca6/chapter/249"
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case chapterPath:
-			fmt.Fprint(w, `
-				<html>
-					<body>
-						<script>
-							window.__DATA__ = {
-								pages: [
-									"https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/001.webp",
-									"https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/002.webp",
-									"https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/001.webp"
-								]
-							}
-						</script>
-					</body>
-				</html>
-			`)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-
-	src := newTestAsurascans(server.URL+chapterPath, server.URL)
-
-	chapter := domain.Chapter{
-		URL:    server.URL + chapterPath,
-		Number: mustChapterNumber("249"),
-	}
-
-	pages, err := src.Pages(t.Context(), chapter)
-	require.NoError(t, err)
-	require.Len(t, pages, 2)
-	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/001.webp", pages[0].ImageURL)
-	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters/solo-max-level-newbie/249/002.webp", pages[1].ImageURL)
-	for _, page := range pages {
-		require.Equal(t, browserUserAgent, page.RequestHeaders["User-Agent"])
-	}
-}
-
-// Some chapters, such as Solo Max-Level Newbie Ch. 0, store pages under chapters-merged/<chapter ID>/.
-func TestAsurascansPagesExtractsMergedChapterAssets(t *testing.T) {
-	t.Parallel()
-
-	const chapterPath = "/comics/solo-max-level-newbie-bd5bdaf8/chapter/0"
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case chapterPath:
-			fmt.Fprint(w, `
-				<html>
-					<body>
-						<img src="https://cdn.asurascans.com/asura-images/covers/solo-max-level-newbie.bac83f.webp" />
-						<img src="https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/001.webp?v=1791412460" />
-						<img src="https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/002.webp?v=1791412460" />
-						<img src="https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/001.webp?v=1791412460" />
-					</body>
-				</html>
-			`)
-		default:
-			http.NotFound(w, r)
-		}
-	}))
-	defer server.Close()
-
-	src := newTestAsurascans(server.URL+chapterPath, server.URL)
-
-	pages, err := src.Pages(t.Context(), domain.Chapter{
-		URL:    server.URL + chapterPath,
-		Number: mustChapterNumber("0"),
-	})
-	require.NoError(t, err)
-	require.Len(t, pages, 2)
-	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/001.webp?v=1791412460", pages[0].ImageURL)
-	require.Equal(t, "https://cdn.asurascans.com/asura-images/chapters-merged/solo-max-level-newbie/143802/002.webp?v=1791412460", pages[1].ImageURL)
-}
-
-func newTestAsurascans(mangaURL, baseURL string) *asurascans {
-	collector := newScrapeCollector(10 * time.Second)
-
+func newTestAsurascans(mangaURL, apiURL string) *asurascans {
 	return &asurascans{
-		MangaURL:  mangaURL,
-		Collector: collector,
-		BaseURL:   baseURL,
-		Client:    *http.DefaultClient,
+		MangaURL: mangaURL,
+		APIURL:   apiURL,
+		Client:   *http.DefaultClient,
 	}
 }
