@@ -44,6 +44,9 @@ read any series.
 
 - The API is not documented. Its shape can change without notice. The series
   endpoint has no `data` wrapper, but the chapter endpoints do.
+  Update 2026-11-14: about 3.5% of monitor checks failed with `getting title
+  for series`, because some API origins return the series in a `data` wrapper.
+  The adapter now reads both shapes.
 - The chapter list has no `is_locked` field. Discovery filters `is_premium`
   only. In all live samples, a chapter with a future `early_access_until` also
   had `is_premium=true`.

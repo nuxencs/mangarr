@@ -36,7 +36,7 @@ All adapters implement the small `domain.Source` contract:
 
 - unknown source values fail fast in source selection
 - `mangaplus` uses the mobile API because the web protobuf endpoint rejects current unauthenticated access; chapter discovery reads the current `chapter_list_v2` field with legacy list fields kept as fallback
-- `asurascans` reads `/api/series/<slug>` and `/api/series/<slug>/chapters` from `https://api.asurascans.com`, because Cloudflare has challenged every `asurascans.com` page since 2026-11-10. The slug comes from the configured `/comics/<slug>` URL. The API accepts a slug with an outdated hash suffix (the series endpoint redirects it to the current slug), so old URLs keep working.
+- `asurascans` reads `/api/series/<slug>` and `/api/series/<slug>/chapters` from `https://api.asurascans.com`, because Cloudflare has challenged every `asurascans.com` page since 2026-11-10. The slug comes from the configured `/comics/<slug>` URL. The API accepts a slug with an outdated hash suffix (the series endpoint redirects it to the current slug), so old URLs keep working. The series endpoint returns two shapes: some API origins wrap the series in `data` and others do not, and Cloudflare caches either one for up to 5 minutes. The adapter reads both.
 - `asurascans` removes chapters marked `is_premium=true` before returning the chapter map, and takes page image URLs from the `pages` list of `/api/series/<slug>/chapters/<chapter slug>`.
 - `weebcentral` fetches chapter images from the `/chapters/<id>/images` HTML fragment
 - `comix` implements frontend build `35595e3de3c99889c1aa70`; it generates request tokens, decodes encrypted API envelopes, sends image request headers, and reconstructs scrambled tile images

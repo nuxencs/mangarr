@@ -39,11 +39,21 @@ func NewAsurascans(mangaURL string) domain.Source {
 	}
 }
 
-// Unlike the chapter endpoints, the series endpoint has no "data" wrapper.
+type asurascansSeries struct {
+	Title string `json:"title"`
+}
+
+// Since 2026-11-10, some API origins wrap the series in "data" (like the chapter endpoints) and others do not.
+// Cloudflare caches either shape for up to 5 minutes, so read both.
 type asurascansSeriesResponse struct {
-	Series struct {
-		Title string `json:"title"`
-	} `json:"series"`
+	Series asurascansSeries `json:"series"`
+	Data   struct {
+		Series asurascansSeries `json:"series"`
+	} `json:"data"`
+}
+
+func (r asurascansSeriesResponse) title() string {
+	return strings.TrimSpace(cmp.Or(r.Data.Series.Title, r.Series.Title))
 }
 
 type asurascansChapterListResponse struct {
@@ -107,7 +117,7 @@ func (a *asurascans) Discover(ctx context.Context) (domain.Manga, error) {
 		return domain.Manga{}, fmt.Errorf("getting series %s: %w", slug, err)
 	}
 
-	title := sanitize.Filename(strings.TrimSpace(series.Series.Title))
+	title := sanitize.Filename(series.title())
 	if len(title) == 0 {
 		return domain.Manga{}, fmt.Errorf("getting title for series %s", slug)
 	}
