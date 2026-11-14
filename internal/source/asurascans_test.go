@@ -86,6 +86,50 @@ func TestAsurascansDiscoverSkipsPremiumChapters(t *testing.T) {
 	require.Equal(t, "Public Chapter", chapter214.Title)
 }
 
+// Since 2026-11-10, some API origins wrap the series response in "data", and Cloudflare caches either shape for up to 5 minutes.
+func TestAsurascansDiscoverReadsBothSeriesResponseShapes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		series string
+	}{
+		{
+			name:   "unwrapped",
+			series: `{"series":{"slug":"star-embracing-swordmaster","title":"Star-Embracing Swordmaster"},"recommended_series":[]}`,
+		},
+		{
+			name:   "data wrapper",
+			series: `{"data":{"linked_novel":{"id":5,"title":"Star-Embracing Swordmaster"},"recommended_series":[],"series":{"slug":"star-embracing-swordmaster","title":"Star-Embracing Swordmaster"}}}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/api/series/star-embracing-swordmaster-f212c582":
+					fmt.Fprint(w, tt.series)
+				case "/api/series/star-embracing-swordmaster-f212c582/chapters":
+					fmt.Fprint(w, `{"data":[{"number":146,"title":"","slug":"chapter-146","is_premium":false,"series_slug":"star-embracing-swordmaster"}]}`)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer server.Close()
+
+			src := newTestAsurascans(server.URL+"/comics/star-embracing-swordmaster-f212c582", server.URL)
+
+			manga, err := src.Discover(t.Context())
+			require.NoError(t, err)
+			require.Equal(t, "Star-Embracing Swordmaster", manga.Title)
+			require.Len(t, manga.Chapters, 1)
+		})
+	}
+}
+
 func newTestAsurascans(mangaURL, apiURL string) *asurascans {
 	return &asurascans{
 		MangaURL: mangaURL,
